@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import selectinload
+import logging
 
 from models import db, User, Wine, Cellar, CellarFloor, WineConsumption
 from config import Config
@@ -20,6 +21,13 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     db.init_app(app)
+    
+    # Configuration du logging pour afficher les logs INFO et DEBUG
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    app.logger.setLevel(logging.INFO)
 
     login_manager = LoginManager(app)
     login_manager.login_view = "login"
