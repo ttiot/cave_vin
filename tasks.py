@@ -15,8 +15,6 @@ from services.wine_info_service import InsightData, WineInfoService
 logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wine-info")
-_service = WineInfoService()
-
 
 def schedule_wine_enrichment(wine_id: int) -> None:
     """Launch an asynchronous job that fetches contextual data for a wine."""
@@ -33,7 +31,9 @@ def _run_enrichment(app, wine_id: int) -> None:
             return
 
         logger.info("Starting enrichment for wine %s", wine.name)
-        insights = _service.fetch(wine)
+
+        service = WineInfoService.from_app(app)
+        insights = service.fetch(wine)
         if not insights:
             logger.info("No insights available for wine %s", wine.name)
             return

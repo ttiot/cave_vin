@@ -10,6 +10,8 @@ from typing import Iterable, List, Optional
 
 import requests
 
+from .openai_client import OpenAIClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,10 +28,23 @@ class InsightData:
 
 
 class WineInfoService:
-    """Aggregate data from public APIs (Wikipedia, DuckDuckGo, …)."""
+    """Aggregate data from public APIs (Wikipedia, DuckDuckGo, OpenAI, …)."""
 
-    def __init__(self, session: Optional[requests.Session] = None):
+    def __init__(
+        self,
+        session: Optional[requests.Session] = None,
+        *,
+        openai_client: Optional[OpenAIClient] = None,
+    ) -> None:
         self.session = session or requests.Session()
+        self.openai_client = openai_client
+
+    @classmethod
+    def from_app(cls, app) -> "WineInfoService":
+        """Factory that uses the Flask app configuration to bootstrap providers."""
+
+        openai_client = OpenAIClient.from_config(app.config)
+        return cls(openai_client=openai_client)
 
     # ------------------------------------------------------------------
     # Public API
@@ -44,11 +59,19 @@ class WineInfoService:
         logger.info("Fetching contextual data for wine %s", query)
         insights: List[InsightData] = []
 
-        for provider in (self._wikipedia_insights, self._duckduckgo_insights):
+        providers = [
+            ("wikipedia", lambda: self._wikipedia_insights(query)),
+            ("duckduckgo", lambda: self._duckduckgo_insights(query)),
+        ]
+
+        if self.openai_client and self.openai_client.is_available:
+            providers.append(("openai", lambda: self._openai_insights(wine, query)))
+
+        for provider_name, provider_callable in providers:
             try:
-                insights.extend(provider(query))
+                insights.extend(provider_callable())
             except Exception:  # pragma: no cover - defensive logging
-                logger.exception("Provider %s failed for %s", provider.__name__, query)
+                logger.exception("Provider %s failed for %s", provider_name, query)
 
         return self._deduplicate(insights)
 
@@ -185,6 +208,107 @@ class WineInfoService:
                     source_name="DuckDuckGo",
                     source_url=abstract_url,
                     weight=3,
+                )
+            )
+
+        return insights
+
+    def _openai_insights(self, wine, query: str) -> Iterable[InsightData]:
+        if not self.openai_client or not self.openai_client.is_available:
+            return []
+
+        details = [f"Nom: {wine.name}"]
+        if getattr(wine, "year", None):
+            details.append(f"Millésime: {wine.year}")
+        if getattr(wine, "region", None):
+            details.append(f"Région: {wine.region}")
+        if getattr(wine, "grape", None):
+            details.append(f"Cépage: {wine.grape}")
+        if getattr(wine, "description", None):
+            details.append(
+                f"Description utilisateur: {self._truncate(str(wine.description), 280)}"
+            )
+        if getattr(wine, "cellar", None):
+            details.append(f"Cave: {wine.cellar.name}")
+        details.append(f"Requête utilisée: {query}")
+
+        system_prompt = (
+            "Tu es un assistant sommelier chargé d'enrichir la fiche d'un vin. "
+            "Tu réponds exclusivement en français et fournis des informations fiables, "
+            "concis, adaptées à un public de passionnés."
+        )
+
+        user_prompt = (
+            "Voici les informations connues sur le vin :\n"
+            + "\n".join(f"- {line}" for line in details if line)
+            + "\n\n"
+            "Complète avec 3 à 5 éclairages distincts (histoire du domaine, profil aromatique, accords mets et vins, potentiel de garde, etc.). "
+            "Chaque éclairage doit tenir en 2 à 4 phrases maximum."
+            "Structure ta réponse au format JSON selon le schéma demandé, sans texte additionnel."
+        )
+
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "insights": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "category": {"type": "string"},
+                            "title": {"type": "string"},
+                            "content": {"type": "string"},
+                            "source": {"type": "string"},
+                            "weight": {"type": "integer"},
+                        },
+                        "required": ["content"],
+                    },
+                }
+            },
+            "required": ["insights"],
+        }
+
+        payload = self.openai_client.generate_json(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            schema=schema,
+            temperature=0.25,
+            max_output_tokens=900,
+        )
+
+        if not payload:
+            return []
+
+        items = payload.get("insights") or []
+        insights: List[InsightData] = []
+        for index, item in enumerate(items[:5]):
+            raw_content = (item.get("content") or "").strip()
+            if not raw_content:
+                continue
+
+            category = (item.get("category") or "").strip() or "analyse"
+            title = (item.get("title") or "").strip() or None
+            source_name = (item.get("source") or self.openai_client.source_name).strip() or self.openai_client.source_name
+
+            weight = item.get("weight")
+            try:
+                weight_value = int(weight)
+            except (TypeError, ValueError):
+                weight_value = max(1, 10 - index)
+            weight_value = max(1, min(10, weight_value))
+
+            insights.append(
+                InsightData(
+                    category=category,
+                    title=title,
+                    content=self._truncate(raw_content, 900),
+                    source_name=source_name,
+                    source_url=None,
+                    weight=weight_value,
                 )
             )
 
