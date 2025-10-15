@@ -332,6 +332,68 @@ def create_app():
             return redirect(url_for('list_cellars'))
 
         return render_template('add_cellar.html', floor_capacities=[''])
+    @app.route('/cellars/<int:cellar_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    def edit_cellar(cellar_id):
+        """Modifier une cave existante."""
+        cellar = Cellar.query.get_or_404(cellar_id)
+        
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            cellar_type = request.form.get('cellar_type')
+            raw_floor_capacities = [value.strip() for value in request.form.getlist('floor_capacities')]
+            floor_capacities = []
+            invalid_capacity = False
+            
+            for raw_capacity in raw_floor_capacities:
+                if not raw_capacity:
+                    invalid_capacity = True
+                    break
+                try:
+                    capacity_value = int(raw_capacity)
+                except (TypeError, ValueError):
+                    invalid_capacity = True
+                    break
+                if capacity_value <= 0:
+                    invalid_capacity = True
+                    break
+                floor_capacities.append(capacity_value)
+            
+            if not name:
+                flash("Le nom de la cave est obligatoire.")
+                return render_template('edit_cellar.html', cellar=cellar)
+            
+            if cellar_type not in {'naturelle', 'electrique'}:
+                flash("Veuillez sélectionner un type de cave valide.")
+                return render_template('edit_cellar.html', cellar=cellar)
+            
+            if not floor_capacities or invalid_capacity:
+                flash("Veuillez indiquer un nombre de bouteilles positif pour chaque étage.")
+                return render_template('edit_cellar.html', cellar=cellar)
+            
+            # Mettre à jour les informations de base
+            cellar.name = name
+            cellar.cellar_type = cellar_type
+            cellar.floor_count = len(floor_capacities)
+            cellar.bottles_per_floor = max(floor_capacities)
+            
+            # Supprimer les anciens niveaux et créer les nouveaux
+            # Utiliser list() pour éviter les problèmes de modification pendant l'itération
+            for level in list(cellar.levels):
+                db.session.delete(level)
+            
+            # Flush pour s'assurer que les suppressions sont effectuées avant les insertions
+            db.session.flush()
+            
+            for index, capacity in enumerate(floor_capacities, start=1):
+                cellar.levels.append(CellarFloor(level=index, capacity=capacity))
+            
+            db.session.commit()
+            flash('Cave modifiée avec succès.')
+            return redirect(url_for('list_cellars'))
+        
+        return render_template('edit_cellar.html', cellar=cellar)
+
 
     @app.route('/add', methods=['GET', 'POST'])
     @login_required

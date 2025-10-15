@@ -21,6 +21,11 @@
         <p class="card-text">Capacité totale : {{ cellar.capacity }}</p>
         <small class="text-muted">Vins stockés : {{ cellar.wines.count() }}</small>
       </div>
+      <div class="card-footer bg-transparent border-0 pt-0">
+        <a href="{{ url_for('edit_cellar', cellar_id=cellar.id) }}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-pencil"></i> Modifier
+        </a>
+      </div>
     </div>
   </div>
   {% endfor %}
