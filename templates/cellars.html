@@ -12,8 +12,13 @@
       <div class="card-body">
         <h5 class="card-title">{{ cellar.name }}</h5>
         <p class="card-text mb-1">Type : {{ 'Naturelle' if cellar.cellar_type == 'naturelle' else 'Électrique' }}</p>
-        <p class="card-text mb-0">Étages : {{ cellar.floors }}</p>
-        <p class="card-text">Bouteilles / étage : {{ cellar.bottles_per_floor }} (Capacité totale : {{ cellar.capacity }})</p>
+        <p class="card-text mb-1">Étages : {{ cellar.floors }}</p>
+        <ul class="list-unstyled small mb-2">
+          {% for index, capacity in cellar.floor_breakdown %}
+          <li>Étage {{ index }} : {{ capacity }} bouteilles</li>
+          {% endfor %}
+        </ul>
+        <p class="card-text">Capacité totale : {{ cellar.capacity }}</p>
         <small class="text-muted">Vins stockés : {{ cellar.wines.count() }}</small>
       </div>
     </div>

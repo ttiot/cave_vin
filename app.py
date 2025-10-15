@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Wine, Cellar
+from models import db, User, Wine, Cellar, CellarFloor
 from config import Config
 import requests
 
@@ -128,14 +128,27 @@ def create_app():
         if request.method == 'POST':
             name = (request.form.get('name') or '').strip()
             cellar_type = request.form.get('cellar_type')
-            floors = request.form.get('floors', type=int)
-            bottles_per_floor = request.form.get('bottles_per_floor', type=int)
+            raw_floor_capacities = [value.strip() for value in request.form.getlist('floor_capacities')]
+            floor_capacities = []
+            invalid_capacity = False
+            for raw_capacity in raw_floor_capacities:
+                if not raw_capacity:
+                    invalid_capacity = True
+                    break
+                try:
+                    capacity_value = int(raw_capacity)
+                except (TypeError, ValueError):
+                    invalid_capacity = True
+                    break
+                if capacity_value <= 0:
+                    invalid_capacity = True
+                    break
+                floor_capacities.append(capacity_value)
 
             context = {
                 'name': name,
                 'cellar_type': cellar_type,
-                'floors': floors,
-                'bottles_per_floor': bottles_per_floor,
+                'floor_capacities': raw_floor_capacities,
             }
 
             if not name:
@@ -146,20 +159,22 @@ def create_app():
                 flash("Veuillez sélectionner un type de cave valide.")
                 return render_template('add_cellar.html', **context)
 
-            if not floors or floors <= 0 or not bottles_per_floor or bottles_per_floor <= 0:
-                flash("Les nombres d'étages et de bouteilles par étage doivent être positifs.")
+            if not floor_capacities or invalid_capacity:
+                flash("Veuillez indiquer un nombre de bouteilles positif pour chaque étage.")
                 return render_template('add_cellar.html', **context)
 
             cellar = Cellar(name=name,
                             cellar_type=cellar_type,
-                            floors=floors,
-                            bottles_per_floor=bottles_per_floor)
+                            floor_count=len(floor_capacities),
+                            bottles_per_floor=max(floor_capacities))
+            for index, capacity in enumerate(floor_capacities, start=1):
+                cellar.levels.append(CellarFloor(level=index, capacity=capacity))
             db.session.add(cellar)
             db.session.commit()
             flash('Cave créée avec succès.')
             return redirect(url_for('list_cellars'))
 
-        return render_template('add_cellar.html')
+        return render_template('add_cellar.html', floor_capacities=[''])
 
     @app.route('/add', methods=['GET', 'POST'])
     @login_required
