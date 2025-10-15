@@ -116,9 +116,40 @@ def _create_wine_insight_table(connection: Connection) -> None:
     )
 
 
+def _create_wine_consumption_table(connection: Connection) -> None:
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS wine_consumption (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                wine_id INTEGER NOT NULL,
+                consumed_at DATETIME NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                snapshot_name VARCHAR(120) NOT NULL,
+                snapshot_year INTEGER,
+                snapshot_region VARCHAR(120),
+                snapshot_grape VARCHAR(80),
+                snapshot_cellar VARCHAR(120),
+                CONSTRAINT fk_wine_consumption_wine FOREIGN KEY(wine_id) REFERENCES wine(id) ON DELETE CASCADE
+            )
+            """
+        )
+    )
+
+    connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_wine_consumption_wine_id
+            ON wine_consumption (wine_id)
+            """
+        )
+    )
+
+
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
     ("0002_create_wine_insight", _create_wine_insight_table),
+    ("0003_create_wine_consumption", _create_wine_consumption_table),
 )
 
 

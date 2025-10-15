@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   initBarcodeScanner();
   initWineCards();
+  initWineActions();
 });
 
 function initBarcodeScanner() {
@@ -88,11 +89,25 @@ function initWineCards() {
     });
 
     card.addEventListener('click', (event) => {
+      if (event.target.closest('.wine-action-form')) {
+        return;
+      }
       const url = card.dataset.detailUrl;
       if (url) {
         event.preventDefault();
         popover.hide();
         window.location.href = url;
+      }
+    });
+  });
+}
+
+function initWineActions() {
+  document.querySelectorAll('.wine-action-form[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      const message = form.getAttribute('data-confirm');
+      if (message && !window.confirm(message)) {
+        event.preventDefault();
       }
     });
   });

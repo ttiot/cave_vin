@@ -80,7 +80,13 @@ class Wine(db.Model):
         "WineInsight",
         back_populates="wine",
         cascade="all, delete-orphan",
-        order_by="WineInsight.weight.desc(), WineInsight.created_at.desc()",
+        order_by="WineInsight.weight DESC, WineInsight.created_at DESC",
+    )
+    consumptions = db.relationship(
+        "WineConsumption",
+        back_populates="wine",
+        cascade="all, delete-orphan",
+        order_by="WineConsumption.consumed_at.desc()",
     )
 
     def preview_insights(self, limit: int = 2) -> list[dict[str, str]]:
@@ -125,3 +131,25 @@ class WineInsight(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class WineConsumption(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    wine_id = db.Column(db.Integer, db.ForeignKey("wine.id"), nullable=False, index=True)
+    consumed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    quantity = db.Column(db.Integer, default=1, nullable=False)
+    snapshot_name = db.Column(db.String(120), nullable=False)
+    snapshot_year = db.Column(db.Integer)
+    snapshot_region = db.Column(db.String(120))
+    snapshot_grape = db.Column(db.String(80))
+    snapshot_cellar = db.Column(db.String(120))
+
+    wine = db.relationship("Wine", back_populates="consumptions")
+
+    def describe(self) -> str:
+        parts: list[str] = [self.snapshot_name]
+        if self.snapshot_year:
+            parts.append(str(self.snapshot_year))
+        if self.snapshot_region:
+            parts.append(self.snapshot_region)
+        return " — ".join(parts)

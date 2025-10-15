@@ -3,11 +3,18 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import selectinload
 
-from models import db, User, Wine, Cellar, CellarFloor
+from models import db, User, Wine, Cellar, CellarFloor, WineConsumption
 from config import Config
 import requests
 from migrations import run_migrations
 from tasks import schedule_wine_enrichment
+
+
+def _resolve_redirect(default_endpoint: str) -> str:
+    target = (request.form.get('redirect') or '').strip()
+    if target.startswith('/'):
+        return target
+    return url_for(default_endpoint)
 
 def create_app():
     app = Flask(__name__)
@@ -122,6 +129,7 @@ def create_app():
                 selectinload(Wine.cellar),
                 selectinload(Wine.insights),
             )
+            .filter(Wine.quantity > 0)
             .order_by(Wine.name.asc())
             .all()
         )
@@ -248,11 +256,63 @@ def create_app():
             Wine.query.options(
                 selectinload(Wine.cellar),
                 selectinload(Wine.insights),
+                selectinload(Wine.consumptions),
             )
             .filter_by(id=wine_id)
             .first_or_404()
         )
         return render_template('wine_detail.html', wine=wine)
+
+    @app.route('/wines/<int:wine_id>/refresh', methods=['POST'])
+    @login_required
+    def refresh_wine(wine_id):
+        wine = Wine.query.get_or_404(wine_id)
+        schedule_wine_enrichment(wine.id)
+        flash("La récupération des informations a été relancée.")
+        return redirect(_resolve_redirect('index'))
+
+    @app.route('/wines/<int:wine_id>/consume', methods=['POST'])
+    @login_required
+    def consume_wine(wine_id):
+        wine = Wine.query.get_or_404(wine_id)
+        if wine.quantity <= 0:
+            flash("Ce vin n'est plus disponible dans la cave.")
+            return redirect(_resolve_redirect('index'))
+
+        wine.quantity -= 1
+        consumption = WineConsumption(
+            wine=wine,
+            quantity=1,
+            snapshot_name=wine.name,
+            snapshot_year=wine.year,
+            snapshot_region=wine.region,
+            snapshot_grape=wine.grape,
+            snapshot_cellar=wine.cellar.name if wine.cellar else None,
+        )
+        db.session.add(consumption)
+        db.session.commit()
+
+        flash("Une bouteille a été marquée comme consommée.")
+        return redirect(_resolve_redirect('index'))
+
+    @app.route('/wines/<int:wine_id>/delete', methods=['POST'])
+    @login_required
+    def delete_wine(wine_id):
+        wine = Wine.query.get_or_404(wine_id)
+        db.session.delete(wine)
+        db.session.commit()
+        flash("Le vin a été supprimé de votre cave.")
+        return redirect(_resolve_redirect('index'))
+
+    @app.route('/consommations', methods=['GET'])
+    @login_required
+    def consumption_history():
+        consumptions = (
+            WineConsumption.query.options(selectinload(WineConsumption.wine))
+            .order_by(WineConsumption.consumed_at.desc())
+            .all()
+        )
+        return render_template('consumption_history.html', consumptions=consumptions)
 
     return app
 
