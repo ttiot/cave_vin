@@ -46,7 +46,7 @@
         
         {% if wine.subcategory %}
         <p class="mb-2">
-          <span class="badge text-bg-primary">{{ wine.subcategory.name }}</span>
+          <span class="badge {{ wine.subcategory|category_badge_class }}">{{ wine.subcategory.name }}</span>
         </p>
         {% endif %}
         

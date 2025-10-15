@@ -75,7 +75,7 @@
         <h5 class="card-title">{{ wine.name }}</h5>
         {% if wine.subcategory %}
         <p class="mb-1">
-          <span class="badge text-bg-primary">{{ wine.subcategory.name }}</span>
+          <span class="badge {{ wine.subcategory|category_badge_class }}">{{ wine.subcategory.name }}</span>
         </p>
         {% endif %}
         <p class="card-text">

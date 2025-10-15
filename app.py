@@ -18,10 +18,122 @@ def _resolve_redirect(default_endpoint: str) -> str:
         return target
     return url_for(default_endpoint)
 
+def get_category_badge_class(subcategory):
+    """Retourne la classe CSS appropriée pour le badge de sous-catégorie."""
+    if not subcategory:
+        return 'badge-default'
+    
+    # Normaliser le nom de la sous-catégorie (minuscules, sans accents pour la recherche)
+    import unicodedata
+    subcategory_name = subcategory.name.lower()
+    # Retirer les accents pour la recherche
+    subcategory_normalized = ''.join(
+        c for c in unicodedata.normalize('NFD', subcategory_name)
+        if unicodedata.category(c) != 'Mn'
+    )
+    
+    # Mapper les sous-catégories aux classes CSS
+    # On cherche d'abord des correspondances exactes, puis partielles
+    subcategory_map = {
+        # Vins
+        'vin rouge': 'badge-vin-rouge',
+        'red wine': 'badge-red-wine',
+        'rouge': 'badge-vin-rouge',
+        'vin blanc': 'badge-vin-blanc',
+        'white wine': 'badge-white-wine',
+        'blanc': 'badge-vin-blanc',
+        'vin rose': 'badge-vin-rose',
+        'rose wine': 'badge-rose-wine',
+        'rose': 'badge-vin-rose',
+        'rosé': 'badge-rosé',
+        'vin orange': 'badge-vin-orange',
+        'orange wine': 'badge-orange-wine',
+        'orange': 'badge-vin-orange',
+        
+        # Champagnes et effervescents
+        'champagne': 'badge-champagne',
+        'cremant': 'badge-cremant',
+        'crémant': 'badge-crémant',
+        'prosecco': 'badge-prosecco',
+        'cava': 'badge-cava',
+        'mousseux': 'badge-mousseux',
+        
+        # Whiskies
+        'whisky': 'badge-whisky',
+        'scotch': 'badge-scotch',
+        'bourbon': 'badge-bourbon',
+        'irish whiskey': 'badge-irish-whiskey',
+        
+        # Rhums
+        'rhum blanc': 'badge-rhum-blanc',
+        'rhum ambre': 'badge-rhum-ambré',
+        'rhum vieux': 'badge-rhum-vieux',
+        'rhum': 'badge-rhum',
+        
+        # Autres spiritueux
+        'cognac': 'badge-cognac',
+        'armagnac': 'badge-armagnac',
+        'vodka': 'badge-vodka',
+        'gin': 'badge-gin',
+        'tequila': 'badge-tequila',
+        'mezcal': 'badge-mezcal',
+        
+        # Bières
+        'biere blonde': 'badge-bière-blonde',
+        'bière blonde': 'badge-bière-blonde',
+        'blonde': 'badge-bière-blonde',
+        'biere brune': 'badge-bière-brune',
+        'bière brune': 'badge-bière-brune',
+        'brune': 'badge-bière-brune',
+        'biere blanche': 'badge-bière-blanche',
+        'bière blanche': 'badge-bière-blanche',
+        'blanche': 'badge-bière-blanche',
+        'biere ambree': 'badge-bière-ambrée',
+        'bière ambrée': 'badge-bière-ambrée',
+        'ambree': 'badge-bière-ambrée',
+        'ipa': 'badge-ipa',
+        'stout': 'badge-stout',
+        'porter': 'badge-porter',
+        
+        # Liqueurs
+        'liqueur': 'badge-liqueur',
+        'creme': 'badge-crème',
+        'crème': 'badge-crème',
+        
+        # Apéritifs
+        'aperitif': 'badge-apéritif',
+        'apéritif': 'badge-apéritif',
+        'vermouth': 'badge-vermouth',
+        'pastis': 'badge-pastis',
+        'porto': 'badge-porto',
+        
+        # Saké
+        'sake': 'badge-sake',
+        'saké': 'badge-saké',
+        
+        # Cidres
+        'cidre': 'badge-cidre',
+        'cider': 'badge-cider',
+    }
+    
+    # Chercher une correspondance exacte d'abord
+    if subcategory_normalized in subcategory_map:
+        return subcategory_map[subcategory_normalized]
+    
+    # Chercher une correspondance partielle
+    for key, css_class in subcategory_map.items():
+        if key in subcategory_normalized:
+            return css_class
+    
+    return 'badge-default'
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     db.init_app(app)
+    
+    # Enregistrer le filtre Jinja2 pour les couleurs de badges
+    app.jinja_env.filters['category_badge_class'] = get_category_badge_class
     
     # Configuration du logging pour afficher les logs INFO et DEBUG
     logging.basicConfig(
