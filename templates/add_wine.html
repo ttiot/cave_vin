@@ -3,6 +3,17 @@
 <h3>Ajouter un vin</h3>
 <form method="POST">
   <div class="mb-3">
+    <label class="form-label">Cave</label>
+    <select class="form-select" name="cellar_id" required>
+      <option value="" disabled {% if not selected_cellar_id %}selected{% endif %}>Sélectionnez une cave</option>
+      {% for cellar in cellars %}
+      <option value="{{ cellar.id }}" {% if selected_cellar_id==cellar.id %}selected{% endif %}>
+        {{ cellar.name }} — {{ 'Naturelle' if cellar.cellar_type == 'naturelle' else 'Électrique' }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
     <label class="form-label">Nom du vin</label>
     <input type="text" class="form-control" name="name" placeholder="Ex: Château Margaux">
   </div>

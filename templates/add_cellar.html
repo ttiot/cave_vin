@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Créer une cave</h3>
+<form method="POST" class="mt-3">
+  <div class="mb-3">
+    <label class="form-label">Nom de la cave</label>
+    <input type="text" class="form-control" name="name" value="{{ name or '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Type de cave</label>
+    <select class="form-select" name="cellar_type" required>
+      <option value="" disabled {% if not cellar_type %}selected{% endif %}>Sélectionnez un type</option>
+      <option value="naturelle" {% if cellar_type == 'naturelle' %}selected{% endif %}>Cave naturelle</option>
+      <option value="electrique" {% if cellar_type == 'electrique' %}selected{% endif %}>Cave électrique de conservation</option>
+    </select>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Nombre d'étages</label>
+      <input type="number" class="form-control" name="floors" min="1" value="{{ floors or '' }}" required>
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Bouteilles par étage</label>
+      <input type="number" class="form-control" name="bottles_per_floor" min="1" value="{{ bottles_per_floor or '' }}" required>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-dark w-100">Enregistrer</button>
+</form>
+{% endblock %}
