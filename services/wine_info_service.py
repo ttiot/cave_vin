@@ -265,7 +265,7 @@ class WineInfoService:
                             "source": {"type": "string"},
                             "weight": {"type": "integer"},
                         },
-                        "required": ["content"],
+                        "required": ["category", "title", "content", "source", "weight"],
                     },
                 }
             },
@@ -276,7 +276,6 @@ class WineInfoService:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             schema=schema,
-            temperature=0.25,
             max_output_tokens=900,
         )
 

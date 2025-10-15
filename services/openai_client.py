@@ -23,6 +23,7 @@ class OpenAIClient:
     #: Preference order used when an API key is provided. The first model found in
     #: the list is picked if no explicit choice is configured by the user.
     _PREFERRED_MODELS: tuple[str, ...] = (
+        "gpt-5-mini",
         "gpt-4.1-mini",
         "gpt-4o-mini",
         "gpt-4.1",
@@ -112,7 +113,6 @@ class OpenAIClient:
         user_prompt: str,
         schema: dict,
         model: Optional[str] = None,
-        temperature: float = 0.3,
         max_output_tokens: int = 800,
     ) -> Optional[dict]:
         """Generate a JSON payload according to the provided schema."""
@@ -130,22 +130,22 @@ class OpenAIClient:
             "input": [
                 {
                     "role": "system",
-                    "content": [
-                        {"type": "text", "text": system_prompt.strip()},
-                    ],
+                    "type": "message",
+                    "content": system_prompt.strip(),
                 },
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_prompt.strip()},
-                    ],
+                    "type": "message",
+                    "content": user_prompt.strip(),
                 },
             ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": "wine_enrichment", "schema": schema},
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "wine_enrichment",
+                    "schema": schema,
+                }
             },
-            "temperature": temperature,
             "max_output_tokens": max_output_tokens,
         }
 

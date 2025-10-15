@@ -80,7 +80,7 @@ class Wine(db.Model):
         "WineInsight",
         back_populates="wine",
         cascade="all, delete-orphan",
-        order_by="WineInsight.weight DESC, WineInsight.created_at DESC",
+        order_by="WineInsight.weight.desc(), WineInsight.created_at.desc()",
     )
 
     def preview_insights(self, limit: int = 2) -> list[dict[str, str]]:
