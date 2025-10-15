@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, desc
 
 db = SQLAlchemy()
 
@@ -80,13 +80,13 @@ class Wine(db.Model):
         "WineInsight",
         back_populates="wine",
         cascade="all, delete-orphan",
-        order_by="WineInsight.weight DESC, WineInsight.created_at DESC",
+        order_by="desc(WineInsight.weight), desc(WineInsight.created_at)",
     )
     consumptions = db.relationship(
         "WineConsumption",
         back_populates="wine",
         cascade="all, delete-orphan",
-        order_by="WineConsumption.consumed_at.desc()",
+        order_by="desc(WineConsumption.consumed_at)",
     )
 
     def preview_insights(self, limit: int = 2) -> list[dict[str, str]]:
