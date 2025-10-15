@@ -248,14 +248,30 @@ def create_app():
         wines = (
             Wine.query.options(
                 selectinload(Wine.cellar),
+                selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
                 selectinload(Wine.insights),
             )
             .filter(Wine.quantity > 0)
-            .order_by(Wine.name.asc())
+            .order_by(Wine.cellar_id.asc(), Wine.subcategory_id.asc(), Wine.name.asc())
             .all()
         )
         cellars = Cellar.query.order_by(Cellar.name.asc()).all()
-        return render_template('index.html', wines=wines, cellars=cellars)
+        
+        # Organiser les vins par cave
+        wines_by_cellar = {}
+        for wine in wines:
+            cellar_name = wine.cellar.name if wine.cellar else "Sans cave"
+            if cellar_name not in wines_by_cellar:
+                wines_by_cellar[cellar_name] = {}
+            
+            # Organiser par type (sous-catégorie)
+            subcategory_name = wine.subcategory.name if wine.subcategory else "Non catégorisé"
+            if subcategory_name not in wines_by_cellar[cellar_name]:
+                wines_by_cellar[cellar_name][subcategory_name] = []
+            
+            wines_by_cellar[cellar_name][subcategory_name].append(wine)
+        
+        return render_template('index.html', wines_by_cellar=wines_by_cellar, cellars=cellars)
 
     @app.route('/cellars', methods=['GET'])
     @login_required

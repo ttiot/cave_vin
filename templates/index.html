@@ -7,54 +7,68 @@
 {% if not cellars %}
 <div class="alert alert-warning">Vous n'avez pas encore de cave. <a href="{{ url_for('add_cellar') }}" class="alert-link">Créez-en une</a> pour commencer à ajouter des bouteilles.</div>
 {% endif %}
-<div class="row row-cols-1 row-cols-md-3 g-4">
-  {% for wine in wines %}
-  <div class="col">
-    <div class="card shadow-sm h-100 wine-card"
-         data-detail-url="{{ url_for('wine_detail', wine_id=wine.id) }}"
-         data-wine-preview='{{ wine.preview_insights()|tojson }}'>
-      {% if wine.image_url %}
-      <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
-      {% endif %}
-      <div class="card-body">
-        <h5 class="card-title">{{ wine.name }}</h5>
-        {% if wine.subcategory %}
-        <p class="mb-1">
-          <span class="badge {{ wine.subcategory|category_badge_class }}">{{ wine.subcategory.name }}</span>
-        </p>
-        {% endif %}
-        <p class="card-text">
-          {{ wine.region or 'Région inconnue' }}{% if wine.year %} — {{ wine.year }}{% endif %}<br>
-          Cépage : {{ wine.grape or 'Inconnu' }}
-        </p>
-        {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
-      </div>
-      <div class="card-footer bg-white">
-        <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
-        <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
-      </div>
-      <div class="card-actions border-top bg-light p-3">
-        <div class="btn-group d-flex" role="group">
-          <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
-            <input type="hidden" name="redirect" value="{{ request.path }}">
-            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
-          </form>
-          <form method="post" action="{{ url_for('refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
-            <input type="hidden" name="redirect" value="{{ request.path }}">
-            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
-          </form>
-          <form method="post" action="{{ url_for('delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
-            <input type="hidden" name="redirect" value="{{ request.path }}">
-            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
-          </form>
+
+{% if wines_by_cellar %}
+  {% for cellar_name, wines_by_type in wines_by_cellar.items() %}
+  <div class="mb-5">
+    <h4 class="mb-3 pb-2 border-bottom">
+      <i class="bi bi-archive"></i> {{ cellar_name }}
+    </h4>
+    
+    {% for subcategory_name, wines in wines_by_type.items() %}
+    <div class="mb-4">
+      <h5 class="mb-3 text-muted">{{ subcategory_name }}</h5>
+      <div class="row row-cols-1 row-cols-md-3 g-4">
+        {% for wine in wines %}
+        <div class="col">
+          <div class="card shadow-sm h-100 wine-card"
+               data-detail-url="{{ url_for('wine_detail', wine_id=wine.id) }}"
+               data-wine-preview='{{ wine.preview_insights()|tojson }}'>
+            {% if wine.image_url %}
+            <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
+            {% endif %}
+            <div class="card-body">
+              <h5 class="card-title">{{ wine.name }}</h5>
+              {% if wine.subcategory %}
+              <p class="mb-1">
+                <span class="badge {{ wine.subcategory|category_badge_class }}">{{ wine.subcategory.name }}</span>
+              </p>
+              {% endif %}
+              <p class="card-text">
+                {{ wine.region or 'Région inconnue' }}{% if wine.year %} — {{ wine.year }}{% endif %}<br>
+                Cépage : {{ wine.grape or 'Inconnu' }}
+              </p>
+              {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
+            </div>
+            <div class="card-footer bg-white">
+              <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
+              <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
+            </div>
+            <div class="card-actions border-top bg-light p-3">
+              <div class="btn-group d-flex" role="group">
+                <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                  <input type="hidden" name="redirect" value="{{ request.path }}">
+                  <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
+                </form>
+                <form method="post" action="{{ url_for('refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                  <input type="hidden" name="redirect" value="{{ request.path }}">
+                  <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
+                </form>
+                <form method="post" action="{{ url_for('delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+                  <input type="hidden" name="redirect" value="{{ request.path }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
+        {% endfor %}
       </div>
     </div>
-  </div>
-  {% else %}
-  <div class="col">
-    <div class="alert alert-secondary">Aucun vin pour le moment. Ajoutez votre premier vin !</div>
+    {% endfor %}
   </div>
   {% endfor %}
-</div>
+{% else %}
+  <div class="alert alert-secondary">Aucun vin pour le moment. Ajoutez votre premier vin !</div>
+{% endif %}
 {% endblock %}
