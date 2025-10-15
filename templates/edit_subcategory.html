@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Modifier la sous-catégorie</h3>
+<p class="text-muted">Catégorie : {{ subcategory.category.name }}</p>
+<form method="POST">
+  <div class="mb-3">
+    <label class="form-label">Nom de la sous-catégorie</label>
+    <input type="text" class="form-control" name="name" value="{{ subcategory.name }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    <textarea class="form-control" name="description" rows="2">{{ subcategory.description or '' }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Ordre d'affichage</label>
+    <input type="number" class="form-control" name="display_order" value="{{ subcategory.display_order }}" min="0">
+    <div class="form-text">Les sous-catégories sont triées par ordre croissant (0 = premier)</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-dark">Enregistrer</button>
+    <a href="{{ url_for('list_categories') }}" class="btn btn-secondary">Annuler</a>
+  </div>
+</form>
+{% endblock %}

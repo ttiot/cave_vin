@@ -14,7 +14,21 @@
     </select>
   </div>
   <div class="mb-3">
-    <label class="form-label">Nom du vin</label>
+    <label class="form-label">Type d'alcool</label>
+    <select class="form-select" name="subcategory_id" id="subcategory_id">
+      <option value="">Non spécifié</option>
+      {% for category in categories %}
+        <optgroup label="{{ category.name }}">
+          {% for subcategory in category.subcategories %}
+            <option value="{{ subcategory.id }}">{{ subcategory.name }}</option>
+          {% endfor %}
+        </optgroup>
+      {% endfor %}
+    </select>
+    <div class="form-text">Sélectionnez le type d'alcool (vin rouge, rhum ambré, etc.)</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Nom</label>
     <input type="text" class="form-control" name="name" placeholder="Ex: Château Margaux">
   </div>
   <div class="row">
@@ -28,11 +42,15 @@
     </div>
   </div>
   <div class="row">
-    <div class="col-md-6 mb-3">
+    <div class="col-md-4 mb-3">
       <label class="form-label">Année</label>
       <input type="number" class="form-control" name="year" min="1900" max="2100">
     </div>
-    <div class="col-md-6 mb-3">
+    <div class="col-md-4 mb-3">
+      <label class="form-label">Quantité</label>
+      <input type="number" class="form-control" name="quantity" min="1" value="1" required>
+    </div>
+    <div class="col-md-4 mb-3">
       <label class="form-label">Code-barres</label>
       <div class="input-group">
         <input type="text" class="form-control" id="barcode" name="barcode" placeholder="EAN/UPC">

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3>Catégories d'alcools</h3>
+  <a href="{{ url_for('add_category') }}" class="btn btn-dark">+ Nouvelle catégorie</a>
+</div>
+
+{% if not categories %}
+<div class="alert alert-info">
+  Aucune catégorie définie. Créez-en une pour organiser vos alcools.
+</div>
+{% else %}
+  {% for category in categories %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">{{ category.name }}</h5>
+      <div>
+        <a href="{{ url_for('add_subcategory', category_id=category.id) }}" class="btn btn-sm btn-outline-primary">+ Sous-catégorie</a>
+        <a href="{{ url_for('edit_category', category_id=category.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a>
+        <form method="POST" action="{{ url_for('delete_category', category_id=category.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?');">
+          <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
+        </form>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if category.description %}
+      <p class="text-muted mb-3">{{ category.description }}</p>
+      {% endif %}
+      
+      {% if category.subcategories %}
+      <div class="row">
+        {% for subcategory in category.subcategories %}
+        <div class="col-md-6 mb-2">
+          <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+            <div>
+              <strong>{{ subcategory.name }}</strong>
+              {% if subcategory.description %}
+              <br><small class="text-muted">{{ subcategory.description }}</small>
+              {% endif %}
+            </div>
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('edit_subcategory', subcategory_id=subcategory.id) }}" class="btn btn-outline-secondary">Modifier</a>
+              <form method="POST" action="{{ url_for('delete_subcategory', subcategory_id=subcategory.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette sous-catégorie ?');">
+                <button type="submit" class="btn btn-outline-danger">Supprimer</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted mb-0">Aucune sous-catégorie définie.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<div class="mt-4">
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">← Retour à la cave</a>
+</div>
+{% endblock %}

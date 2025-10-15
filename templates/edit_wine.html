@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Modifier "{{ wine.name }}"</h3>
+<form method="POST">
+  <div class="mb-3">
+    <label class="form-label">Cave</label>
+    <select class="form-select" name="cellar_id" required>
+      {% for cellar in cellars %}
+      <option value="{{ cellar.id }}" {% if wine.cellar_id==cellar.id %}selected{% endif %}>
+        {{ cellar.name }} — {{ 'Naturelle' if cellar.cellar_type == 'naturelle' else 'Électrique' }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Type d'alcool</label>
+    <select class="form-select" name="subcategory_id" id="subcategory_id">
+      <option value="">Non spécifié</option>
+      {% for category in categories %}
+        <optgroup label="{{ category.name }}">
+          {% for subcategory in category.subcategories %}
+            <option value="{{ subcategory.id }}" {% if wine.subcategory_id==subcategory.id %}selected{% endif %}>
+              {{ subcategory.name }}
+            </option>
+          {% endfor %}
+        </optgroup>
+      {% endfor %}
+    </select>
+    <div class="form-text">Sélectionnez le type d'alcool (vin rouge, rhum ambré, etc.)</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Nom</label>
+    <input type="text" class="form-control" name="name" value="{{ wine.name }}" required>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Région</label>
+      <input type="text" class="form-control" name="region" value="{{ wine.region or '' }}">
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Cépage</label>
+      <input type="text" class="form-control" name="grape" value="{{ wine.grape or '' }}">
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Année</label>
+      <input type="number" class="form-control" name="year" value="{{ wine.year or '' }}" min="1900" max="2100">
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Quantité</label>
+      <input type="number" class="form-control" name="quantity" value="{{ wine.quantity }}" min="0" required>
+    </div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    <textarea class="form-control" name="description" rows="3">{{ wine.description or '' }}</textarea>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-dark">Enregistrer</button>
+    <a href="{{ url_for('wine_detail', wine_id=wine.id) }}" class="btn btn-secondary">Annuler</a>
+  </div>
+</form>
+{% endblock %}

@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import selectinload
 import logging
 
-from models import db, User, Wine, Cellar, CellarFloor, WineConsumption
+from models import db, User, Wine, Cellar, CellarFloor, WineConsumption, AlcoholCategory, AlcoholSubcategory
 from config import Config
 import requests
 from migrations import run_migrations
@@ -208,6 +208,7 @@ def create_app():
     @login_required
     def add_wine():
         cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+        categories = AlcoholCategory.query.order_by(AlcoholCategory.display_order, AlcoholCategory.name).all()
 
         if not cellars:
             flash("Créez d'abord une cave avant d'ajouter des bouteilles.")
@@ -220,16 +221,18 @@ def create_app():
             grape = (request.form.get('grape') or '').strip()
             year = request.form.get('year') or None
             description = (request.form.get('description') or '').strip()
+            quantity = request.form.get('quantity', type=int) or 1
             cellar_id = request.form.get('cellar_id', type=int)
+            subcategory_id = request.form.get('subcategory_id', type=int) or None
 
             if not cellar_id:
                 flash("Veuillez sélectionner une cave pour y ajouter le vin.")
-                return render_template('add_wine.html', cellars=cellars, selected_cellar_id=cellar_id)
+                return render_template('add_wine.html', cellars=cellars, categories=categories, selected_cellar_id=cellar_id)
 
             cellar = Cellar.query.get(cellar_id)
             if not cellar:
                 flash("La cave sélectionnée est introuvable.")
-                return render_template('add_wine.html', cellars=cellars, selected_cellar_id=cellar_id)
+                return render_template('add_wine.html', cellars=cellars, categories=categories, selected_cellar_id=cellar_id)
 
             # Recherche auto via OpenFoodFacts si code-barres et pas de nom
             if barcode and not name:
@@ -248,14 +251,14 @@ def create_app():
 
             wine = Wine(name=name or 'Vin sans nom', region=region, grape=grape, year=year,
                         barcode=barcode, description=description, image_url=image_url,
-                        cellar=cellar)
+                        quantity=quantity, cellar=cellar, subcategory_id=subcategory_id)
             db.session.add(wine)
             db.session.commit()
             schedule_wine_enrichment(wine.id)
             flash('Vin ajouté avec succès.')
             return redirect(url_for('index'))
         selected_cellar_id = cellars[0].id if len(cellars) == 1 else None
-        return render_template('add_wine.html', cellars=cellars, selected_cellar_id=selected_cellar_id)
+        return render_template('add_wine.html', cellars=cellars, categories=categories, selected_cellar_id=selected_cellar_id)
 
     @app.route('/wines/<int:wine_id>', methods=['GET'])
     @login_required
@@ -321,6 +324,225 @@ def create_app():
             .all()
         )
         return render_template('consumption_history.html', consumptions=consumptions)
+
+    @app.route('/categories', methods=['GET'])
+    @login_required
+    def list_categories():
+        """Liste toutes les catégories et sous-catégories d'alcool."""
+        categories = AlcoholCategory.query.order_by(AlcoholCategory.display_order, AlcoholCategory.name).all()
+        return render_template('categories.html', categories=categories)
+
+    @app.route('/categories/add', methods=['GET', 'POST'])
+    @login_required
+    def add_category():
+        """Ajouter une nouvelle catégorie."""
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or '').strip()
+            display_order = request.form.get('display_order', type=int) or 0
+            
+            if not name:
+                flash("Le nom de la catégorie est obligatoire.")
+                return render_template('add_category.html', name=name, description=description, display_order=display_order)
+            
+            # Vérifier si la catégorie existe déjà
+            existing = AlcoholCategory.query.filter_by(name=name).first()
+            if existing:
+                flash("Une catégorie avec ce nom existe déjà.")
+                return render_template('add_category.html', name=name, description=description, display_order=display_order)
+            
+            category = AlcoholCategory(name=name, description=description, display_order=display_order)
+            db.session.add(category)
+            db.session.commit()
+            flash('Catégorie créée avec succès.')
+            return redirect(url_for('list_categories'))
+        
+        return render_template('add_category.html')
+
+    @app.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    def edit_category(category_id):
+        """Modifier une catégorie existante."""
+        category = AlcoholCategory.query.get_or_404(category_id)
+        
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or '').strip()
+            display_order = request.form.get('display_order', type=int) or 0
+            
+            if not name:
+                flash("Le nom de la catégorie est obligatoire.")
+                return render_template('edit_category.html', category=category)
+            
+            # Vérifier si le nom existe déjà (sauf pour cette catégorie)
+            existing = AlcoholCategory.query.filter(
+                AlcoholCategory.name == name,
+                AlcoholCategory.id != category_id
+            ).first()
+            if existing:
+                flash("Une autre catégorie avec ce nom existe déjà.")
+                return render_template('edit_category.html', category=category)
+            
+            category.name = name
+            category.description = description
+            category.display_order = display_order
+            db.session.commit()
+            flash('Catégorie modifiée avec succès.')
+            return redirect(url_for('list_categories'))
+        
+        return render_template('edit_category.html', category=category)
+
+    @app.route('/categories/<int:category_id>/delete', methods=['POST'])
+    @login_required
+    def delete_category(category_id):
+        """Supprimer une catégorie."""
+        category = AlcoholCategory.query.get_or_404(category_id)
+        
+        # Vérifier si des vins utilisent des sous-catégories de cette catégorie
+        wines_count = db.session.query(Wine).join(AlcoholSubcategory).filter(
+            AlcoholSubcategory.category_id == category_id
+        ).count()
+        
+        if wines_count > 0:
+            flash(f"Impossible de supprimer cette catégorie : {wines_count} bouteille(s) l'utilisent.")
+            return redirect(url_for('list_categories'))
+        
+        db.session.delete(category)
+        db.session.commit()
+        flash('Catégorie supprimée avec succès.')
+        return redirect(url_for('list_categories'))
+
+    @app.route('/categories/<int:category_id>/subcategories/add', methods=['GET', 'POST'])
+    @login_required
+    def add_subcategory(category_id):
+        """Ajouter une sous-catégorie à une catégorie."""
+        category = AlcoholCategory.query.get_or_404(category_id)
+        
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or '').strip()
+            display_order = request.form.get('display_order', type=int) or 0
+            
+            if not name:
+                flash("Le nom de la sous-catégorie est obligatoire.")
+                return render_template('add_subcategory.html', category=category, name=name, description=description, display_order=display_order)
+            
+            # Vérifier si la sous-catégorie existe déjà dans cette catégorie
+            existing = AlcoholSubcategory.query.filter_by(category_id=category_id, name=name).first()
+            if existing:
+                flash("Une sous-catégorie avec ce nom existe déjà dans cette catégorie.")
+                return render_template('add_subcategory.html', category=category, name=name, description=description, display_order=display_order)
+            
+            subcategory = AlcoholSubcategory(
+                name=name,
+                category_id=category_id,
+                description=description,
+                display_order=display_order
+            )
+            db.session.add(subcategory)
+            db.session.commit()
+            flash('Sous-catégorie créée avec succès.')
+            return redirect(url_for('list_categories'))
+        
+        return render_template('add_subcategory.html', category=category)
+
+    @app.route('/subcategories/<int:subcategory_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    def edit_subcategory(subcategory_id):
+        """Modifier une sous-catégorie existante."""
+        subcategory = AlcoholSubcategory.query.get_or_404(subcategory_id)
+        
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or '').strip()
+            display_order = request.form.get('display_order', type=int) or 0
+            
+            if not name:
+                flash("Le nom de la sous-catégorie est obligatoire.")
+                return render_template('edit_subcategory.html', subcategory=subcategory)
+            
+            # Vérifier si le nom existe déjà dans cette catégorie (sauf pour cette sous-catégorie)
+            existing = AlcoholSubcategory.query.filter(
+                AlcoholSubcategory.category_id == subcategory.category_id,
+                AlcoholSubcategory.name == name,
+                AlcoholSubcategory.id != subcategory_id
+            ).first()
+            if existing:
+                flash("Une autre sous-catégorie avec ce nom existe déjà dans cette catégorie.")
+                return render_template('edit_subcategory.html', subcategory=subcategory)
+            
+            subcategory.name = name
+            subcategory.description = description
+            subcategory.display_order = display_order
+            db.session.commit()
+            flash('Sous-catégorie modifiée avec succès.')
+            return redirect(url_for('list_categories'))
+        
+        return render_template('edit_subcategory.html', subcategory=subcategory)
+
+    @app.route('/subcategories/<int:subcategory_id>/delete', methods=['POST'])
+    @login_required
+    def delete_subcategory(subcategory_id):
+        """Supprimer une sous-catégorie."""
+        subcategory = AlcoholSubcategory.query.get_or_404(subcategory_id)
+        
+        # Vérifier si des vins utilisent cette sous-catégorie
+        wines_count = Wine.query.filter_by(subcategory_id=subcategory_id).count()
+        
+        if wines_count > 0:
+            flash(f"Impossible de supprimer cette sous-catégorie : {wines_count} bouteille(s) l'utilisent.")
+            return redirect(url_for('list_categories'))
+        
+        db.session.delete(subcategory)
+        db.session.commit()
+        flash('Sous-catégorie supprimée avec succès.')
+        return redirect(url_for('list_categories'))
+
+    @app.route('/wines/<int:wine_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    def edit_wine(wine_id):
+        """Modifier un vin existant."""
+        wine = Wine.query.get_or_404(wine_id)
+        cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+        categories = AlcoholCategory.query.order_by(AlcoholCategory.display_order, AlcoholCategory.name).all()
+        
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            region = (request.form.get('region') or '').strip()
+            grape = (request.form.get('grape') or '').strip()
+            year = request.form.get('year') or None
+            description = (request.form.get('description') or '').strip()
+            quantity = request.form.get('quantity', type=int) or 1
+            cellar_id = request.form.get('cellar_id', type=int)
+            subcategory_id = request.form.get('subcategory_id', type=int) or None
+            
+            if not name:
+                flash("Le nom du vin est obligatoire.")
+                return render_template('edit_wine.html', wine=wine, cellars=cellars, categories=categories)
+            
+            if not cellar_id:
+                flash("Veuillez sélectionner une cave.")
+                return render_template('edit_wine.html', wine=wine, cellars=cellars, categories=categories)
+            
+            cellar = Cellar.query.get(cellar_id)
+            if not cellar:
+                flash("La cave sélectionnée est introuvable.")
+                return render_template('edit_wine.html', wine=wine, cellars=cellars, categories=categories)
+            
+            wine.name = name
+            wine.region = region
+            wine.grape = grape
+            wine.year = year
+            wine.description = description
+            wine.quantity = quantity
+            wine.cellar_id = cellar_id
+            wine.subcategory_id = subcategory_id
+            
+            db.session.commit()
+            flash('Vin modifié avec succès.')
+            return redirect(url_for('wine_detail', wine_id=wine.id))
+        
+        return render_template('edit_wine.html', wine=wine, cellars=cellars, categories=categories)
 
     return app
 

@@ -63,6 +63,37 @@ class CellarFloor(db.Model):
     __table_args__ = (UniqueConstraint("cellar_id", "level", name="uq_cellar_level"),)
 
 
+class AlcoholCategory(db.Model):
+    """Catégorie principale d'alcool (ex: Vins, Spiritueux, Bières)"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    description = db.Column(db.Text)
+    display_order = db.Column(db.Integer, default=0)
+    
+    subcategories = db.relationship(
+        "AlcoholSubcategory",
+        back_populates="category",
+        cascade="all, delete-orphan",
+        order_by="AlcoholSubcategory.display_order, AlcoholSubcategory.name",
+    )
+
+
+class AlcoholSubcategory(db.Model):
+    """Sous-catégorie d'alcool (ex: Vin rouge, Rhum ambré, IPA)"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey("alcohol_category.id"), nullable=False)
+    description = db.Column(db.Text)
+    display_order = db.Column(db.Integer, default=0)
+    
+    category = db.relationship("AlcoholCategory", back_populates="subcategories")
+    wines = db.relationship("Wine", back_populates="subcategory")
+    
+    __table_args__ = (
+        UniqueConstraint("category_id", "name", name="uq_category_subcategory"),
+    )
+
+
 class Wine(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -74,8 +105,10 @@ class Wine(db.Model):
     image_url = db.Column(db.String(255))
     quantity = db.Column(db.Integer, default=1)
     cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id"), nullable=False)
+    subcategory_id = db.Column(db.Integer, db.ForeignKey("alcohol_subcategory.id"))
 
     cellar = db.relationship("Cellar", back_populates="wines")
+    subcategory = db.relationship("AlcoholSubcategory", back_populates="wines")
     insights = db.relationship(
         "WineInsight",
         back_populates="wine",

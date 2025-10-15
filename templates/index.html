@@ -18,6 +18,11 @@
       {% endif %}
       <div class="card-body">
         <h5 class="card-title">{{ wine.name }}</h5>
+        {% if wine.subcategory %}
+        <p class="mb-1">
+          <span class="badge text-bg-primary">{{ wine.subcategory.name }}</span>
+        </p>
+        {% endif %}
         <p class="card-text">
           {{ wine.region or 'Région inconnue' }}{% if wine.year %} — {{ wine.year }}{% endif %}<br>
           Cépage : {{ wine.grape or 'Inconnu' }}

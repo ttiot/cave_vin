@@ -157,6 +157,13 @@ class WineInfoService:
             details.append(f"Région: {wine.region}")
         if getattr(wine, "grape", None):
             details.append(f"Cépage: {wine.grape}")
+        if getattr(wine, "subcategory", None):
+            subcategory_name = wine.subcategory.name
+            category_name = wine.subcategory.category.name if wine.subcategory.category else None
+            if category_name:
+                details.append(f"Type: {category_name} - {subcategory_name}")
+            else:
+                details.append(f"Type: {subcategory_name}")
         if getattr(wine, "description", None):
             details.append(
                 f"Description utilisateur: {self._truncate(str(wine.description), 280)}"
@@ -166,13 +173,13 @@ class WineInfoService:
         logger.debug("📋 OpenAI: détails du vin collectés: %s", ", ".join(details))
 
         system_prompt = (
-            "Tu es un assistant sommelier chargé d'enrichir la fiche d'un vin. "
+            "Tu es un assistant sommelier chargé d'enrichir la fiche d'un alcool. "
             "Tu réponds exclusivement en français et fournis des informations fiables, "
             "concis, adaptées à un public de passionnés."
         )
 
         user_prompt = (
-            "Voici les informations connues sur le vin :\n"
+            "Voici les informations connues sur l'alcool :\n"
             + "\n".join(f"- {line}" for line in details if line)
             + "\n\n"
             "Complète avec 3 à 5 éclairages distincts (histoire du domaine, profil aromatique, accords mets et vins, potentiel de garde, etc.). "
