@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-4">
+  <h3>🍷 Vins à consommer prochainement</h3>
+  <p class="text-muted">Cette page affiche les vins de votre cave en fonction de leur potentiel de garde et de leur âge actuel.</p>
+</div>
+
+{% if wines_data %}
+<div class="row">
+  <div class="col-12">
+    <div class="alert alert-info mb-4">
+      <strong>Légende :</strong>
+      <span class="badge bg-danger ms-2">Urgent</span> À boire immédiatement (score ≥ 80)
+      <span class="badge bg-warning text-dark ms-2">Prioritaire</span> À boire dans les prochains mois (score 50-79)
+      <span class="badge bg-success ms-2">Optimal</span> Dans la fenêtre de garde idéale (score 30-49)
+      <span class="badge bg-secondary ms-2">Patience</span> Peut encore attendre (score < 30)
+    </div>
+  </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+  {% for item in wines_data %}
+  {% set wine = item.wine %}
+  {% set urgency = item.urgency_score %}
+  {% set age = item.wine_age %}
+  
+  <div class="col">
+    <div class="card shadow-sm h-100 {% if urgency >= 80 %}border-danger{% elif urgency >= 50 %}border-warning{% endif %}">
+      {% if wine.image_url %}
+      <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}" style="max-height: 200px; object-fit: cover;">
+      {% endif %}
+      
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h5 class="card-title mb-0">{{ wine.name }}</h5>
+          {% if urgency >= 80 %}
+          <span class="badge bg-danger">Urgent</span>
+          {% elif urgency >= 50 %}
+          <span class="badge bg-warning text-dark">Prioritaire</span>
+          {% elif urgency >= 30 %}
+          <span class="badge bg-success">Optimal</span>
+          {% else %}
+          <span class="badge bg-secondary">Patience</span>
+          {% endif %}
+        </div>
+        
+        {% if wine.subcategory %}
+        <p class="mb-2">
+          <span class="badge text-bg-primary">{{ wine.subcategory.name }}</span>
+        </p>
+        {% endif %}
+        
+        <p class="card-text mb-2">
+          <strong>Millésime :</strong> {{ wine.year }}<br>
+          <strong>Âge actuel :</strong> {{ age }} an{{ 's' if age > 1 else '' }}<br>
+          {% if wine.region %}
+          <strong>Région :</strong> {{ wine.region }}<br>
+          {% endif %}
+          {% if wine.grape %}
+          <strong>Cépage :</strong> {{ wine.grape }}<br>
+          {% endif %}
+        </p>
+        
+        {% if item.recommended_years %}
+        <div class="alert alert-light py-2 px-3 mb-2">
+          <small>
+            <strong>Potentiel de garde :</strong> {{ item.recommended_years[0] }} à {{ item.recommended_years[1] }} ans
+          </small>
+        </div>
+        {% endif %}
+        
+        {% if item.garde_info %}
+        <div class="alert alert-info py-2 px-3 mb-2">
+          <small><strong>Info :</strong> {{ item.garde_info[:200] }}{% if item.garde_info|length > 200 %}...{% endif %}</small>
+        </div>
+        {% endif %}
+        
+        <div class="progress mb-2" style="height: 8px;">
+          <div class="progress-bar 
+            {% if urgency >= 80 %}bg-danger
+            {% elif urgency >= 50 %}bg-warning
+            {% elif urgency >= 30 %}bg-success
+            {% else %}bg-secondary{% endif %}" 
+            role="progressbar" 
+            style="width: {{ urgency }}%;" 
+            aria-valuenow="{{ urgency }}" 
+            aria-valuemin="0" 
+            aria-valuemax="100">
+          </div>
+        </div>
+        <small class="text-muted">Score d'urgence : {{ "%.0f"|format(urgency) }}/100</small>
+      </div>
+      
+      <div class="card-footer bg-white">
+        <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
+        <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
+      </div>
+      
+      <div class="card-actions border-top bg-light p-3">
+        <div class="btn-group d-flex" role="group">
+          <a href="{{ url_for('wine_detail', wine_id=wine.id) }}" class="btn btn-outline-primary btn-sm flex-fill">Détails</a>
+          <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill">
+            <input type="hidden" name="redirect" value="{{ url_for('wines_to_consume') }}">
+            <button type="submit" class="btn btn-outline-success btn-sm w-100">Consommer</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="alert alert-secondary">
+  <h5>Aucun vin à afficher</h5>
+  <p class="mb-0">Aucun vin avec un millésime n'a été trouvé dans votre cave, ou aucune information de garde n'est disponible.</p>
+  <p class="mb-0 mt-2">
+    <a href="{{ url_for('index') }}" class="alert-link">Retour à la liste des vins</a>
+  </p>
+</div>
+{% endif %}
+
+<div class="mt-4">
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">← Retour à la cave</a>
+</div>
+{% endblock %}
