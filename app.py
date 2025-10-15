@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Wine, Cellar, CellarFloor
 from config import Config
 import requests
+from migrations import run_migrations
 
 def create_app():
     app = Flask(__name__)
@@ -32,6 +33,7 @@ def create_app():
         if not hasattr(app, "_db_initialized"):
             with app.app_context():
                 db.create_all()
+                run_migrations(app)
                 if not User.query.filter_by(username="admin").first():
                     # Obtenir le mot de passe admin par défaut
                     admin_password, is_temporary = Config.get_default_admin_password()
