@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-4">
+  <h3>Recherche multi-critères</h3>
+  <p class="text-muted">Recherchez vos bouteilles par type d'alcool et/ou par accord mets-vins</p>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" action="{{ url_for('search_wines') }}">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="subcategory_id" class="form-label">Type d'alcool</label>
+          <select class="form-select" id="subcategory_id" name="subcategory_id">
+            <option value="">-- Tous les types --</option>
+            {% for category in categories %}
+              <optgroup label="{{ category.name }}">
+                {% for subcategory in category.subcategories %}
+                  <option value="{{ subcategory.id }}" {% if subcategory_id == subcategory.id %}selected{% endif %}>
+                    {{ subcategory.name }}
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% endfor %}
+          </select>
+          <div class="form-text">Filtrer par catégorie d'alcool (vin rouge, whisky, etc.)</div>
+        </div>
+        
+        <div class="col-md-6">
+          <label for="food_pairing" class="form-label">Accord mets-vins</label>
+          <input type="text" class="form-control" id="food_pairing" name="food_pairing" 
+                 value="{{ food_pairing }}" placeholder="Ex: viande, poisson, fromage...">
+          <div class="form-text">Recherche dans les informations enrichies (insights)</div>
+        </div>
+      </div>
+      
+      <div class="mt-3">
+        <button type="submit" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+          </svg>
+          Rechercher
+        </button>
+        {% if subcategory_id or food_pairing %}
+        <a href="{{ url_for('search_wines') }}" class="btn btn-outline-secondary">Réinitialiser</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if subcategory_id or food_pairing %}
+<div class="mb-3">
+  <h4>Résultats de la recherche</h4>
+  {% if wines %}
+    <p class="text-muted">{{ wines|length }} bouteille(s) trouvée(s)</p>
+  {% else %}
+    <div class="alert alert-info">
+      Aucune bouteille ne correspond à vos critères de recherche.
+    </div>
+  {% endif %}
+</div>
+
+{% if wines %}
+<div class="row row-cols-1 row-cols-md-3 g-4">
+  {% for wine in wines %}
+  <div class="col">
+    <div class="card shadow-sm h-100 wine-card"
+         data-detail-url="{{ url_for('wine_detail', wine_id=wine.id) }}"
+         data-wine-preview='{{ wine.preview_insights()|tojson }}'>
+      {% if wine.image_url %}
+      <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
+      {% endif %}
+      <div class="card-body">
+        <h5 class="card-title">{{ wine.name }}</h5>
+        {% if wine.subcategory %}
+        <p class="mb-1">
+          <span class="badge text-bg-primary">{{ wine.subcategory.name }}</span>
+        </p>
+        {% endif %}
+        <p class="card-text">
+          {{ wine.region or 'Région inconnue' }}{% if wine.year %} — {{ wine.year }}{% endif %}<br>
+          Cépage : {{ wine.grape or 'Inconnu' }}
+        </p>
+        {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
+        
+        {% if food_pairing %}
+        <div class="mt-2">
+          <small class="text-muted d-block"><strong>Insights correspondants :</strong></small>
+          {% for insight in wine.insights %}
+            {% if food_pairing.lower() in insight.content.lower() or 
+                  (insight.title and food_pairing.lower() in insight.title.lower()) or
+                  (insight.category and food_pairing.lower() in insight.category.lower()) %}
+              <small class="d-block text-truncate" title="{{ insight.content }}">
+                {% if insight.title %}
+                  <strong>{{ insight.title }}:</strong>
+                {% endif %}
+                {{ insight.content[:100] }}{% if insight.content|length > 100 %}...{% endif %}
+              </small>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-footer bg-white">
+        <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
+        <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
+      </div>
+      <div class="card-actions border-top bg-light p-3">
+        <div class="btn-group d-flex" role="group">
+          <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
+          </form>
+          <form method="post" action="{{ url_for('refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
+          </form>
+          <form method="post" action="{{ url_for('delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+{% endblock %}

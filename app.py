@@ -2,9 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import selectinload
+from sqlalchemy import or_
 import logging
 
-from models import db, User, Wine, Cellar, CellarFloor, WineConsumption, AlcoholCategory, AlcoholSubcategory
+from models import db, User, Wine, Cellar, CellarFloor, WineConsumption, AlcoholCategory, AlcoholSubcategory, WineInsight
 from config import Config
 import requests
 from migrations import run_migrations
@@ -543,6 +544,66 @@ def create_app():
             return redirect(url_for('wine_detail', wine_id=wine.id))
         
         return render_template('edit_wine.html', wine=wine, cellars=cellars, categories=categories)
+
+    @app.route('/search', methods=['GET'])
+    @login_required
+    def search_wines():
+        """Recherche multi-critères dans les vins et leurs insights."""
+        # Récupérer les paramètres de recherche
+        subcategory_id = request.args.get('subcategory_id', type=int)
+        food_pairing = request.args.get('food_pairing', '').strip()
+        
+        # Récupérer toutes les catégories pour le formulaire
+        categories = AlcoholCategory.query.order_by(
+            AlcoholCategory.display_order,
+            AlcoholCategory.name
+        ).all()
+        
+        # Si aucun critère n'est fourni, afficher juste le formulaire
+        if not subcategory_id and not food_pairing:
+            return render_template(
+                'search.html',
+                categories=categories,
+                wines=[],
+                subcategory_id=None,
+                food_pairing=''
+            )
+        
+        # Construire la requête de base
+        query = Wine.query.options(
+            selectinload(Wine.cellar),
+            selectinload(Wine.subcategory),
+            selectinload(Wine.insights)
+        ).filter(Wine.quantity > 0)
+        
+        # Filtrer par sous-catégorie si spécifié
+        if subcategory_id:
+            query = query.filter(Wine.subcategory_id == subcategory_id)
+        
+        # Filtrer par accord mets-vins si spécifié
+        if food_pairing:
+            # Rechercher dans les insights (content, title, category)
+            search_pattern = f"%{food_pairing}%"
+            wine_ids_with_matching_insights = db.session.query(WineInsight.wine_id).filter(
+                or_(
+                    WineInsight.content.ilike(search_pattern),
+                    WineInsight.title.ilike(search_pattern),
+                    WineInsight.category.ilike(search_pattern)
+                )
+            ).distinct().subquery()
+            
+            query = query.filter(Wine.id.in_(wine_ids_with_matching_insights))
+        
+        # Exécuter la requête
+        wines = query.order_by(Wine.name.asc()).all()
+        
+        return render_template(
+            'search.html',
+            categories=categories,
+            wines=wines,
+            subcategory_id=subcategory_id,
+            food_pairing=food_pairing
+        )
 
     return app
 

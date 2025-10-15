@@ -13,6 +13,7 @@
     <a class="navbar-brand" href="{{ url_for('index') }}">🍷 Ma Cave</a>
     <div>
       {% if current_user.is_authenticated %}
+      <a href="{{ url_for('search_wines') }}" class="btn btn-outline-light btn-sm me-2">🔍 Recherche</a>
       <a href="{{ url_for('list_cellars') }}" class="btn btn-outline-light btn-sm me-2">Mes caves</a>
       <a href="{{ url_for('list_categories') }}" class="btn btn-outline-light btn-sm me-2">Catégories</a>
       <a href="{{ url_for('consumption_history') }}" class="btn btn-outline-light btn-sm me-2">Historique</a>
