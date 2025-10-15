@@ -4,6 +4,9 @@
   <h3 class="m-0">Mes vins</h3>
   <a href="{{ url_for('add_wine') }}" class="btn btn-dark">+ Ajouter</a>
 </div>
+{% if not cellars %}
+<div class="alert alert-warning">Vous n'avez pas encore de cave. <a href="{{ url_for('add_cellar') }}" class="alert-link">Créez-en une</a> pour commencer à ajouter des bouteilles.</div>
+{% endif %}
 <div class="row row-cols-1 row-cols-md-3 g-4">
   {% for wine in wines %}
   <div class="col">
@@ -20,7 +23,8 @@
         {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
       </div>
       <div class="card-footer bg-white">
-        <small class="text-muted">Quantité : {{ wine.quantity }}</small>
+        <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
+        <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
       </div>
     </div>
   </div>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="m-0">Mes caves</h3>
+  <a href="{{ url_for('add_cellar') }}" class="btn btn-dark">+ Nouvelle cave</a>
+</div>
+{% if cellars %}
+<div class="row row-cols-1 row-cols-md-2 g-4">
+  {% for cellar in cellars %}
+  <div class="col">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">{{ cellar.name }}</h5>
+        <p class="card-text mb-1">Type : {{ 'Naturelle' if cellar.cellar_type == 'naturelle' else 'Électrique' }}</p>
+        <p class="card-text mb-1">Étages : {{ cellar.floors }}</p>
+        <ul class="list-unstyled small mb-2">
+          {% for index, capacity in cellar.floor_breakdown %}
+          <li>Étage {{ index }} : {{ capacity }} bouteilles</li>
+          {% endfor %}
+        </ul>
+        <p class="card-text">Capacité totale : {{ cellar.capacity }}</p>
+        <small class="text-muted">Vins stockés : {{ cellar.wines.count() }}</small>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary">Aucune cave enregistrée pour le moment. Créez votre première cave pour commencer.</div>
+{% endif %}
+{% endblock %}

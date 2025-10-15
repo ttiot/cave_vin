@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Wine
+from models import db, User, Wine, Cellar, CellarFloor
 from config import Config
 import requests
+from migrations import run_migrations
 
 def create_app():
     app = Flask(__name__)
@@ -32,6 +33,7 @@ def create_app():
         if not hasattr(app, "_db_initialized"):
             with app.app_context():
                 db.create_all()
+                run_migrations(app)
                 if not User.query.filter_by(username="admin").first():
                     # Obtenir le mot de passe admin par défaut
                     admin_password, is_temporary = Config.get_default_admin_password()
@@ -113,11 +115,78 @@ def create_app():
     @login_required
     def index():
         wines = Wine.query.order_by(Wine.name.asc()).all()
-        return render_template('index.html', wines=wines)
+        cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+        return render_template('index.html', wines=wines, cellars=cellars)
+
+    @app.route('/cellars', methods=['GET'])
+    @login_required
+    def list_cellars():
+        cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+        return render_template('cellars.html', cellars=cellars)
+
+    @app.route('/cellars/add', methods=['GET', 'POST'])
+    @login_required
+    def add_cellar():
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            cellar_type = request.form.get('cellar_type')
+            raw_floor_capacities = [value.strip() for value in request.form.getlist('floor_capacities')]
+            floor_capacities = []
+            invalid_capacity = False
+            for raw_capacity in raw_floor_capacities:
+                if not raw_capacity:
+                    invalid_capacity = True
+                    break
+                try:
+                    capacity_value = int(raw_capacity)
+                except (TypeError, ValueError):
+                    invalid_capacity = True
+                    break
+                if capacity_value <= 0:
+                    invalid_capacity = True
+                    break
+                floor_capacities.append(capacity_value)
+
+            context = {
+                'name': name,
+                'cellar_type': cellar_type,
+                'floor_capacities': raw_floor_capacities,
+            }
+
+            if not name:
+                flash("Le nom de la cave est obligatoire.")
+                return render_template('add_cellar.html', **context)
+
+            if cellar_type not in {'naturelle', 'electrique'}:
+                flash("Veuillez sélectionner un type de cave valide.")
+                return render_template('add_cellar.html', **context)
+
+            if not floor_capacities or invalid_capacity:
+                flash("Veuillez indiquer un nombre de bouteilles positif pour chaque étage.")
+                return render_template('add_cellar.html', **context)
+
+            cellar = Cellar(name=name,
+                            cellar_type=cellar_type,
+                            floor_count=len(floor_capacities),
+                            bottles_per_floor=max(floor_capacities))
+            for index, capacity in enumerate(floor_capacities, start=1):
+                cellar.levels.append(CellarFloor(level=index, capacity=capacity))
+            db.session.add(cellar)
+            db.session.commit()
+            flash('Cave créée avec succès.')
+            return redirect(url_for('list_cellars'))
+
+        return render_template('add_cellar.html', floor_capacities=[''])
 
     @app.route('/add', methods=['GET', 'POST'])
     @login_required
     def add_wine():
+        cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+
+        if not cellars:
+            flash("Créez d'abord une cave avant d'ajouter des bouteilles.")
+            return redirect(url_for('add_cellar'))
+
         if request.method == 'POST':
             barcode = request.form.get('barcode') or None
             name = (request.form.get('name') or '').strip()
@@ -125,6 +194,16 @@ def create_app():
             grape = (request.form.get('grape') or '').strip()
             year = request.form.get('year') or None
             description = (request.form.get('description') or '').strip()
+            cellar_id = request.form.get('cellar_id', type=int)
+
+            if not cellar_id:
+                flash("Veuillez sélectionner une cave pour y ajouter le vin.")
+                return render_template('add_wine.html', cellars=cellars, selected_cellar_id=cellar_id)
+
+            cellar = Cellar.query.get(cellar_id)
+            if not cellar:
+                flash("La cave sélectionnée est introuvable.")
+                return render_template('add_wine.html', cellars=cellars, selected_cellar_id=cellar_id)
 
             # Recherche auto via OpenFoodFacts si code-barres et pas de nom
             if barcode and not name:
@@ -142,12 +221,14 @@ def create_app():
                 image_url = None
 
             wine = Wine(name=name or 'Vin sans nom', region=region, grape=grape, year=year,
-                        barcode=barcode, description=description, image_url=image_url)
+                        barcode=barcode, description=description, image_url=image_url,
+                        cellar=cellar)
             db.session.add(wine)
             db.session.commit()
             flash('Vin ajouté avec succès.')
             return redirect(url_for('index'))
-        return render_template('add_wine.html')
+        selected_cellar_id = cellars[0].id if len(cellars) == 1 else None
+        return render_template('add_wine.html', cellars=cellars, selected_cellar_id=selected_cellar_id)
 
     return app
 
