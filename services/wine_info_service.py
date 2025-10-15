@@ -10,7 +10,7 @@ from typing import Iterable, List, Optional
 
 import requests
 
-from .openai_client import OpenAIClient
+from openai import OpenAI, OpenAIError
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +34,50 @@ class WineInfoService:
         self,
         session: Optional[requests.Session] = None,
         *,
-        openai_client: Optional[OpenAIClient] = None,
+        openai_client: Optional[OpenAI] = None,
+        openai_model: Optional[str] = None,
+        openai_source_name: str = "OpenAI",
     ) -> None:
         self.session = session or requests.Session()
         self.openai_client = openai_client
+        self.openai_model = openai_model
+        self.openai_source_name = openai_source_name
 
     @classmethod
     def from_app(cls, app) -> "WineInfoService":
         """Factory that uses the Flask app configuration to bootstrap providers."""
 
-        openai_client = OpenAIClient.from_config(app.config)
-        return cls(openai_client=openai_client)
+        openai_client = None
+        client_kwargs = {}
+
+        api_key = (app.config.get("OPENAI_API_KEY") or "").strip()
+        base_url = (app.config.get("OPENAI_BASE_URL") or "").strip()
+
+        if api_key:
+            client_kwargs["api_key"] = api_key
+
+        if base_url:
+            client_kwargs["base_url"] = base_url.rstrip("/")
+
+        if client_kwargs:
+            try:
+                openai_client = OpenAI(**client_kwargs)
+            except OpenAIError as exc:  # pragma: no cover - defensive logging
+                logger.warning("Impossible d'initialiser le client OpenAI : %s", exc)
+
+        openai_model = (
+            (app.config.get("OPENAI_MODEL") or "").strip()
+            or (app.config.get("OPENAI_FREE_MODEL") or "").strip()
+            or "gpt-4o-mini"
+        )
+
+        source_name = (app.config.get("OPENAI_SOURCE_NAME") or "OpenAI").strip() or "OpenAI"
+
+        return cls(
+            openai_client=openai_client,
+            openai_model=openai_model,
+            openai_source_name=source_name,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -64,7 +97,7 @@ class WineInfoService:
             ("duckduckgo", lambda: self._duckduckgo_insights(query)),
         ]
 
-        if self.openai_client and self.openai_client.is_available:
+        if self.openai_client:
             providers.append(("openai", lambda: self._openai_insights(wine, query)))
 
         for provider_name, provider_callable in providers:
@@ -214,7 +247,11 @@ class WineInfoService:
         return insights
 
     def _openai_insights(self, wine, query: str) -> Iterable[InsightData]:
-        if not self.openai_client or not self.openai_client.is_available:
+        if not self.openai_client:
+            return []
+
+        if not self.openai_model:
+            logger.info("Aucun modèle OpenAI configuré ; abandon de la requête")
             return []
 
         details = [f"Nom: {wine.name}"]
@@ -272,12 +309,33 @@ class WineInfoService:
             "required": ["insights"],
         }
 
-        payload = self.openai_client.generate_json(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            schema=schema,
-            max_output_tokens=900,
-        )
+        try:
+            response = self.openai_client.responses.create(
+                model=self.openai_model,
+                input=[
+                    {
+                        "role": "system",
+                        "content": [{"type": "text", "text": system_prompt.strip()}],
+                    },
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": user_prompt.strip()}],
+                    },
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "wine_enrichment", "schema": schema},
+                },
+                max_output_tokens=900,
+            )
+        except OpenAIError as exc:
+            logger.warning("Requête OpenAI échouée : %s", exc)
+            return []
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Erreur inattendue lors de l'appel OpenAI : %s", exc)
+            return []
+
+        payload = self._parse_openai_payload(response)
 
         if not payload:
             return []
@@ -291,7 +349,7 @@ class WineInfoService:
 
             category = (item.get("category") or "").strip() or "analyse"
             title = (item.get("title") or "").strip() or None
-            source_name = (item.get("source") or self.openai_client.source_name).strip() or self.openai_client.source_name
+            source_name = (item.get("source") or self.openai_source_name).strip() or self.openai_source_name
 
             weight = item.get("weight")
             try:
@@ -312,6 +370,53 @@ class WineInfoService:
             )
 
         return insights
+
+    def _parse_openai_payload(self, response) -> Optional[dict]:
+        if response is None:
+            return None
+
+        text_payload = getattr(response, "output_text", None)
+        if text_payload:
+            try:
+                return json.loads(text_payload)
+            except json.JSONDecodeError:
+                logger.debug("Le texte retourné par OpenAI n'est pas du JSON valide")
+
+        try:
+            raw = response.model_dump()
+        except Exception:  # pragma: no cover - defensive guard
+            raw = None
+
+        if isinstance(raw, dict):
+            outputs = raw.get("output") or []
+            for block in outputs:
+                for content in block.get("content", []):
+                    if content.get("type") == "json":
+                        candidate = content.get("json")
+                        if isinstance(candidate, dict):
+                            return candidate
+                        try:
+                            return json.loads(json.dumps(candidate))
+                        except (TypeError, ValueError):
+                            continue
+                    if content.get("type") in {"text", "output_text"} and content.get("text"):
+                        try:
+                            return json.loads(content["text"])
+                        except json.JSONDecodeError:
+                            continue
+
+            choices = raw.get("choices") or []
+            for choice in choices:
+                message = choice.get("message") or {}
+                text = message.get("content")
+                if not text:
+                    continue
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    continue
+
+        return None
 
     # ------------------------------------------------------------------
     # Helpers
