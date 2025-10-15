@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="m-0">Historique des bouteilles consommées</h3>
+  <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">← Retour</a>
+</div>
+{% if consumptions %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Bouteille</th>
+          <th>Cave</th>
+          <th>Quantité</th>
+          <th>Consommée le</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in consumptions %}
+        <tr>
+          <td>
+            <strong>{{ item.snapshot_name }}</strong>
+            {% if item.snapshot_year %}<div class="text-muted small">Millésime {{ item.snapshot_year }}</div>{% endif %}
+            {% if item.snapshot_region %}<div class="text-muted small">{{ item.snapshot_region }}</div>{% endif %}
+            {% if item.snapshot_grape %}<div class="text-muted small">Cépage : {{ item.snapshot_grape }}</div>{% endif %}
+          </td>
+          <td>
+            {% if item.snapshot_cellar %}
+              {{ item.snapshot_cellar }}
+            {% elif item.wine and item.wine.cellar %}
+              {{ item.wine.cellar.name }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>{{ item.quantity }}</td>
+          <td>{{ item.consumed_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Aucune bouteille consommée pour le moment.</div>
+{% endif %}
+{% endblock %}

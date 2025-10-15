@@ -10,7 +10,9 @@
 <div class="row row-cols-1 row-cols-md-3 g-4">
   {% for wine in wines %}
   <div class="col">
-    <div class="card shadow-sm h-100">
+    <div class="card shadow-sm h-100 wine-card"
+         data-detail-url="{{ url_for('wine_detail', wine_id=wine.id) }}"
+         data-wine-preview='{{ wine.preview_insights()|tojson }}'>
       {% if wine.image_url %}
       <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
       {% endif %}
@@ -25,6 +27,22 @@
       <div class="card-footer bg-white">
         <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
         <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
+      </div>
+      <div class="card-actions border-top bg-light p-3">
+        <div class="btn-group d-flex" role="group">
+          <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
+          </form>
+          <form method="post" action="{{ url_for('refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
+          </form>
+          <form method="post" action="{{ url_for('delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
