@@ -182,7 +182,7 @@ class WineInfoService:
             "Voici les informations connues sur l'alcool :\n"
             + "\n".join(f"- {line}" for line in details if line)
             + "\n\n"
-            "Complète avec 3 à 5 éclairages distincts (histoire du domaine, profil aromatique, accords mets et vins, potentiel de garde, etc.). "
+            "Complète avec 4 à 6 éclairages distincts (estimation du prix actuel, histoire du domaine, profil aromatique, accords mets et vins, potentiel de garde, etc.). "
             "Chaque éclairage doit tenir en 2 à 4 phrases maximum."
             "Structure ta réponse au format JSON selon le schéma demandé, sans texte additionnel."
         )

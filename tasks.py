@@ -42,22 +42,24 @@ def _run_enrichment(app, wine_id: int) -> None:
 
 
 def _store_insights(wine: Wine, insights: Iterable[InsightData]) -> None:
-    existing_keys = {
-        (
-            insight.category,
-            insight.title,
-            insight.content,
-            insight.source_url,
-        )
-        for insight in wine.insights
-    }
-
+    # Convertir l'itérable en liste pour pouvoir le parcourir plusieurs fois
+    insights_list = list(insights)
+    
+    if not insights_list:
+        logger.info("No new insights to store for wine %s", wine.name)
+        return
+    
+    # Supprimer tous les anciens insights avant d'ajouter les nouveaux
+    # Cela garantit qu'on remplace complètement les données
+    old_insights_count = len(wine.insights)
+    if old_insights_count > 0:
+        logger.info("Removing %s old insights for wine %s", old_insights_count, wine.name)
+        for old_insight in list(wine.insights):
+            db.session.delete(old_insight)
+    
+    # Ajouter les nouveaux insights
     added = 0
-    for data in insights:
-        key = (data.category, data.title, data.content, data.source_url)
-        if key in existing_keys:
-            continue
-
+    for data in insights_list:
         model = WineInsight(
             wine=wine,
             category=data.category,
@@ -68,16 +70,12 @@ def _store_insights(wine: Wine, insights: Iterable[InsightData]) -> None:
             weight=data.weight,
         )
         db.session.add(model)
-        existing_keys.add(key)
         added += 1
-
-    if not added:
-        logger.info("All insights already stored for wine %s", wine.name)
-        return
 
     try:
         db.session.commit()
-        logger.info("Stored %s new insights for wine %s", added, wine.name)
+        logger.info("Replaced %s old insights with %s new insights for wine %s",
+                   old_insights_count, added, wine.name)
     except SQLAlchemyError:  # pragma: no cover - defensive commit
         db.session.rollback()
         logger.exception("Failed to persist insights for wine %s", wine.name)
