@@ -1,10 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.orm import selectinload
+
 from models import db, User, Wine, Cellar, CellarFloor
 from config import Config
 import requests
 from migrations import run_migrations
+from tasks import schedule_wine_enrichment
 
 def create_app():
     app = Flask(__name__)
@@ -114,7 +117,14 @@ def create_app():
     @app.route('/')
     @login_required
     def index():
-        wines = Wine.query.order_by(Wine.name.asc()).all()
+        wines = (
+            Wine.query.options(
+                selectinload(Wine.cellar),
+                selectinload(Wine.insights),
+            )
+            .order_by(Wine.name.asc())
+            .all()
+        )
         cellars = Cellar.query.order_by(Cellar.name.asc()).all()
         return render_template('index.html', wines=wines, cellars=cellars)
 
@@ -225,10 +235,24 @@ def create_app():
                         cellar=cellar)
             db.session.add(wine)
             db.session.commit()
+            schedule_wine_enrichment(wine.id)
             flash('Vin ajouté avec succès.')
             return redirect(url_for('index'))
         selected_cellar_id = cellars[0].id if len(cellars) == 1 else None
         return render_template('add_wine.html', cellars=cellars, selected_cellar_id=selected_cellar_id)
+
+    @app.route('/wines/<int:wine_id>', methods=['GET'])
+    @login_required
+    def wine_detail(wine_id):
+        wine = (
+            Wine.query.options(
+                selectinload(Wine.cellar),
+                selectinload(Wine.insights),
+            )
+            .filter_by(id=wine_id)
+            .first_or_404()
+        )
+        return render_template('wine_detail.html', wine=wine)
 
     return app
 

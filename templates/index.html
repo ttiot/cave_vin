@@ -10,7 +10,9 @@
 <div class="row row-cols-1 row-cols-md-3 g-4">
   {% for wine in wines %}
   <div class="col">
-    <div class="card shadow-sm h-100">
+    <div class="card shadow-sm h-100 wine-card"
+         data-detail-url="{{ url_for('wine_detail', wine_id=wine.id) }}"
+         data-wine-preview='{{ wine.preview_insights()|tojson }}'>
       {% if wine.image_url %}
       <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
       {% endif %}

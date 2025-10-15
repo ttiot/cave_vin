@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('index') }}" class="btn btn-link mb-3">← Retour à mes vins</a>
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card h-100 shadow-sm">
+      {% if wine.image_url %}
+      <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
+      {% endif %}
+      <div class="card-body">
+        <h3 class="card-title">{{ wine.name }}</h3>
+        <p class="card-text">
+          <strong>Année :</strong> {{ wine.year or 'Non renseigné' }}<br>
+          <strong>Région :</strong> {{ wine.region or 'Non renseignée' }}<br>
+          <strong>Cépage :</strong> {{ wine.grape or 'Inconnu' }}<br>
+          <strong>Cave :</strong> {{ wine.cellar.name }}<br>
+          <strong>Quantité :</strong> {{ wine.quantity }}
+        </p>
+        {% if wine.barcode %}
+        <p class="card-text"><span class="badge text-bg-secondary">EAN : {{ wine.barcode }}</span></p>
+        {% endif %}
+        {% if wine.description %}
+        <p class="card-text text-muted">{{ wine.description }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="card-title mb-0">Informations enrichies</h4>
+          <span class="badge text-bg-light">Mise à jour automatique</span>
+        </div>
+        {% if wine.insights %}
+        <div class="accordion" id="insightsAccordion">
+          {% for insight in wine.insights %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ loop.index }}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                {{ insight.title or insight.category|capitalize or 'Information' }}
+                {% if insight.source_name %}
+                <span class="ms-2 badge text-bg-secondary">{{ insight.source_name }}</span>
+                {% endif %}
+              </button>
+            </h2>
+            <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#insightsAccordion">
+              <div class="accordion-body">
+                <div>{{ insight.content | replace('\n', '<br>') | safe }}</div>
+                <div class="mt-3 text-muted small">
+                  {% if insight.source_url %}
+                  Source : <a href="{{ insight.source_url }}" target="_blank" rel="noopener">{{ insight.source_name or insight.source_url }}</a>
+                  {% elif insight.source_name %}
+                  Source : {{ insight.source_name }}
+                  {% endif %}
+                  {% if insight.updated_at %}
+                  <span class="ms-2">Actualisé le {{ insight.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">Les informations sont en cours de récupération. Revenez dans quelques instants.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

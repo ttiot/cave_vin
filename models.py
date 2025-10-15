@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from datetime import datetime
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from sqlalchemy import UniqueConstraint
@@ -72,3 +76,52 @@ class Wine(db.Model):
     cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id"), nullable=False)
 
     cellar = db.relationship("Cellar", back_populates="wines")
+    insights = db.relationship(
+        "WineInsight",
+        back_populates="wine",
+        cascade="all, delete-orphan",
+        order_by="WineInsight.weight.desc(), WineInsight.created_at.desc()",
+    )
+
+    def preview_insights(self, limit: int = 2) -> list[dict[str, str]]:
+        """Return a lightweight representation of the first insights for popovers."""
+
+        preview = []
+        for insight in self.insights[:limit]:
+            preview.append(
+                {
+                    "title": insight.title or insight.category or insight.source_name or "Information",
+                    "content": insight.content,
+                    "source": insight.source_name,
+                }
+            )
+        return preview
+
+
+class WineInsight(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    wine_id = db.Column(db.Integer, db.ForeignKey("wine.id"), nullable=False, index=True)
+    category = db.Column(db.String(50))
+    title = db.Column(db.String(200))
+    content = db.Column(db.Text, nullable=False)
+    source_name = db.Column(db.String(120))
+    source_url = db.Column(db.String(255))
+    weight = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    wine = db.relationship("Wine", back_populates="insights")
+
+    def as_dict(self) -> dict[str, str | int | None]:
+        return {
+            "category": self.category,
+            "title": self.title,
+            "content": self.content,
+            "source_name": self.source_name,
+            "source_url": self.source_url,
+            "weight": self.weight,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
