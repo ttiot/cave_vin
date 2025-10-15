@@ -18,7 +18,7 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wine-info")
 
 def schedule_wine_enrichment(wine_id: int) -> None:
     """Launch an asynchronous job that fetches contextual data for a wine."""
-
+    
     app = current_app._get_current_object()
     _executor.submit(_run_enrichment, app, wine_id)
 

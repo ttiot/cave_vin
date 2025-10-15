@@ -6,6 +6,8 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Iterable, List, Optional
 
 import requests
@@ -28,7 +30,7 @@ class InsightData:
 
 
 class WineInfoService:
-    """Aggregate data from public APIs (Wikipedia, DuckDuckGo, OpenAI, …)."""
+    """Aggregate data from public APIs (OpenAI)."""
 
     def __init__(
         self,
@@ -46,12 +48,16 @@ class WineInfoService:
     @classmethod
     def from_app(cls, app) -> "WineInfoService":
         """Factory that uses the Flask app configuration to bootstrap providers."""
+        logger.info("🔧 Initialisation de WineInfoService depuis l'application Flask")
 
         openai_client = None
         client_kwargs = {}
 
         api_key = (app.config.get("OPENAI_API_KEY") or "").strip()
         base_url = (app.config.get("OPENAI_BASE_URL") or "").strip()
+
+        logger.debug("Configuration OpenAI - API Key présente: %s, Base URL: %s",
+                    bool(api_key), base_url or "par défaut")
 
         if api_key:
             client_kwargs["api_key"] = api_key
@@ -62,16 +68,19 @@ class WineInfoService:
         if client_kwargs:
             try:
                 openai_client = OpenAI(**client_kwargs)
+                logger.info("✅ Client OpenAI initialisé avec succès")
             except OpenAIError as exc:  # pragma: no cover - defensive logging
-                logger.warning("Impossible d'initialiser le client OpenAI : %s", exc)
+                logger.warning("❌ Impossible d'initialiser le client OpenAI : %s", exc)
 
         openai_model = (
             (app.config.get("OPENAI_MODEL") or "").strip()
             or (app.config.get("OPENAI_FREE_MODEL") or "").strip()
             or "gpt-4o-mini"
         )
+        logger.info("📋 Modèle OpenAI configuré: %s", openai_model)
 
         source_name = (app.config.get("OPENAI_SOURCE_NAME") or "OpenAI").strip() or "OpenAI"
+        logger.debug("Source name: %s", source_name)
 
         return cls(
             openai_client=openai_client,
@@ -84,175 +93,62 @@ class WineInfoService:
     # ------------------------------------------------------------------
     def fetch(self, wine) -> List[InsightData]:
         """Return a list of insights for the provided wine model instance."""
+        logger.info("=" * 80)
+        logger.info("🍷 Début de la récupération d'informations pour le vin: %s", wine.name)
 
         query = self._build_query(wine)
+        logger.debug("🔍 Requête construite: '%s'", query)
+        
         if not query:
+            logger.warning("⚠️ Requête vide, abandon de la récupération")
             return []
 
-        logger.info("Fetching contextual data for wine %s", query)
+        logger.info("📊 Fetching contextual data for wine: %s", query)
         insights: List[InsightData] = []
 
-        providers = [
-            ("wikipedia", lambda: self._wikipedia_insights(query)),
-            ("duckduckgo", lambda: self._duckduckgo_insights(query)),
-        ]
+        providers = []
 
         if self.openai_client:
+            logger.info("🤖 Client OpenAI disponible, ajout du provider OpenAI")
             providers.append(("openai", lambda: self._openai_insights(wine, query)))
+        else:
+            logger.info("⚠️ Client OpenAI non disponible, skip du provider OpenAI")
+
+        logger.info("📡 Nombre de providers à interroger: %d", len(providers))
 
         for provider_name, provider_callable in providers:
+            logger.info("🔄 Interrogation du provider: %s", provider_name)
             try:
-                insights.extend(provider_callable())
-            except Exception:  # pragma: no cover - defensive logging
-                logger.exception("Provider %s failed for %s", provider_name, query)
+                provider_insights = list(provider_callable())
+                insights.extend(provider_insights)
+                logger.info("✅ Provider %s: %d insights récupérés",
+                          provider_name, len(provider_insights))
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.exception("❌ Provider %s failed for %s: %s",
+                               provider_name, query, exc)
 
-        return self._deduplicate(insights)
+        logger.info("🔄 Déduplication des insights (%d avant déduplication)", len(insights))
+        deduplicated = self._deduplicate(insights)
+        logger.info("✅ Récupération terminée: %d insights uniques", len(deduplicated))
+        logger.info("=" * 80)
+        
+        return deduplicated
 
     # ------------------------------------------------------------------
     # Providers
     # ------------------------------------------------------------------
-    def _wikipedia_insights(self, query: str) -> Iterable[InsightData]:
-        """Return summary information collected through the Wikipedia API."""
-
-        languages = ("fr", "en")
-        for lang in languages:
-            search_params = {
-                "action": "query",
-                "list": "search",
-                "srsearch": query,
-                "srlimit": 1,
-                "format": "json",
-            }
-            search_response = self._request(
-                f"https://{lang}.wikipedia.org/w/api.php", params=search_params
-            )
-            if not search_response:
-                continue
-
-            hits = search_response.get("query", {}).get("search", [])
-            if not hits:
-                continue
-
-            hit = hits[0]
-            page_id = hit.get("pageid")
-            title = hit.get("title")
-            if not page_id:
-                continue
-
-            extract_params = {
-                "action": "query",
-                "prop": "extracts",
-                "explaintext": 1,
-                "exintro": 1,
-                "pageids": page_id,
-                "format": "json",
-            }
-            extract_response = self._request(
-                f"https://{lang}.wikipedia.org/w/api.php", params=extract_params
-            )
-            if not extract_response:
-                continue
-
-            pages = extract_response.get("query", {}).get("pages", {})
-            page_data = pages.get(str(page_id))
-            if not page_data:
-                continue
-
-            summary = page_data.get("extract", "")
-            cleaned = self._clean_text(summary)
-            if not cleaned:
-                continue
-
-            url_title = (title or "").replace(" ", "_")
-            page_url = f"https://{lang}.wikipedia.org/wiki/{url_title}" if title else None
-            source_name = f"Wikipedia ({lang})"
-
-            yield InsightData(
-                category="domaine",
-                title=f"{title} — aperçu" if title else "Aperçu du domaine",
-                content=self._truncate(cleaned, 800),
-                source_name=source_name,
-                source_url=page_url,
-                weight=10,
-            )
-
-            if cleaned and len(cleaned) > 400:
-                # Provide a shorter digest for the hover previews
-                yield InsightData(
-                    category="synthese",
-                    title="Résumé rapide",
-                    content=self._truncate(cleaned, 320),
-                    source_name=source_name,
-                    source_url=page_url,
-                    weight=8,
-                )
-
-            # Stop at the first language that yields a result to avoid duplicates
-            break
-
-    def _duckduckgo_insights(self, query: str) -> Iterable[InsightData]:
-        params = {
-            "q": query,
-            "format": "json",
-            "no_redirect": 1,
-            "no_html": 1,
-            "skip_disambig": 1,
-        }
-        response_json = self._request("https://api.duckduckgo.com/", params=params)
-        if not response_json:
-            return []
-
-        abstract = self._clean_text(response_json.get("AbstractText"))
-        abstract_url = response_json.get("AbstractURL") or None
-        abstract_source = response_json.get("AbstractSource") or "DuckDuckGo"
-
-        insights: List[InsightData] = []
-        if abstract:
-            insights.append(
-                InsightData(
-                    category="profil",
-                    title=response_json.get("Heading") or "Profil général",
-                    content=self._truncate(abstract, 600),
-                    source_name=abstract_source,
-                    source_url=abstract_url,
-                    weight=5,
-                )
-            )
-
-        related = response_json.get("RelatedTopics") or []
-        bullets: List[str] = []
-        for item in related:
-            if isinstance(item, dict) and item.get("Text"):
-                bullets.append(item["Text"])
-            elif isinstance(item, dict) and item.get("Topics"):
-                for sub_item in item["Topics"]:
-                    if isinstance(sub_item, dict) and sub_item.get("Text"):
-                        bullets.append(sub_item["Text"])
-            if len(bullets) >= 3:
-                break
-
-        if bullets:
-            formatted = "\n".join(f"• {self._clean_text(text)}" for text in bullets[:3])
-            insights.append(
-                InsightData(
-                    category="faits_marquant",
-                    title="Points clés",  # purposely french label
-                    content=self._truncate(formatted, 600),
-                    source_name="DuckDuckGo",
-                    source_url=abstract_url,
-                    weight=3,
-                )
-            )
-
-        return insights
-
     def _openai_insights(self, wine, query: str) -> Iterable[InsightData]:
+        logger.info("🤖 OpenAI: début de la génération d'insights")
+        
         if not self.openai_client:
+            logger.warning("⚠️ OpenAI: client non disponible")
             return []
 
         if not self.openai_model:
-            logger.info("Aucun modèle OpenAI configuré ; abandon de la requête")
+            logger.info("⚠️ Aucun modèle OpenAI configuré ; abandon de la requête")
             return []
+
+        logger.debug("🤖 OpenAI: modèle utilisé: %s", self.openai_model)
 
         details = [f"Nom: {wine.name}"]
         if getattr(wine, "year", None):
@@ -265,9 +161,9 @@ class WineInfoService:
             details.append(
                 f"Description utilisateur: {self._truncate(str(wine.description), 280)}"
             )
-        if getattr(wine, "cellar", None):
-            details.append(f"Cave: {wine.cellar.name}")
         details.append(f"Requête utilisée: {query}")
+        
+        logger.debug("📋 OpenAI: détails du vin collectés: %s", ", ".join(details))
 
         system_prompt = (
             "Tu es un assistant sommelier chargé d'enrichir la fiche d'un vin. "
@@ -308,46 +204,84 @@ class WineInfoService:
             },
             "required": ["insights"],
         }
+        
+        logger.info("📤 OpenAI: envoi de la requête à l'API")
+        logger.debug("System prompt: %s", system_prompt[:100] + "...")
+        logger.debug("User prompt: %s", user_prompt[:100] + "...")
 
         try:
+            # Utilisation de l'API Responses avec le type correct 'input_text'
             response = self.openai_client.responses.create(
                 model=self.openai_model,
                 input=[
                     {
                         "role": "system",
-                        "content": [{"type": "text", "text": system_prompt.strip()}],
+                        "content": [{"type": "input_text", "text": system_prompt.strip()}],
                     },
                     {
                         "role": "user",
-                        "content": [{"type": "text", "text": user_prompt.strip()}],
+                        "content": [{"type": "input_text", "text": user_prompt.strip()}],
                     },
                 ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {"name": "wine_enrichment", "schema": schema},
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "wine_enrichment",
+                        "schema": schema
+                    },
                 },
                 max_output_tokens=900,
             )
+            logger.info("✅ OpenAI: réponse reçue de l'API")
+            
+            # Enregistrement de la requête et de la réponse
+            self._log_openai_request_response(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=schema,
+                response=response,
+                error=None
+            )
+            
         except OpenAIError as exc:
-            logger.warning("Requête OpenAI échouée : %s", exc)
+            logger.warning("❌ Requête OpenAI échouée : %s", exc)
+            self._log_openai_request_response(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=schema,
+                response=None,
+                error=str(exc)
+            )
             return []
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.warning("Erreur inattendue lors de l'appel OpenAI : %s", exc)
+            logger.warning("❌ Erreur inattendue lors de l'appel OpenAI : %s", exc)
+            self._log_openai_request_response(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=schema,
+                response=None,
+                error=f"Unexpected error: {exc}"
+            )
             return []
 
+        logger.debug("🔍 OpenAI: parsing de la réponse")
         payload = self._parse_openai_payload(response)
 
         if not payload:
+            logger.warning("⚠️ OpenAI: impossible de parser la réponse")
             return []
 
         items = payload.get("insights") or []
+        logger.info("📊 OpenAI: %d insight(s) trouvé(s) dans la réponse", len(items))
         insights: List[InsightData] = []
         for index, item in enumerate(items[:5]):
             raw_content = (item.get("content") or "").strip()
             if not raw_content:
+                logger.debug("⚠️ OpenAI: insight #%d ignoré (contenu vide)", index)
                 continue
 
             category = (item.get("category") or "").strip() or "analyse"
+            logger.debug("✅ OpenAI: création insight #%d - catégorie: %s", index, category)
             title = (item.get("title") or "").strip() or None
             source_name = (item.get("source") or self.openai_source_name).strip() or self.openai_source_name
 
@@ -368,41 +302,58 @@ class WineInfoService:
                     weight=weight_value,
                 )
             )
-
+        
+        logger.info("✅ OpenAI: %d insight(s) créé(s) avec succès", len(insights))
         return insights
 
     def _parse_openai_payload(self, response) -> Optional[dict]:
+        logger.debug("🔍 Parsing de la réponse OpenAI")
+        
         if response is None:
+            logger.debug("⚠️ Réponse OpenAI est None")
             return None
 
         text_payload = getattr(response, "output_text", None)
         if text_payload:
+            logger.debug("📝 Tentative de parsing depuis output_text")
             try:
-                return json.loads(text_payload)
+                parsed = json.loads(text_payload)
+                logger.debug("✅ Parsing réussi depuis output_text")
+                return parsed
             except json.JSONDecodeError:
-                logger.debug("Le texte retourné par OpenAI n'est pas du JSON valide")
+                logger.debug("❌ Le texte retourné par OpenAI n'est pas du JSON valide")
 
+        logger.debug("🔍 Tentative de parsing depuis model_dump()")
         try:
             raw = response.model_dump()
-        except Exception:  # pragma: no cover - defensive guard
+            logger.debug("✅ model_dump() réussi, type: %s", type(raw))
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.debug("❌ model_dump() échoué: %s", exc)
             raw = None
 
         if isinstance(raw, dict):
+            logger.debug("📊 Analyse de la structure raw (dict)")
             outputs = raw.get("output") or []
             for block in outputs:
                 for content in block.get("content", []):
                     if content.get("type") == "json":
+                        logger.debug("✅ Trouvé un bloc de type 'json'")
                         candidate = content.get("json")
                         if isinstance(candidate, dict):
+                            logger.debug("✅ Parsing réussi depuis bloc json")
                             return candidate
                         try:
                             return json.loads(json.dumps(candidate))
                         except (TypeError, ValueError):
                             continue
                     if content.get("type") in {"text", "output_text"} and content.get("text"):
+                        logger.debug("🔍 Tentative de parsing depuis bloc text/output_text")
                         try:
-                            return json.loads(content["text"])
+                            parsed = json.loads(content["text"])
+                            logger.debug("✅ Parsing réussi depuis bloc text")
+                            return parsed
                         except json.JSONDecodeError:
+                            logger.debug("❌ Parsing JSON échoué depuis bloc text")
                             continue
 
             choices = raw.get("choices") or []
@@ -411,34 +362,46 @@ class WineInfoService:
                 text = message.get("content")
                 if not text:
                     continue
+                logger.debug("🔍 Tentative de parsing depuis choices.message.content")
                 try:
-                    return json.loads(text)
+                    parsed = json.loads(text)
+                    logger.debug("✅ Parsing réussi depuis choices")
+                    return parsed
                 except json.JSONDecodeError:
+                    logger.debug("❌ Parsing JSON échoué depuis choices")
                     continue
 
+        logger.warning("⚠️ Impossible de parser la réponse OpenAI avec toutes les méthodes")
         return None
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
     def _request(self, url: str, params: Optional[dict[str, str]] = None) -> Optional[dict]:
+        logger.debug("🌐 Requête HTTP vers: %s", url)
+        logger.debug("📋 Paramètres: %s", params)
+        
         try:
             response = self.session.get(url, params=params, timeout=8)
+            logger.debug("✅ Réponse reçue - Status: %d", response.status_code)
         except requests.RequestException as exc:
-            logger.warning("Request to %s failed: %s", url, exc)
+            logger.warning("❌ Request to %s failed: %s", url, exc)
             return None
 
         if response.status_code != 200:
-            logger.warning("Request to %s failed with status %s", url, response.status_code)
+            logger.warning("❌ Request to %s failed with status %s", url, response.status_code)
             return None
 
         try:
-            return response.json()
+            json_data = response.json()
+            logger.debug("✅ JSON décodé avec succès")
+            return json_data
         except json.JSONDecodeError:
-            logger.warning("Unable to decode JSON from %s", url)
+            logger.warning("❌ Unable to decode JSON from %s", url)
             return None
 
     def _build_query(self, wine) -> str:
+        logger.debug("🔨 Construction de la requête pour le vin: %s", wine.name)
         parts = [wine.name]
         if getattr(wine, "year", None):
             parts.append(str(wine.year))
@@ -447,7 +410,9 @@ class WineInfoService:
         grape = getattr(wine, "grape", None)
         if grape:
             parts.append(grape)
-        return " ".join(filter(None, parts)).strip()
+        query = " ".join(filter(None, parts)).strip()
+        logger.debug("✅ Requête construite: '%s'", query)
+        return query
 
     @staticmethod
     def _clean_text(value: Optional[str]) -> str:
@@ -462,10 +427,69 @@ class WineInfoService:
             return value
         return value[: max_length - 1].rstrip() + "…"
 
+    def _log_openai_request_response(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema: dict,
+        response,
+        error: Optional[str]
+    ) -> None:
+        """Enregistre la requête et la réponse OpenAI dans un fichier JSON."""
+        try:
+            # Créer le répertoire si nécessaire
+            log_dir = Path("logs/openai_responses")
+            log_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Générer un nom de fichier unique avec timestamp
+            timestamp = datetime.now()
+            filename = timestamp.strftime("openai_%Y%m%d_%H%M%S_%f.json")
+            filepath = log_dir / filename
+            
+            # Préparer les données de log
+            log_data = {
+                "timestamp": timestamp.isoformat(),
+                "model": self.openai_model,
+                "request": {
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "schema": schema
+                },
+                "response": {}
+            }
+            
+            if error:
+                log_data["response"]["error"] = error
+                log_data["response"]["parsed_data"] = None
+                logger.debug("💾 Enregistrement de l'erreur OpenAI dans: %s", filepath)
+            else:
+                # Tenter de parser la réponse
+                parsed_data = self._parse_openai_payload(response)
+                log_data["response"]["parsed_data"] = parsed_data
+                
+                # Ajouter la réponse brute si disponible
+                try:
+                    log_data["response"]["raw"] = response.model_dump() if response else None
+                except Exception:
+                    log_data["response"]["raw"] = None
+                
+                log_data["response"]["error"] = None
+                logger.debug("💾 Enregistrement de la réponse OpenAI dans: %s", filepath)
+            
+            # Écrire le fichier JSON
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(log_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info("✅ Log OpenAI enregistré: %s", filepath)
+            
+        except Exception as exc:
+            logger.error("❌ Erreur lors de l'enregistrement du log OpenAI: %s", exc)
+
     @staticmethod
     def _deduplicate(insights: Iterable[InsightData]) -> List[InsightData]:
         seen = set()
         result: List[InsightData] = []
+        duplicates_count = 0
         for insight in insights:
             key = (
                 insight.category,
@@ -474,7 +498,12 @@ class WineInfoService:
                 insight.source_url,
             )
             if key in seen:
+                duplicates_count += 1
                 continue
             seen.add(key)
             result.append(insight)
+        
+        if duplicates_count > 0:
+            logger.debug("🔄 Déduplication: %d doublons supprimés", duplicates_count)
+        
         return result
