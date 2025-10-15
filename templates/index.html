@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="m-0">Mes vins</h3>
+  <a href="{{ url_for('add_wine') }}" class="btn btn-dark">+ Ajouter</a>
+</div>
+<div class="row row-cols-1 row-cols-md-3 g-4">
+  {% for wine in wines %}
+  <div class="col">
+    <div class="card shadow-sm h-100">
+      {% if wine.image_url %}
+      <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
+      {% endif %}
+      <div class="card-body">
+        <h5 class="card-title">{{ wine.name }}</h5>
+        <p class="card-text">
+          {{ wine.region or 'Région inconnue' }}{% if wine.year %} — {{ wine.year }}{% endif %}<br>
+          Cépage : {{ wine.grape or 'Inconnu' }}
+        </p>
+        {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
+      </div>
+      <div class="card-footer bg-white">
+        <small class="text-muted">Quantité : {{ wine.quantity }}</small>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col">
+    <div class="alert alert-secondary">Aucun vin pour le moment. Ajoutez votre premier vin !</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

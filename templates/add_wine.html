@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Ajouter un vin</h3>
+<form method="POST">
+  <div class="mb-3">
+    <label class="form-label">Nom du vin</label>
+    <input type="text" class="form-control" name="name" placeholder="Ex: Château Margaux">
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Région</label>
+      <input type="text" class="form-control" name="region" placeholder="Bordeaux, Bourgogne...">
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Cépage</label>
+      <input type="text" class="form-control" name="grape" placeholder="Merlot, Pinot Noir...">
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Année</label>
+      <input type="number" class="form-control" name="year" min="1900" max="2100">
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Code-barres</label>
+      <div class="input-group">
+        <input type="text" class="form-control" id="barcode" name="barcode" placeholder="EAN/UPC">
+        <button type="button" class="btn btn-outline-secondary" id="scan-btn">Scanner</button>
+      </div>
+    </div>
+  </div>
+  <div id="scanner-container" class="my-3" style="display:none;">
+    <div class="ratio ratio-4x3 border rounded">
+      <div id="scanner" class="w-100 h-100"></div>
+    </div>
+    <div class="form-text">Pointez la caméra arrière sur l'étiquette/code-barres.</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    <textarea class="form-control" name="description" rows="3"></textarea>
+  </div>
+  <button type="submit" class="btn btn-dark w-100">Sauvegarder</button>
+</form>
+{% endblock %}
