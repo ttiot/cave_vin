@@ -33,7 +33,10 @@
         <div class="col-md-6 mb-2">
           <div class="d-flex justify-content-between align-items-center p-2 border rounded">
             <div>
-              <strong>{{ subcategory.name }}</strong>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <strong class="mb-0">{{ subcategory.name }}</strong>
+                <span class="badge" style="{{ subcategory|subcategory_badge_style }}">{{ subcategory.name }}</span>
+              </div>
               {% if subcategory.description %}
               <br><small class="text-muted">{{ subcategory.description }}</small>
               {% endif %}
