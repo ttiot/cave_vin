@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import selectinload
 from sqlalchemy import or_
@@ -41,9 +42,23 @@ def _sanitize_color(value: str, fallback: str) -> str:
 
 
 def _resolve_redirect(default_endpoint: str) -> str:
+    """Résout une redirection de manière sécurisée en validant l'URL."""
     target = (request.form.get('redirect') or '').strip()
-    if target.startswith('/'):
-        return target
+    
+    # Validation stricte : uniquement les chemins relatifs sans '..'
+    if target and target.startswith('/') and '..' not in target:
+        # Vérifier que c'est un chemin valide de l'application
+        try:
+            # Tenter de construire l'URL pour valider qu'elle existe
+            from urllib.parse import urlparse
+            parsed = urlparse(target)
+            # Rejeter si contient un schéma (http://, etc.) ou un netloc (domaine)
+            if parsed.scheme or parsed.netloc:
+                return url_for(default_endpoint)
+            return target
+        except (ValueError, AttributeError):
+            pass
+    
     return url_for(default_endpoint)
 
 def get_subcategory_badge_style(subcategory):
@@ -58,28 +73,32 @@ def get_subcategory_badge_style(subcategory):
     return f"background-color: {background}; color: {text_color};"
 
 def create_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
-    db.init_app(app)
+    flask_app = Flask(__name__)
+    flask_app.config.from_object(Config)
+    
+    # Initialiser la protection CSRF
+    CSRFProtect(flask_app)
+    
+    db.init_app(flask_app)
     
     # Enregistrer le filtre Jinja2 pour les couleurs de badges
-    app.jinja_env.filters['subcategory_badge_style'] = get_subcategory_badge_style
+    flask_app.jinja_env.filters['subcategory_badge_style'] = get_subcategory_badge_style
     
     # Configuration du logging pour afficher les logs INFO et DEBUG
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    app.logger.setLevel(logging.INFO)
+    flask_app.logger.setLevel(logging.INFO)
 
-    login_manager = LoginManager(app)
+    login_manager = LoginManager(flask_app)
     login_manager.login_view = "login"
 
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    @app.before_request
+    @flask_app.before_request
     def check_temporary_password():
         # Vérifier si l'utilisateur connecté a un mot de passe temporaire
         if (current_user.is_authenticated and
@@ -87,14 +106,14 @@ def create_app():
             request.endpoint not in ['change_password', 'logout', 'static']):
             return redirect(url_for('change_password'))
 
-    @app.before_request
+    @flask_app.before_request
     def ensure_db():
         # Create DB tables lazily (first request), and seed default admin if needed
         # Using before_request for Flask>=3 compatibility (before_first_request removed)
-        if not hasattr(app, "_db_initialized"):
-            with app.app_context():
+        if not hasattr(flask_app, "_db_initialized"):
+            with flask_app.app_context():
                 db.create_all()
-                run_migrations(app)
+                run_migrations(flask_app)
                 if not User.query.filter_by(username="admin").first():
                     # Obtenir le mot de passe admin par défaut
                     admin_password, is_temporary = Config.get_default_admin_password()
@@ -115,13 +134,13 @@ def create_app():
                         print("="*60 + "\n")
                         
                         # Log également pour les logs de l'application
-                        app.logger.warning("Compte admin créé avec mot de passe temporaire : %s", admin_password)
+                        flask_app.logger.warning("Compte admin créé avec mot de passe temporaire : %s", admin_password)
                     else:
                         print("\n🔐 Compte admin créé avec le mot de passe défini dans DEFAULT_ADMIN_PASSWORD\n")
-                        app.logger.info("Compte admin créé avec mot de passe depuis variable d'environnement")
-            app._db_initialized = True
+                        flask_app.logger.info("Compte admin créé avec mot de passe depuis variable d'environnement")
+            flask_app._db_initialized = True
 
-    @app.route('/login', methods=['GET', 'POST'])
+    @flask_app.route('/login', methods=['GET', 'POST'])
     def login():
         if request.method == 'POST':
             username = request.form['username']
@@ -133,13 +152,13 @@ def create_app():
             flash("Identifiants incorrects.")
         return render_template('login.html')
 
-    @app.route('/logout')
+    @flask_app.route('/logout')
     @login_required
     def logout():
         logout_user()
         return redirect(url_for('login'))
 
-    @app.route('/change_password', methods=['GET', 'POST'])
+    @flask_app.route('/change_password', methods=['GET', 'POST'])
     @login_required
     def change_password():
         if request.method == 'POST':
@@ -172,7 +191,7 @@ def create_app():
         
         return render_template('change_password.html')
 
-    @app.route('/')
+    @flask_app.route('/')
     @login_required
     def index():
         wines = (
@@ -203,13 +222,13 @@ def create_app():
         
         return render_template('index.html', wines_by_cellar=wines_by_cellar, cellars=cellars)
 
-    @app.route('/cellars', methods=['GET'])
+    @flask_app.route('/cellars', methods=['GET'])
     @login_required
     def list_cellars():
         cellars = Cellar.query.order_by(Cellar.name.asc()).all()
         return render_template('cellars.html', cellars=cellars)
 
-    @app.route('/cellars/add', methods=['GET', 'POST'])
+    @flask_app.route('/cellars/add', methods=['GET', 'POST'])
     @login_required
     def add_cellar():
         categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
@@ -265,7 +284,7 @@ def create_app():
             return redirect(url_for('list_cellars'))
 
         return render_template('add_cellar.html', floor_capacities=[''], categories=categories)
-    @app.route('/cellars/<int:cellar_id>/edit', methods=['GET', 'POST'])
+    @flask_app.route('/cellars/<int:cellar_id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_cellar(cellar_id):
         """Modifier une cave existante."""
@@ -329,7 +348,7 @@ def create_app():
         return render_template('edit_cellar.html', cellar=cellar, categories=categories)
 
 
-    @app.route('/add', methods=['GET', 'POST'])
+    @flask_app.route('/add', methods=['GET', 'POST'])
     @login_required
     def add_wine():
         cellars = Cellar.query.order_by(Cellar.name.asc()).all()
@@ -385,7 +404,7 @@ def create_app():
         selected_cellar_id = cellars[0].id if len(cellars) == 1 else None
         return render_template('add_wine.html', cellars=cellars, categories=categories, selected_cellar_id=selected_cellar_id)
 
-    @app.route('/wines/<int:wine_id>', methods=['GET'])
+    @flask_app.route('/wines/<int:wine_id>', methods=['GET'])
     @login_required
     def wine_detail(wine_id):
         wine = (
@@ -399,7 +418,7 @@ def create_app():
         )
         return render_template('wine_detail.html', wine=wine)
 
-    @app.route('/wines/<int:wine_id>/refresh', methods=['POST'])
+    @flask_app.route('/wines/<int:wine_id>/refresh', methods=['POST'])
     @login_required
     def refresh_wine(wine_id):
         wine = Wine.query.get_or_404(wine_id)
@@ -407,7 +426,7 @@ def create_app():
         flash("La récupération des informations a été relancée.")
         return redirect(_resolve_redirect('index'))
 
-    @app.route('/wines/<int:wine_id>/consume', methods=['POST'])
+    @flask_app.route('/wines/<int:wine_id>/consume', methods=['POST'])
     @login_required
     def consume_wine(wine_id):
         wine = Wine.query.get_or_404(wine_id)
@@ -431,7 +450,7 @@ def create_app():
         flash("Une bouteille a été marquée comme consommée.")
         return redirect(_resolve_redirect('index'))
 
-    @app.route('/wines/<int:wine_id>/delete', methods=['POST'])
+    @flask_app.route('/wines/<int:wine_id>/delete', methods=['POST'])
     @login_required
     def delete_wine(wine_id):
         wine = Wine.query.get_or_404(wine_id)
@@ -440,7 +459,7 @@ def create_app():
         flash("Le vin a été supprimé de votre cave.")
         return redirect(_resolve_redirect('index'))
 
-    @app.route('/consommations', methods=['GET'])
+    @flask_app.route('/consommations', methods=['GET'])
     @login_required
     def consumption_history():
         consumptions = (
@@ -450,14 +469,14 @@ def create_app():
         )
         return render_template('consumption_history.html', consumptions=consumptions)
 
-    @app.route('/categories', methods=['GET'])
+    @flask_app.route('/categories', methods=['GET'])
     @login_required
     def list_categories():
         """Liste toutes les catégories et sous-catégories d'alcool."""
         categories = AlcoholCategory.query.order_by(AlcoholCategory.display_order, AlcoholCategory.name).all()
         return render_template('categories.html', categories=categories)
 
-    @app.route('/categories/add', methods=['GET', 'POST'])
+    @flask_app.route('/categories/add', methods=['GET', 'POST'])
     @login_required
     def add_category():
         """Ajouter une nouvelle catégorie."""
@@ -484,7 +503,7 @@ def create_app():
         
         return render_template('add_category.html')
 
-    @app.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
+    @flask_app.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_category(category_id):
         """Modifier une catégorie existante."""
@@ -517,7 +536,7 @@ def create_app():
         
         return render_template('edit_category.html', category=category)
 
-    @app.route('/categories/<int:category_id>/delete', methods=['POST'])
+    @flask_app.route('/categories/<int:category_id>/delete', methods=['POST'])
     @login_required
     def delete_category(category_id):
         """Supprimer une catégorie."""
@@ -537,7 +556,7 @@ def create_app():
         flash('Catégorie supprimée avec succès.')
         return redirect(url_for('list_categories'))
 
-    @app.route('/categories/<int:category_id>/subcategories/add', methods=['GET', 'POST'])
+    @flask_app.route('/categories/<int:category_id>/subcategories/add', methods=['GET', 'POST'])
     @login_required
     def add_subcategory(category_id):
         """Ajouter une sous-catégorie à une catégorie."""
@@ -591,7 +610,7 @@ def create_app():
         
         return render_template('add_subcategory.html', category=category)
 
-    @app.route('/subcategories/<int:subcategory_id>/edit', methods=['GET', 'POST'])
+    @flask_app.route('/subcategories/<int:subcategory_id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_subcategory(subcategory_id):
         """Modifier une sous-catégorie existante."""
@@ -639,7 +658,7 @@ def create_app():
 
         return render_template('edit_subcategory.html', subcategory=subcategory)
 
-    @app.route('/subcategories/<int:subcategory_id>/delete', methods=['POST'])
+    @flask_app.route('/subcategories/<int:subcategory_id>/delete', methods=['POST'])
     @login_required
     def delete_subcategory(subcategory_id):
         """Supprimer une sous-catégorie."""
@@ -657,14 +676,14 @@ def create_app():
         flash('Sous-catégorie supprimée avec succès.')
         return redirect(url_for('list_categories'))
 
-    @app.route('/cellar-categories', methods=['GET'])
+    @flask_app.route('/cellar-categories', methods=['GET'])
     @login_required
     def list_cellar_categories():
         """Liste toutes les catégories de cave."""
         categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
         return render_template('cellar_categories.html', categories=categories)
 
-    @app.route('/cellar-categories/add', methods=['GET', 'POST'])
+    @flask_app.route('/cellar-categories/add', methods=['GET', 'POST'])
     @login_required
     def add_cellar_category():
         """Ajouter une nouvelle catégorie de cave."""
@@ -691,7 +710,7 @@ def create_app():
         
         return render_template('add_cellar_category.html')
 
-    @app.route('/cellar-categories/<int:category_id>/edit', methods=['GET', 'POST'])
+    @flask_app.route('/cellar-categories/<int:category_id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_cellar_category(category_id):
         """Modifier une catégorie de cave existante."""
@@ -724,7 +743,7 @@ def create_app():
         
         return render_template('edit_cellar_category.html', category=category)
 
-    @app.route('/cellar-categories/<int:category_id>/delete', methods=['POST'])
+    @flask_app.route('/cellar-categories/<int:category_id>/delete', methods=['POST'])
     @login_required
     def delete_cellar_category(category_id):
         """Supprimer une catégorie de cave."""
@@ -742,7 +761,7 @@ def create_app():
         flash('Catégorie de cave supprimée avec succès.')
         return redirect(url_for('list_cellar_categories'))
 
-    @app.route('/wines/<int:wine_id>/edit', methods=['GET', 'POST'])
+    @flask_app.route('/wines/<int:wine_id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_wine(wine_id):
         """Modifier un vin existant."""
@@ -788,7 +807,7 @@ def create_app():
         
         return render_template('edit_wine.html', wine=wine, cellars=cellars, categories=categories)
 
-    @app.route('/search', methods=['GET'])
+    @flask_app.route('/search', methods=['GET'])
     @login_required
     def search_wines():
         """Recherche multi-critères dans les vins et leurs insights."""
@@ -825,13 +844,15 @@ def create_app():
         
         # Filtrer par accord mets-vins si spécifié
         if food_pairing:
-            # Rechercher dans les insights (content, title, category)
-            search_pattern = f"%{food_pairing}%"
+            # Échapper les caractères spéciaux SQL LIKE pour éviter l'injection
+            # Remplacer % et _ par leur version échappée
+            escaped_food_pairing = food_pairing.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            search_pattern = f"%{escaped_food_pairing}%"
             wine_ids_with_matching_insights = db.session.query(WineInsight.wine_id).filter(
                 or_(
-                    WineInsight.content.ilike(search_pattern),
-                    WineInsight.title.ilike(search_pattern),
-                    WineInsight.category.ilike(search_pattern)
+                    WineInsight.content.ilike(search_pattern, escape='\\'),
+                    WineInsight.title.ilike(search_pattern, escape='\\'),
+                    WineInsight.category.ilike(search_pattern, escape='\\')
                 )
             ).distinct().subquery()
             
@@ -848,7 +869,7 @@ def create_app():
             food_pairing=food_pairing
         )
 
-    @app.route('/a-consommer', methods=['GET'])
+    @flask_app.route('/a-consommer', methods=['GET'])
     @login_required
     def wines_to_consume():
         """Affiche les vins à consommer prochainement selon leur potentiel de garde."""
@@ -942,7 +963,7 @@ def create_app():
             current_year=current_year
         )
 
-    return app
+    return flask_app
 
 if __name__ == '__main__':
     app = create_app()

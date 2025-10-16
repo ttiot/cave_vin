@@ -3,9 +3,13 @@ import secrets
 import string
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev_secret_key')
+    # Génération automatique d'une SECRET_KEY sécurisée si non définie
+    SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///wines.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Protection CSRF
+    WTF_CSRF_ENABLED = True
+    WTF_CSRF_TIME_LIMIT = None  # Pas de limite de temps pour les tokens CSRF
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', 'https://api.openai.com/v1')
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL')

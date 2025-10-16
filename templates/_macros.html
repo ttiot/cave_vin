@@ -1,0 +1,10 @@
+{# Macro pour ouvrir un formulaire avec protection CSRF #}
+{% macro form_start(method='POST', action='', class='', id='', onsubmit='') %}
+<form method="{{ method }}" {% if action %}action="{{ action }}"{% endif %} {% if class %}class="{{ class }}"{% endif %} {% if id %}id="{{ id }}"{% endif %} {% if onsubmit %}onsubmit="{{ onsubmit }}"{% endif %}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+{% endmacro %}
+
+{# Macro pour fermer un formulaire #}
+{% macro form_end() %}
+</form>
+{% endmacro %}
