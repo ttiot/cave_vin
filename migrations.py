@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from models import db
+from app.field_config import get_display_order
 
 
 Migration = Tuple[str, Callable[[Connection], None]]
@@ -673,14 +674,40 @@ def _populate_default_field_requirements(connection: Connection) -> None:
             },
         )
 
-    _ensure_requirement(
-        field_name="volume_ml",
-        category_id=None,
-        subcategory_id=None,
-        is_enabled=True,
-        is_required=True,
-        display_order=20,
-    )
+    global_defaults = [
+        {
+            "field_name": "region",
+            "category_id": None,
+            "subcategory_id": None,
+            "is_enabled": True,
+            "is_required": False,
+        },
+        {
+            "field_name": "year",
+            "category_id": None,
+            "subcategory_id": None,
+            "is_enabled": True,
+            "is_required": False,
+        },
+        {
+            "field_name": "volume_ml",
+            "category_id": None,
+            "subcategory_id": None,
+            "is_enabled": True,
+            "is_required": True,
+        },
+        {
+            "field_name": "description",
+            "category_id": None,
+            "subcategory_id": None,
+            "is_enabled": True,
+            "is_required": False,
+        },
+    ]
+
+    for default in global_defaults:
+        default["display_order"] = get_display_order(default["field_name"])
+        _ensure_requirement(**default)
 
     wine_category_id = connection.execute(
         text("SELECT id FROM alcohol_category WHERE LOWER(name) = 'vins'")
@@ -693,7 +720,7 @@ def _populate_default_field_requirements(connection: Connection) -> None:
             subcategory_id=None,
             is_enabled=True,
             is_required=False,
-            display_order=30,
+            display_order=get_display_order("grape"),
         )
 
 

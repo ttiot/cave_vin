@@ -2,9 +2,11 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
+from sqlalchemy.orm import selectinload
 
-from models import AlcoholCategory, AlcoholSubcategory, Wine, db
+from models import AlcoholCategory, AlcoholSubcategory, AlcoholFieldRequirement, Wine, db
 from app.utils.formatters import sanitize_color, DEFAULT_BADGE_BG_COLOR, DEFAULT_BADGE_TEXT_COLOR
+from app.field_config import FIELD_DEFINITIONS, iter_fields, get_display_order
 
 
 categories_bp = Blueprint('categories', __name__, url_prefix='/categories')
@@ -16,6 +18,134 @@ def list_categories():
     """Liste toutes les catégories et sous-catégories d'alcool."""
     categories = AlcoholCategory.query.order_by(AlcoholCategory.display_order, AlcoholCategory.name).all()
     return render_template('categories.html', categories=categories)
+
+
+def _blank_field_state() -> dict[str, dict[str, bool]]:
+    return {
+        field_name: {"enabled": False, "required": False}
+        for field_name, _ in iter_fields()
+    }
+
+
+def _build_settings_snapshot(categories: list[AlcoholCategory]) -> dict[str, dict]:
+    settings: dict[str, dict] = {
+        "global": _blank_field_state(),
+        "category": {},
+        "subcategory": {},
+    }
+
+    for category in categories:
+        settings["category"][category.id] = _blank_field_state()
+        for subcategory in category.subcategories:
+            settings["subcategory"][subcategory.id] = _blank_field_state()
+
+    requirements = AlcoholFieldRequirement.query.all()
+    for requirement in requirements:
+        rule = {
+            "enabled": bool(requirement.is_enabled),
+            "required": bool(requirement.is_required),
+        }
+
+        if requirement.subcategory_id:
+            target = settings["subcategory"].setdefault(
+                requirement.subcategory_id, _blank_field_state()
+            )
+        elif requirement.category_id:
+            target = settings["category"].setdefault(
+                requirement.category_id, _blank_field_state()
+            )
+        else:
+            target = settings["global"]
+
+        if requirement.field_name in target:
+            target[requirement.field_name] = rule
+
+    return settings
+
+
+def _input_name(scope: str, scope_id: int | None, field_name: str, attribute: str) -> str:
+    scope_key = scope if scope == "global" else f"{scope}_{scope_id}"
+    return f"{scope_key}__{field_name}__{attribute}"
+
+
+def _upsert_requirement(
+    field_name: str,
+    scope: str,
+    scope_id: int | None,
+    *,
+    enabled: bool,
+    required: bool,
+    parent_category_id: int | None = None,
+) -> None:
+    filters: dict[str, int | None | str] = {"field_name": field_name}
+
+    if scope == "category":
+        filters.update({"category_id": scope_id, "subcategory_id": None})
+    elif scope == "subcategory":
+        filters.update({"category_id": parent_category_id, "subcategory_id": scope_id})
+    else:
+        filters.update({"category_id": None, "subcategory_id": None})
+
+    requirement = AlcoholFieldRequirement.query.filter_by(**filters).first()
+
+    if requirement is None:
+        requirement = AlcoholFieldRequirement(**filters)
+
+    requirement.is_enabled = enabled
+    requirement.is_required = required and enabled
+    requirement.display_order = get_display_order(field_name)
+    db.session.add(requirement)
+
+
+@categories_bp.route('/field-requirements', methods=['GET', 'POST'])
+@login_required
+def manage_field_requirements():
+    """Permettre aux administrateurs de configurer la visibilité des champs."""
+
+    categories = (
+        AlcoholCategory.query.options(selectinload(AlcoholCategory.subcategories))
+        .order_by(AlcoholCategory.display_order, AlcoholCategory.name)
+        .all()
+    )
+    field_settings = _build_settings_snapshot(categories)
+
+    if request.method == 'POST':
+        scopes: list[tuple[str, int | None]] = [('global', None)]
+        subcategory_parents: dict[int, int | None] = {}
+
+        for category in categories:
+            scopes.append(('category', category.id))
+            for subcategory in category.subcategories:
+                subcategory_parents[subcategory.id] = category.id
+                scopes.append(('subcategory', subcategory.id))
+
+        for scope, scope_id in scopes:
+            for field_name, _ in iter_fields():
+                enabled = request.form.get(_input_name(scope, scope_id, field_name, 'enabled')) == '1'
+                required = request.form.get(_input_name(scope, scope_id, field_name, 'required')) == '1'
+                _upsert_requirement(
+                    field_name,
+                    scope,
+                    scope_id,
+                    enabled=enabled,
+                    required=required,
+                    parent_category_id=subcategory_parents.get(scope_id) if scope == 'subcategory' else None,
+                )
+
+        db.session.commit()
+        flash('Configuration des champs mise à jour avec succès.')
+        return redirect(url_for('categories.manage_field_requirements'))
+
+    ordered_fields = list(iter_fields())
+
+    return render_template(
+        'field_requirements.html',
+        categories=categories,
+        ordered_fields=ordered_fields,
+        field_definitions=FIELD_DEFINITIONS,
+        field_settings=field_settings,
+        input_name=_input_name,
+    )
 
 
 @categories_bp.route('/add', methods=['GET', 'POST'])

@@ -14,6 +14,7 @@ from models import (
     WineConsumption,
     db,
 )
+from app.field_config import FIELD_DEFINITIONS, iter_fields
 from app.utils.formatters import resolve_redirect
 from tasks import schedule_wine_enrichment
 
@@ -21,42 +22,10 @@ from tasks import schedule_wine_enrichment
 wines_bp = Blueprint('wines', __name__, url_prefix='/wines')
 
 
-FIELD_DEFINITIONS: dict[str, dict[str, object]] = {
-    "region": {
-        "label": "Région",
-        "default_enabled": True,
-        "default_required": False,
-    },
-    "grape": {
-        "label": "Cépage",
-        "default_enabled": False,
-        "default_required": False,
-    },
-    "year": {
-        "label": "Année",
-        "default_enabled": True,
-        "default_required": False,
-    },
-    "volume_ml": {
-        "label": "Contenance (mL)",
-        "default_enabled": False,
-        "default_required": False,
-    },
-    "description": {
-        "label": "Description",
-        "default_enabled": True,
-        "default_required": False,
-    },
-}
-
-
 def _initial_field_state() -> dict[str, dict[str, bool]]:
     return {
-        field_name: {
-            "enabled": bool(definition.get("default_enabled", True)),
-            "required": bool(definition.get("default_required", False)),
-        }
-        for field_name, definition in FIELD_DEFINITIONS.items()
+        field_name: {"enabled": False, "required": False}
+        for field_name, _ in iter_fields()
     }
 
 
@@ -157,7 +126,7 @@ def _extract_field_values(
     values: dict[str, object | None] = {}
     errors: list[str] = []
 
-    for field_name in FIELD_DEFINITIONS.keys():
+    for field_name, _definition in iter_fields():
         config = field_config.get(field_name, {"enabled": True, "required": False})
 
         if not config.get("enabled", True):

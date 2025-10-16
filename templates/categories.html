@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h3>Catégories d'alcools</h3>
-  <a href="{{ url_for('categories.add_category') }}" class="btn btn-dark">+ Nouvelle catégorie</a>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h3 class="mb-0">Catégories d'alcools</h3>
+  <div class="btn-group">
+    <a href="{{ url_for('categories.manage_field_requirements') }}" class="btn btn-outline-secondary">Configurer les champs</a>
+    <a href="{{ url_for('categories.add_category') }}" class="btn btn-dark">+ Nouvelle catégorie</a>
+  </div>
 </div>
 
 {% if not categories %}
