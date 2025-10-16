@@ -1,0 +1,1 @@
+"""Blueprints Flask pour l'organisation des routes."""

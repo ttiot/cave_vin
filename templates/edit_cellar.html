@@ -15,7 +15,7 @@
       {% endfor %}
     </select>
     <div class="form-text">
-      Gérer les catégories : <a href="{{ url_for('list_cellar_categories') }}" target="_blank">Catégories de caves</a>
+      Gérer les catégories : <a href="{{ url_for('cellar_categories.list_cellar_categories') }}" target="_blank">Catégories de caves</a>
     </div>
   </div>
   <div class="mb-3">
@@ -35,7 +35,7 @@
   </div>
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-dark flex-grow-1">Enregistrer les modifications</button>
-    <a href="{{ url_for('list_cellars') }}" class="btn btn-outline-secondary">Annuler</a>
+    <a href="{{ url_for('cellars.list_cellars') }}" class="btn btn-outline-secondary">Annuler</a>
   </div>
 </form>
 <script>

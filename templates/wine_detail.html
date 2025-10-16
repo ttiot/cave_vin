@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<a href="{{ url_for('index') }}" class="btn btn-link mb-3">← Retour à mes vins</a>
+<a href="{{ url_for('main.index') }}" class="btn btn-link mb-3">← Retour à mes vins</a>
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="card h-100 shadow-sm">
@@ -28,19 +28,19 @@
       </div>
       <div class="card-footer bg-light">
         <div class="d-grid gap-2 mb-2">
-          <a href="{{ url_for('edit_wine', wine_id=wine.id) }}" class="btn btn-outline-dark btn-sm">✏️ Modifier</a>
+          <a href="{{ url_for('wines.edit_wine', wine_id=wine.id) }}" class="btn btn-outline-dark btn-sm">✏️ Modifier</a>
         </div>
         <div class="btn-group d-flex" role="group">
-          <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+          <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
             <input type="hidden" name="redirect" value="{{ request.path }}">
             <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
           </form>
-          <form method="post" action="{{ url_for('refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+          <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
             <input type="hidden" name="redirect" value="{{ request.path }}">
             <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
           </form>
-          <form method="post" action="{{ url_for('delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
-            <input type="hidden" name="redirect" value="{{ url_for('index') }}">
+          <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+            <input type="hidden" name="redirect" value="{{ url_for('main.index') }}">
             <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
           </form>
         </div>

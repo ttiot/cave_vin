@@ -2,7 +2,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h3>Catégories d'alcools</h3>
-  <a href="{{ url_for('add_category') }}" class="btn btn-dark">+ Nouvelle catégorie</a>
+  <a href="{{ url_for('categories.add_category') }}" class="btn btn-dark">+ Nouvelle catégorie</a>
 </div>
 
 {% if not categories %}
@@ -15,9 +15,9 @@
     <div class="card-header d-flex justify-content-between align-items-center">
       <h5 class="mb-0">{{ category.name }}</h5>
       <div>
-        <a href="{{ url_for('add_subcategory', category_id=category.id) }}" class="btn btn-sm btn-outline-primary">+ Sous-catégorie</a>
-        <a href="{{ url_for('edit_category', category_id=category.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a>
-        <form method="POST" action="{{ url_for('delete_category', category_id=category.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?');">
+        <a href="{{ url_for('categories.add_subcategory', category_id=category.id) }}" class="btn btn-sm btn-outline-primary">+ Sous-catégorie</a>
+        <a href="{{ url_for('categories.edit_category', category_id=category.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a>
+        <form method="POST" action="{{ url_for('categories.delete_category', category_id=category.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?');">
           <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
         </form>
       </div>
@@ -42,8 +42,8 @@
               {% endif %}
             </div>
             <div class="btn-group btn-group-sm">
-              <a href="{{ url_for('edit_subcategory', subcategory_id=subcategory.id) }}" class="btn btn-outline-secondary">Modifier</a>
-              <form method="POST" action="{{ url_for('delete_subcategory', subcategory_id=subcategory.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette sous-catégorie ?');">
+              <a href="{{ url_for('categories.edit_subcategory', subcategory_id=subcategory.id) }}" class="btn btn-outline-secondary">Modifier</a>
+              <form method="POST" action="{{ url_for('categories.delete_subcategory', subcategory_id=subcategory.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette sous-catégorie ?');">
                 <button type="submit" class="btn btn-outline-danger">Supprimer</button>
               </form>
             </div>
@@ -60,6 +60,6 @@
 {% endif %}
 
 <div class="mt-4">
-  <a href="{{ url_for('index') }}" class="btn btn-secondary">← Retour à la cave</a>
+  <a href="{{ url_for('main.index') }}" class="btn btn-secondary">← Retour à la cave</a>
 </div>
 {% endblock %}
