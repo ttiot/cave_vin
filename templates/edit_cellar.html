@@ -7,12 +7,16 @@
     <input type="text" class="form-control" name="name" value="{{ cellar.name }}" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">Type de cave</label>
-    <select class="form-select" name="cellar_type" required>
-      <option value="" disabled>Sélectionnez un type</option>
-      <option value="naturelle" {% if cellar.cellar_type == 'naturelle' %}selected{% endif %}>Cave naturelle</option>
-      <option value="electrique" {% if cellar.cellar_type == 'electrique' %}selected{% endif %}>Cave électrique de conservation</option>
+    <label class="form-label">Catégorie de cave</label>
+    <select class="form-select" name="category_id" required>
+      <option value="" disabled>Sélectionnez une catégorie</option>
+      {% for category in categories %}
+      <option value="{{ category.id }}" {% if cellar.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+      {% endfor %}
     </select>
+    <div class="form-text">
+      Gérer les catégories : <a href="{{ url_for('list_cellar_categories') }}" target="_blank">Catégories de caves</a>
+    </div>
   </div>
   <div class="mb-3">
     <label class="form-label">Capacité par étage</label>

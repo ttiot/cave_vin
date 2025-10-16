@@ -467,6 +467,137 @@ def _add_subcategory_colors(connection: Connection) -> None:
         )
 
 
+def _create_cellar_category_table(connection: Connection) -> None:
+    """Créer la table pour les catégories de cave."""
+    
+    # Table des catégories de cave
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS cellar_category (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(80) NOT NULL UNIQUE,
+                description TEXT,
+                display_order INTEGER DEFAULT 0
+            )
+            """
+        )
+    )
+    
+    # Ajouter la colonne category_id à la table cellar
+    connection.execute(
+        text(
+            """
+            ALTER TABLE cellar ADD COLUMN category_id INTEGER
+            REFERENCES cellar_category(id)
+            """
+        )
+    )
+
+
+def _populate_default_cellar_categories(connection: Connection) -> None:
+    """Insérer les catégories de cave par défaut."""
+    
+    # Vérifier si des catégories existent déjà
+    existing = connection.execute(
+        text("SELECT COUNT(*) FROM cellar_category")
+    ).scalar()
+    
+    if existing > 0:
+        return  # Ne pas réinsérer si des données existent déjà
+    
+    default_categories = [
+        ("Cave naturelle", "Cave naturelle traditionnelle", 1),
+        ("Cave électrique", "Cave électrique de conservation", 2),
+        ("Cave de vieillissement", "Cave dédiée au vieillissement des vins", 3),
+        ("Cave d'appoint", "Cave d'appoint ou de service", 4),
+    ]
+    
+    for name, desc, order in default_categories:
+        connection.execute(
+            text(
+                """
+                INSERT INTO cellar_category (name, description, display_order)
+                VALUES (:name, :description, :display_order)
+                """
+            ),
+            {
+                "name": name,
+                "description": desc,
+                "display_order": order,
+            },
+        )
+
+
+def _migrate_cellar_type_to_category(connection: Connection) -> None:
+    """Convertir les types de cave existants en catégories."""
+    
+    # Récupérer les IDs des catégories
+    naturelle_id = connection.execute(
+        text("SELECT id FROM cellar_category WHERE name = 'Cave naturelle'")
+    ).scalar()
+    
+    electrique_id = connection.execute(
+        text("SELECT id FROM cellar_category WHERE name = 'Cave électrique'")
+    ).scalar()
+    
+    if not naturelle_id or not electrique_id:
+        return  # Les catégories n'existent pas encore
+    
+    # Mettre à jour les caves existantes avec cellar_type
+    connection.execute(
+        text(
+            """
+            UPDATE cellar
+            SET category_id = :naturelle_id
+            WHERE cellar_type = 'naturelle' AND category_id IS NULL
+            """
+        ),
+        {"naturelle_id": naturelle_id},
+    )
+    
+    connection.execute(
+        text(
+            """
+            UPDATE cellar
+            SET category_id = :electrique_id
+            WHERE cellar_type = 'electrique' AND category_id IS NULL
+            """
+        ),
+        {"electrique_id": electrique_id},
+    )
+    
+    # Supprimer la colonne cellar_type (SQLite ne supporte pas DROP COLUMN directement)
+    # On doit recréer la table sans cette colonne
+    connection.execute(
+        text(
+            """
+            CREATE TABLE cellar_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(120) NOT NULL,
+                floors INTEGER NOT NULL,
+                bottles_per_floor INTEGER NOT NULL,
+                category_id INTEGER NOT NULL,
+                FOREIGN KEY(category_id) REFERENCES cellar_category(id)
+            )
+            """
+        )
+    )
+    
+    connection.execute(
+        text(
+            """
+            INSERT INTO cellar_new (id, name, floors, bottles_per_floor, category_id)
+            SELECT id, name, floors, bottles_per_floor, category_id
+            FROM cellar
+            """
+        )
+    )
+    
+    connection.execute(text("DROP TABLE cellar"))
+    connection.execute(text("ALTER TABLE cellar_new RENAME TO cellar"))
+
+
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
     ("0002_create_wine_insight", _create_wine_insight_table),
@@ -474,6 +605,9 @@ MIGRATIONS: Iterable[Migration] = (
     ("0004_create_alcohol_categories", _create_alcohol_categories_tables),
     ("0005_populate_default_categories", _populate_default_alcohol_categories),
     ("0006_add_subcategory_colors", _add_subcategory_colors),
+    ("0007_create_cellar_categories", _create_cellar_category_table),
+    ("0008_populate_default_cellar_categories", _populate_default_cellar_categories),
+    ("0009_migrate_cellar_type_to_category", _migrate_cellar_type_to_category),
 )
 
 

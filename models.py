@@ -16,14 +16,29 @@ class User(UserMixin, db.Model):
     has_temporary_password = db.Column(db.Boolean, default=False, nullable=False)
 
 
+class CellarCategory(db.Model):
+    """Catégorie de cave (ex: Cave principale, Cave de vieillissement, Cave d'appoint)"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    description = db.Column(db.Text)
+    display_order = db.Column(db.Integer, default=0)
+    
+    cellars = db.relationship(
+        "Cellar",
+        back_populates="category",
+        order_by="Cellar.name",
+    )
+
+
 class Cellar(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    cellar_type = db.Column(db.String(50), nullable=False)
     floor_count = db.Column("floors", db.Integer, nullable=False)
     bottles_per_floor = db.Column(db.Integer, nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey("cellar_category.id"), nullable=False)
 
     wines = db.relationship("Wine", back_populates="cellar", lazy="dynamic")
+    category = db.relationship("CellarCategory", back_populates="cellars")
     levels = db.relationship(
         "CellarFloor",
         order_by="CellarFloor.level",

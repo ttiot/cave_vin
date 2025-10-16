@@ -11,6 +11,7 @@ from models import (
     Wine,
     Cellar,
     CellarFloor,
+    CellarCategory,
     WineConsumption,
     AlcoholCategory,
     AlcoholSubcategory,
@@ -211,9 +212,11 @@ def create_app():
     @app.route('/cellars/add', methods=['GET', 'POST'])
     @login_required
     def add_cellar():
+        categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
+        
         if request.method == 'POST':
             name = (request.form.get('name') or '').strip()
-            cellar_type = request.form.get('cellar_type')
+            category_id = request.form.get('category_id', type=int)
             raw_floor_capacities = [value.strip() for value in request.form.getlist('floor_capacities')]
             floor_capacities = []
             invalid_capacity = False
@@ -233,16 +236,17 @@ def create_app():
 
             context = {
                 'name': name,
-                'cellar_type': cellar_type,
+                'category_id': category_id,
                 'floor_capacities': raw_floor_capacities,
+                'categories': categories,
             }
 
             if not name:
                 flash("Le nom de la cave est obligatoire.")
                 return render_template('add_cellar.html', **context)
 
-            if cellar_type not in {'naturelle', 'electrique'}:
-                flash("Veuillez sélectionner un type de cave valide.")
+            if not category_id:
+                flash("Veuillez sélectionner une catégorie de cave.")
                 return render_template('add_cellar.html', **context)
 
             if not floor_capacities or invalid_capacity:
@@ -250,7 +254,7 @@ def create_app():
                 return render_template('add_cellar.html', **context)
 
             cellar = Cellar(name=name,
-                            cellar_type=cellar_type,
+                            category_id=category_id,
                             floor_count=len(floor_capacities),
                             bottles_per_floor=max(floor_capacities))
             for index, capacity in enumerate(floor_capacities, start=1):
@@ -260,16 +264,17 @@ def create_app():
             flash('Cave créée avec succès.')
             return redirect(url_for('list_cellars'))
 
-        return render_template('add_cellar.html', floor_capacities=[''])
+        return render_template('add_cellar.html', floor_capacities=[''], categories=categories)
     @app.route('/cellars/<int:cellar_id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_cellar(cellar_id):
         """Modifier une cave existante."""
         cellar = Cellar.query.get_or_404(cellar_id)
+        categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
         
         if request.method == 'POST':
             name = (request.form.get('name') or '').strip()
-            cellar_type = request.form.get('cellar_type')
+            category_id = request.form.get('category_id', type=int)
             raw_floor_capacities = [value.strip() for value in request.form.getlist('floor_capacities')]
             floor_capacities = []
             invalid_capacity = False
@@ -290,19 +295,19 @@ def create_app():
             
             if not name:
                 flash("Le nom de la cave est obligatoire.")
-                return render_template('edit_cellar.html', cellar=cellar)
+                return render_template('edit_cellar.html', cellar=cellar, categories=categories)
             
-            if cellar_type not in {'naturelle', 'electrique'}:
-                flash("Veuillez sélectionner un type de cave valide.")
-                return render_template('edit_cellar.html', cellar=cellar)
+            if not category_id:
+                flash("Veuillez sélectionner une catégorie de cave.")
+                return render_template('edit_cellar.html', cellar=cellar, categories=categories)
             
             if not floor_capacities or invalid_capacity:
                 flash("Veuillez indiquer un nombre de bouteilles positif pour chaque étage.")
-                return render_template('edit_cellar.html', cellar=cellar)
+                return render_template('edit_cellar.html', cellar=cellar, categories=categories)
             
             # Mettre à jour les informations de base
             cellar.name = name
-            cellar.cellar_type = cellar_type
+            cellar.category_id = category_id
             cellar.floor_count = len(floor_capacities)
             cellar.bottles_per_floor = max(floor_capacities)
             
@@ -321,7 +326,7 @@ def create_app():
             flash('Cave modifiée avec succès.')
             return redirect(url_for('list_cellars'))
         
-        return render_template('edit_cellar.html', cellar=cellar)
+        return render_template('edit_cellar.html', cellar=cellar, categories=categories)
 
 
     @app.route('/add', methods=['GET', 'POST'])
@@ -651,6 +656,91 @@ def create_app():
         db.session.commit()
         flash('Sous-catégorie supprimée avec succès.')
         return redirect(url_for('list_categories'))
+
+    @app.route('/cellar-categories', methods=['GET'])
+    @login_required
+    def list_cellar_categories():
+        """Liste toutes les catégories de cave."""
+        categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
+        return render_template('cellar_categories.html', categories=categories)
+
+    @app.route('/cellar-categories/add', methods=['GET', 'POST'])
+    @login_required
+    def add_cellar_category():
+        """Ajouter une nouvelle catégorie de cave."""
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or '').strip()
+            display_order = request.form.get('display_order', type=int) or 0
+            
+            if not name:
+                flash("Le nom de la catégorie est obligatoire.")
+                return render_template('add_cellar_category.html', name=name, description=description, display_order=display_order)
+            
+            # Vérifier si la catégorie existe déjà
+            existing = CellarCategory.query.filter_by(name=name).first()
+            if existing:
+                flash("Une catégorie avec ce nom existe déjà.")
+                return render_template('add_cellar_category.html', name=name, description=description, display_order=display_order)
+            
+            category = CellarCategory(name=name, description=description, display_order=display_order)
+            db.session.add(category)
+            db.session.commit()
+            flash('Catégorie de cave créée avec succès.')
+            return redirect(url_for('list_cellar_categories'))
+        
+        return render_template('add_cellar_category.html')
+
+    @app.route('/cellar-categories/<int:category_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    def edit_cellar_category(category_id):
+        """Modifier une catégorie de cave existante."""
+        category = CellarCategory.query.get_or_404(category_id)
+        
+        if request.method == 'POST':
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or '').strip()
+            display_order = request.form.get('display_order', type=int) or 0
+            
+            if not name:
+                flash("Le nom de la catégorie est obligatoire.")
+                return render_template('edit_cellar_category.html', category=category)
+            
+            # Vérifier si le nom existe déjà (sauf pour cette catégorie)
+            existing = CellarCategory.query.filter(
+                CellarCategory.name == name,
+                CellarCategory.id != category_id
+            ).first()
+            if existing:
+                flash("Une autre catégorie avec ce nom existe déjà.")
+                return render_template('edit_cellar_category.html', category=category)
+            
+            category.name = name
+            category.description = description
+            category.display_order = display_order
+            db.session.commit()
+            flash('Catégorie de cave modifiée avec succès.')
+            return redirect(url_for('list_cellar_categories'))
+        
+        return render_template('edit_cellar_category.html', category=category)
+
+    @app.route('/cellar-categories/<int:category_id>/delete', methods=['POST'])
+    @login_required
+    def delete_cellar_category(category_id):
+        """Supprimer une catégorie de cave."""
+        category = CellarCategory.query.get_or_404(category_id)
+        
+        # Vérifier si des caves utilisent cette catégorie
+        cellars_count = Cellar.query.filter_by(category_id=category_id).count()
+        
+        if cellars_count > 0:
+            flash(f"Impossible de supprimer cette catégorie : {cellars_count} cave(s) l'utilisent.")
+            return redirect(url_for('list_cellar_categories'))
+        
+        db.session.delete(category)
+        db.session.commit()
+        flash('Catégorie de cave supprimée avec succès.')
+        return redirect(url_for('list_cellar_categories'))
 
     @app.route('/wines/<int:wine_id>/edit', methods=['GET', 'POST'])
     @login_required
