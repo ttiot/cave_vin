@@ -12,13 +12,20 @@
       {% for field in ordered_fields %}
       {% set settings = field_settings['global'][field.name] %}
       <div class="row g-0 align-items-center px-3 py-3 border-bottom" data-field-toggle>
-        <div class="col-md-6">
+        <div class="col-md-5">
           <strong>{{ field.label }}</strong>
           {% if field.help_text %}
           <div class="text-muted small">{{ field.help_text }}</div>
           {% endif %}
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+          <a href="{{ url_for('categories.edit_field', field_id=field.id) }}"
+             class="btn btn-sm btn-outline-secondary"
+             title="Modifier ce champ">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </div>
+        <div class="col-md-2">
           <div class="form-check form-switch mb-0">
             <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('global', None, field.name, 'enabled') }}" data-role="enabled" {% if settings.enabled %}checked{% endif %}>
             <label class="form-check-label">Visible</label>
@@ -47,8 +54,15 @@
         {% for field in ordered_fields %}
         {% set settings = category_settings.get(field.name) or {'enabled': False, 'required': False} %}
         <div class="row g-0 align-items-center px-3 py-3 border-bottom" data-field-toggle>
-          <div class="col-md-6">
+          <div class="col-md-5">
             <strong>{{ field.label }}</strong>
+          </div>
+          <div class="col-md-1">
+            <a href="{{ url_for('categories.edit_field', field_id=field.id) }}"
+               class="btn btn-sm btn-outline-secondary"
+               title="Modifier ce champ">
+              <i class="bi bi-pencil"></i>
+            </a>
           </div>
           <div class="col-md-3">
             <div class="form-check form-switch mb-0">
@@ -75,8 +89,15 @@
           {% for field in ordered_fields %}
           {% set settings = sub_settings.get(field.name) or {'enabled': False, 'required': False} %}
           <div class="row align-items-center py-2" data-field-toggle>
-            <div class="col-md-6">
+            <div class="col-md-5">
               <span>{{ field.label }}</span>
+            </div>
+            <div class="col-md-1">
+              <a href="{{ url_for('categories.edit_field', field_id=field.id) }}"
+                 class="btn btn-sm btn-outline-secondary"
+                 title="Modifier ce champ">
+                <i class="bi bi-pencil"></i>
+              </a>
             </div>
             <div class="col-md-3">
               <div class="form-check form-switch mb-0">
@@ -168,7 +189,7 @@
       </div>
     </form>
     <p class="text-muted small mt-3 mb-0">
-      Les champs intégrés par défaut sont : {{ default_field_definitions | map('get', 'label') | join(', ') }}. Vous pouvez ajouter autant de champs personnalisés que nécessaire.
+      Les champs intégrés par défaut sont : {{ default_field_definitions | map(attribute='label') | join(', ') }}. Vous pouvez ajouter autant de champs personnalisés que nécessaire.
     </p>
   </div>
 </div>

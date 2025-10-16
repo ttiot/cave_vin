@@ -250,6 +250,91 @@ def manage_field_requirements():
     )
 
 
+@categories_bp.route('/fields/<int:field_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_field(field_id):
+    """Modifier un champ existant."""
+    field = BottleFieldDefinition.query.get_or_404(field_id)
+    
+    if request.method == 'POST':
+        label = (request.form.get('label') or '').strip()
+        input_type = (request.form.get('input_type') or 'text').strip().lower()
+        help_text = (request.form.get('help_text') or '').strip() or None
+        placeholder = (request.form.get('placeholder') or '').strip() or None
+        form_width = request.form.get('form_width', type=int) or 12
+        display_order = request.form.get('display_order', type=int) or field.display_order
+        
+        if not label:
+            flash("Le libellé du champ est obligatoire.")
+            return render_template('edit_field.html', field=field)
+        
+        if input_type not in {'text', 'number', 'textarea'}:
+            input_type = 'text'
+        
+        form_width = max(1, min(form_width, 12))
+        
+        # Vérifier si le nom change et s'il existe déjà
+        new_name = sanitize_field_name(label)
+        if new_name != field.name:
+            existing = BottleFieldDefinition.query.filter_by(name=new_name).first()
+            if existing:
+                flash("Un champ avec ce nom existe déjà. Choisissez un autre libellé.")
+                return render_template('edit_field.html', field=field)
+            
+            # Si le champ n'est pas builtin, on peut changer son nom
+            if not field.is_builtin:
+                # Mettre à jour les extra_attributes de toutes les bouteilles
+                wines = Wine.query.all()
+                for wine in wines:
+                    if wine.extra_attributes and field.name in wine.extra_attributes:
+                        value = wine.extra_attributes.pop(field.name)
+                        wine.extra_attributes[new_name] = value
+                
+                # Mettre à jour les requirements
+                requirements = AlcoholFieldRequirement.query.filter_by(field_name=field.name).all()
+                for req in requirements:
+                    req.field_name = new_name
+                
+                field.name = new_name
+        
+        field.label = label
+        field.input_type = input_type
+        field.help_text = help_text
+        field.placeholder = placeholder
+        field.form_width = form_width
+        field.display_order = display_order
+        
+        db.session.commit()
+        flash(f"Le champ « {label} » a été modifié avec succès.")
+        return redirect(url_for('categories.manage_field_requirements'))
+    
+    return render_template('edit_field.html', field=field)
+
+
+@categories_bp.route('/fields/<int:field_id>/delete', methods=['POST'])
+@login_required
+def delete_field(field_id):
+    """Supprimer un champ personnalisé."""
+    field = BottleFieldDefinition.query.get_or_404(field_id)
+    
+    if field.is_builtin:
+        flash("Impossible de supprimer un champ intégré.")
+        return redirect(url_for('categories.manage_field_requirements'))
+    
+    # Supprimer le champ des extra_attributes de toutes les bouteilles
+    wines = Wine.query.all()
+    for wine in wines:
+        if wine.extra_attributes and field.name in wine.extra_attributes:
+            wine.extra_attributes.pop(field.name)
+    
+    # Les requirements seront supprimés automatiquement grâce au cascade
+    db.session.delete(field)
+    db.session.commit()
+    
+    flash(f"Le champ « {field.label} » a été supprimé avec succès.")
+    return redirect(url_for('categories.manage_field_requirements'))
+
+
 @categories_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_category():

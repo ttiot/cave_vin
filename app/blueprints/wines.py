@@ -14,7 +14,7 @@ from models import (
     WineConsumption,
     db,
 )
-from app.field_config import FIELD_STORAGE_MAP, iter_fields
+from app.field_config import iter_fields
 from app.utils.formatters import resolve_redirect
 from tasks import schedule_wine_enrichment
 
@@ -163,32 +163,25 @@ def _extract_field_values(
 
 def _split_field_targets(
     field_values: dict[str, object | None]
-) -> tuple[dict[str, object | None], dict[str, object]]:
-    """Split field values between Wine attributes and dynamic extras."""
-
-    standard: dict[str, object | None] = {}
+) -> dict[str, object]:
+    """Convert field values to extras dictionary, filtering out None values."""
+    
     extras: dict[str, object] = {}
-
     for field_name, value in field_values.items():
-        storage = FIELD_STORAGE_MAP.get(field_name)
-        if storage:
-            standard[storage["attribute"]] = value
-        elif value is not None:
+        if value is not None:
             extras[field_name] = value
-
-    return standard, extras
+    
+    return extras
 
 
 def _collect_wine_field_values(wine: Wine | None, ordered_fields) -> dict[str, object | None]:
+    """Collect all field values from wine's extra_attributes."""
     values: dict[str, object | None] = {}
     extras = (wine.extra_attributes if wine and wine.extra_attributes else {}) or {}
+    
     for field in ordered_fields:
-        storage = FIELD_STORAGE_MAP.get(field.name)
-        if storage and wine is not None:
-            attribute = storage.get("attribute")
-            values[field.name] = getattr(wine, attribute, None)
-        else:
-            values[field.name] = extras.get(field.name)
+        values[field.name] = extras.get(field.name)
+    
     return values
 
 
@@ -278,21 +271,16 @@ def add_wine():
                 form_data=request.form,
             )
 
-        standard_values, extra_values = _split_field_targets(field_values)
-        wine_kwargs = {
-            "name": name or 'Bouteille sans nom',
-            "barcode": barcode,
-            "image_url": image_url,
-            "quantity": quantity or 1,
-            "cellar": cellar,
-            "subcategory": subcategory,
-            "extra_attributes": extra_values,
-        }
-        for storage in FIELD_STORAGE_MAP.values():
-            attribute = storage.get("attribute")
-            if attribute:
-                wine_kwargs[attribute] = standard_values.get(attribute)
-        wine = Wine(**wine_kwargs)
+        extra_values = _split_field_targets(field_values)
+        wine = Wine(
+            name=name or 'Bouteille sans nom',
+            barcode=barcode,
+            image_url=image_url,
+            quantity=quantity or 1,
+            cellar=cellar,
+            subcategory=subcategory,
+            extra_attributes=extra_values,
+        )
         db.session.add(wine)
         db.session.commit()
         schedule_wine_enrichment(wine.id)
@@ -399,12 +387,8 @@ def edit_wine(wine_id):
                 existing_field_values=existing_field_values,
             )
 
-        standard_values, extra_values = _split_field_targets(field_values)
+        extra_values = _split_field_targets(field_values)
         wine.name = name
-        for storage in FIELD_STORAGE_MAP.values():
-            attribute = storage.get("attribute")
-            if attribute:
-                setattr(wine, attribute, standard_values.get(attribute))
         wine.extra_attributes = extra_values
         wine.quantity = quantity
         wine.cellar = cellar
@@ -446,13 +430,17 @@ def consume_wine(wine_id):
         return redirect(resolve_redirect('main.index'))
 
     wine.quantity -= 1
+    
+    # Récupérer les valeurs depuis extra_attributes
+    extras = wine.extra_attributes or {}
+    
     consumption = WineConsumption(
         wine=wine,
         quantity=1,
         snapshot_name=wine.name,
-        snapshot_year=wine.year,
-        snapshot_region=wine.region,
-        snapshot_grape=wine.grape,
+        snapshot_year=extras.get('year'),
+        snapshot_region=extras.get('region'),
+        snapshot_grape=extras.get('grape'),
         snapshot_cellar=wine.cellar.name if wine.cellar else None,
     )
     db.session.add(consumption)

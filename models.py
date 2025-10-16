@@ -124,12 +124,7 @@ class AlcoholSubcategory(db.Model):
 class Wine(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    region = db.Column(db.String(120))
-    grape = db.Column(db.String(80))
-    year = db.Column(db.Integer)
-    volume_ml = db.Column(db.Integer)
     barcode = db.Column(db.String(20), unique=True)
-    description = db.Column(db.Text)
     extra_attributes = db.Column(db.JSON, nullable=False, default=dict)
     image_url = db.Column(db.String(255))
     quantity = db.Column(db.Integer, default=1)

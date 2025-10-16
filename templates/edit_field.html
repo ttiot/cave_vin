@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">Modifier le champ « {{ field.label }} »</h3>
+
+<div class="card">
+  <div class="card-body">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Libellé du champ <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="label" value="{{ field.label }}" required>
+          {% if field.is_builtin %}
+          <div class="form-text text-warning">
+            <i class="bi bi-exclamation-triangle"></i> Champ intégré : le nom interne ne peut pas être modifié.
+          </div>
+          {% else %}
+          <div class="form-text">
+            Le nom interne sera généré automatiquement à partir du libellé.
+          </div>
+          {% endif %}
+        </div>
+        
+        <div class="col-md-3">
+          <label class="form-label">Type de saisie</label>
+          <select class="form-select" name="input_type">
+            <option value="text" {% if field.input_type == 'text' %}selected{% endif %}>Texte court</option>
+            <option value="number" {% if field.input_type == 'number' %}selected{% endif %}>Nombre</option>
+            <option value="textarea" {% if field.input_type == 'textarea' %}selected{% endif %}>Texte long</option>
+          </select>
+        </div>
+        
+        <div class="col-md-3">
+          <label class="form-label">Largeur (1-12)</label>
+          <input type="number" class="form-control" name="form_width" min="1" max="12" value="{{ field.form_width }}">
+          <div class="form-text">Largeur dans le formulaire (Bootstrap grid)</div>
+        </div>
+        
+        <div class="col-md-6">
+          <label class="form-label">Placeholder</label>
+          <input type="text" class="form-control" name="placeholder" value="{{ field.placeholder or '' }}" placeholder="Texte d'aide facultatif">
+        </div>
+        
+        <div class="col-md-6">
+          <label class="form-label">Texte d'aide</label>
+          <input type="text" class="form-control" name="help_text" value="{{ field.help_text or '' }}" placeholder="Information affichée sous le champ">
+        </div>
+        
+        <div class="col-md-6">
+          <label class="form-label">Ordre d'affichage</label>
+          <input type="number" class="form-control" name="display_order" value="{{ field.display_order }}">
+          <div class="form-text">Plus le nombre est petit, plus le champ apparaît en haut</div>
+        </div>
+      </div>
+      
+      {% if field.is_builtin %}
+      <div class="alert alert-info mt-3">
+        <i class="bi bi-info-circle"></i> 
+        <strong>Champ intégré :</strong> Ce champ fait partie des champs par défaut du système. 
+        Vous pouvez modifier son apparence et son comportement, mais pas son nom interne ni le supprimer.
+      </div>
+      {% else %}
+      <div class="alert alert-warning mt-3">
+        <i class="bi bi-exclamation-triangle"></i> 
+        <strong>Attention :</strong> Si vous modifiez le libellé d'un champ personnalisé, 
+        son nom interne changera et les données existantes seront automatiquement migrées.
+      </div>
+      {% endif %}
+      
+      <div class="d-flex justify-content-between mt-4">
+        <a href="{{ url_for('categories.manage_field_requirements') }}" class="btn btn-outline-secondary">
+          ← Annuler
+        </a>
+        <button type="submit" class="btn btn-dark">
+          <i class="bi bi-check-lg"></i> Enregistrer les modifications
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if not field.is_builtin %}
+<div class="card mt-4 border-danger">
+  <div class="card-header bg-danger text-white">
+    <i class="bi bi-trash"></i> Zone dangereuse
+  </div>
+  <div class="card-body">
+    <h5 class="card-title">Supprimer ce champ</h5>
+    <p class="card-text">
+      La suppression d'un champ personnalisé est définitive. Toutes les données associées 
+      à ce champ dans les bouteilles existantes seront perdues.
+    </p>
+    <form method="POST" action="{{ url_for('categories.delete_field', field_id=field.id) }}" 
+          onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce champ ? Cette action est irréversible et supprimera toutes les données associées.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="btn btn-danger">
+        <i class="bi bi-trash"></i> Supprimer définitivement ce champ
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -63,14 +63,9 @@ DEFAULT_FIELD_MAP: Dict[str, dict[str, object]] = {
 }
 
 
-# Mapping between known field identifiers and Wine model attributes.
-FIELD_STORAGE_MAP: Dict[str, dict[str, str]] = {
-    "region": {"attribute": "region"},
-    "grape": {"attribute": "grape"},
-    "year": {"attribute": "year"},
-    "volume_ml": {"attribute": "volume_ml"},
-    "description": {"attribute": "description"},
-}
+# DEPRECATED: Tous les champs sont maintenant stockés dans extra_attributes
+# Ce mapping est conservé temporairement pour la rétrocompatibilité
+FIELD_STORAGE_MAP: Dict[str, dict[str, str]] = {}
 
 
 def iter_fields() -> Iterable[BottleFieldDefinition]:
