@@ -4,9 +4,21 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from sqlalchemy.orm import selectinload
 
-from models import AlcoholCategory, AlcoholSubcategory, AlcoholFieldRequirement, Wine, db
+from models import (
+    AlcoholCategory,
+    AlcoholSubcategory,
+    AlcoholFieldRequirement,
+    BottleFieldDefinition,
+    Wine,
+    db,
+)
 from app.utils.formatters import sanitize_color, DEFAULT_BADGE_BG_COLOR, DEFAULT_BADGE_TEXT_COLOR
-from app.field_config import FIELD_DEFINITIONS, iter_fields, get_display_order
+from app.field_config import (
+    DEFAULT_FIELD_DEFINITIONS,
+    get_display_order,
+    iter_fields,
+    sanitize_field_name,
+)
 
 
 categories_bp = Blueprint('categories', __name__, url_prefix='/categories')
@@ -22,8 +34,8 @@ def list_categories():
 
 def _blank_field_state() -> dict[str, dict[str, bool]]:
     return {
-        field_name: {"enabled": False, "required": False}
-        for field_name, _ in iter_fields()
+        field.name: {"enabled": False, "required": False}
+        for field in iter_fields()
     }
 
 
@@ -57,8 +69,10 @@ def _build_settings_snapshot(categories: list[AlcoholCategory]) -> dict[str, dic
         else:
             target = settings["global"]
 
-        if requirement.field_name in target:
-            target[requirement.field_name] = rule
+        field_name = requirement.field_name
+        if field_name not in target:
+            target[field_name] = {"enabled": False, "required": False}
+        target[field_name] = rule
 
     return settings
 
@@ -69,7 +83,7 @@ def _input_name(scope: str, scope_id: int | None, field_name: str, attribute: st
 
 
 def _upsert_requirement(
-    field_name: str,
+    field: BottleFieldDefinition,
     scope: str,
     scope_id: int | None,
     *,
@@ -77,7 +91,10 @@ def _upsert_requirement(
     required: bool,
     parent_category_id: int | None = None,
 ) -> None:
-    filters: dict[str, int | None | str] = {"field_name": field_name}
+    filters: dict[str, int | None | str] = {
+        "field_name": field.name,
+        "field_id": field.id,
+    }
 
     if scope == "category":
         filters.update({"category_id": scope_id, "subcategory_id": None})
@@ -93,8 +110,90 @@ def _upsert_requirement(
 
     requirement.is_enabled = enabled
     requirement.is_required = required and enabled
-    requirement.display_order = get_display_order(field_name)
+    requirement.display_order = get_display_order(field.name)
+    requirement.field = field
     db.session.add(requirement)
+
+
+def _next_display_order() -> int:
+    last_field = (
+        BottleFieldDefinition.query.order_by(
+            BottleFieldDefinition.display_order.desc()
+        ).first()
+    )
+    return (last_field.display_order if last_field else 0) + 10
+
+
+def _handle_add_field(request_form, categories):
+    label = (request_form.get("label") or "").strip()
+    scope_ref = request_form.get("scope_ref") or "global"
+    scope: str
+    scope_id: int | None = None
+    if ":" in scope_ref:
+        scope, scope_id_raw = scope_ref.split(":", 1)
+        try:
+            scope_id = int(scope_id_raw)
+        except ValueError:
+            scope = "global"
+            scope_id = None
+    else:
+        scope = scope_ref
+    input_type = (request_form.get("input_type") or "text").strip().lower()
+    if input_type not in {"text", "number", "textarea"}:
+        input_type = "text"
+    help_text = (request_form.get("help_text") or "").strip() or None
+    placeholder = (request_form.get("placeholder") or "").strip() or None
+    form_width = request_form.get("form_width", type=int) or 12
+    form_width = max(1, min(form_width, 12))
+    enabled = request_form.get("enabled") == "1"
+    required = request_form.get("required") == "1"
+
+    if not label:
+        flash("Le libellé du champ est obligatoire pour le créer.")
+        return redirect(url_for("categories.manage_field_requirements"))
+
+    normalized_name = sanitize_field_name(label)
+    existing = BottleFieldDefinition.query.filter_by(name=normalized_name).first()
+    if existing:
+        flash("Un champ avec ce nom existe déjà. Modifiez-le ou choisissez un autre libellé.")
+        return redirect(url_for("categories.manage_field_requirements"))
+
+    display_order = _next_display_order()
+
+    new_field = BottleFieldDefinition(
+        name=normalized_name,
+        label=label,
+        help_text=help_text,
+        placeholder=placeholder,
+        input_type=input_type,
+        form_width=form_width,
+        is_builtin=False,
+        display_order=display_order,
+    )
+    db.session.add(new_field)
+    db.session.flush()
+
+    parent_category_id = None
+    if scope == "category":
+        parent_category_id = scope_id
+    elif scope == "subcategory":
+        parent_lookup = {
+            sub.id: sub.category_id for category in categories for sub in category.subcategories
+        }
+        parent_category_id = parent_lookup.get(scope_id)
+
+    _upsert_requirement(
+        new_field,
+        scope,
+        scope_id,
+        enabled=enabled or required,
+        required=required,
+        parent_category_id=parent_category_id,
+    )
+
+    db.session.commit()
+    flash(f"Le champ « {label} » a été créé et associé avec succès.")
+    return redirect(url_for("categories.manage_field_requirements"))
 
 
 @categories_bp.route('/field-requirements', methods=['GET', 'POST'])
@@ -108,8 +207,12 @@ def manage_field_requirements():
         .all()
     )
     field_settings = _build_settings_snapshot(categories)
+    ordered_fields = list(iter_fields())
 
     if request.method == 'POST':
+        if request.form.get('action') == 'add_field':
+            return _handle_add_field(request.form, categories)
+
         scopes: list[tuple[str, int | None]] = [('global', None)]
         subcategory_parents: dict[int, int | None] = {}
 
@@ -119,12 +222,13 @@ def manage_field_requirements():
                 subcategory_parents[subcategory.id] = category.id
                 scopes.append(('subcategory', subcategory.id))
 
+        field_map = {field.name: field for field in ordered_fields}
         for scope, scope_id in scopes:
-            for field_name, _ in iter_fields():
+            for field_name, field in field_map.items():
                 enabled = request.form.get(_input_name(scope, scope_id, field_name, 'enabled')) == '1'
                 required = request.form.get(_input_name(scope, scope_id, field_name, 'required')) == '1'
                 _upsert_requirement(
-                    field_name,
+                    field,
                     scope,
                     scope_id,
                     enabled=enabled,
@@ -136,15 +240,13 @@ def manage_field_requirements():
         flash('Configuration des champs mise à jour avec succès.')
         return redirect(url_for('categories.manage_field_requirements'))
 
-    ordered_fields = list(iter_fields())
-
     return render_template(
         'field_requirements.html',
         categories=categories,
         ordered_fields=ordered_fields,
-        field_definitions=FIELD_DEFINITIONS,
         field_settings=field_settings,
         input_name=_input_name,
+        default_field_definitions=DEFAULT_FIELD_DEFINITIONS,
     )
 
 

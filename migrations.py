@@ -10,7 +10,13 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from models import db
-from app.field_config import get_display_order
+from app.field_config import DEFAULT_FIELD_DEFINITIONS
+
+
+DEFAULT_DISPLAY_ORDERS = {
+    field["name"]: int(field.get("display_order", 0))
+    for field in DEFAULT_FIELD_DEFINITIONS
+}
 
 
 Migration = Tuple[str, Callable[[Connection], None]]
@@ -706,7 +712,9 @@ def _populate_default_field_requirements(connection: Connection) -> None:
     ]
 
     for default in global_defaults:
-        default["display_order"] = get_display_order(default["field_name"])
+        default["display_order"] = DEFAULT_DISPLAY_ORDERS.get(
+            default["field_name"], 0
+        )
         _ensure_requirement(**default)
 
     wine_category_id = connection.execute(
@@ -720,9 +728,193 @@ def _populate_default_field_requirements(connection: Connection) -> None:
             subcategory_id=None,
             is_enabled=True,
             is_required=False,
-            display_order=get_display_order("grape"),
+            display_order=DEFAULT_DISPLAY_ORDERS.get("grape", 0),
         )
 
+
+def _create_field_definition_table(connection: Connection) -> None:
+    """Create the table storing available dynamic bottle fields."""
+
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS bottle_field_definition (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL UNIQUE,
+                label VARCHAR(120) NOT NULL,
+                help_text TEXT,
+                placeholder VARCHAR(255),
+                input_type VARCHAR(20) NOT NULL DEFAULT 'text',
+                form_width INTEGER NOT NULL DEFAULT 12,
+                is_builtin BOOLEAN NOT NULL DEFAULT 0,
+                display_order INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+    )
+
+
+def _populate_default_field_definitions(connection: Connection) -> None:
+    """Seed the default bottle field definitions when missing."""
+
+    for definition in DEFAULT_FIELD_DEFINITIONS:
+        name = definition["name"]
+        existing = connection.execute(
+            text(
+                """
+                SELECT id FROM bottle_field_definition WHERE name = :name
+                """
+            ),
+            {"name": name},
+        ).first()
+
+        if existing:
+            continue
+
+        connection.execute(
+            text(
+                """
+                INSERT INTO bottle_field_definition (
+                    name,
+                    label,
+                    help_text,
+                    placeholder,
+                    input_type,
+                    form_width,
+                    is_builtin,
+                    display_order
+                ) VALUES (
+                    :name,
+                    :label,
+                    :help_text,
+                    :placeholder,
+                    :input_type,
+                    :form_width,
+                    :is_builtin,
+                    :display_order
+                )
+                """
+            ),
+            {
+                "name": name,
+                "label": definition["label"],
+                "help_text": definition.get("help_text"),
+                "placeholder": definition.get("placeholder"),
+                "input_type": definition.get("input_type", "text"),
+                "form_width": int(definition.get("form_width", 12)),
+                "is_builtin": 1 if definition.get("is_builtin") else 0,
+                "display_order": int(definition.get("display_order", 0)),
+            },
+        )
+
+
+def _add_wine_extra_attributes(connection: Connection) -> None:
+    """Ensure the wine table can store dynamic attributes."""
+
+    columns = connection.execute(text("PRAGMA table_info(wine)")).fetchall()
+    column_names = {row[1] for row in columns}
+
+    if "extra_attributes" not in column_names:
+        connection.execute(
+            text("ALTER TABLE wine ADD COLUMN extra_attributes TEXT")
+        )
+
+    connection.execute(
+        text(
+            """
+            UPDATE wine
+            SET extra_attributes = '{}'
+            WHERE extra_attributes IS NULL
+            """
+        )
+    )
+
+
+def _link_requirements_to_field_definitions(connection: Connection) -> None:
+    """Attach requirement rows to their corresponding field definitions."""
+
+    columns = connection.execute(
+        text("PRAGMA table_info(alcohol_field_requirement)")
+    ).fetchall()
+    column_names = {row[1] for row in columns}
+
+    if "field_id" not in column_names:
+        connection.execute(
+            text(
+                """
+                ALTER TABLE alcohol_field_requirement
+                ADD COLUMN field_id INTEGER REFERENCES bottle_field_definition(id)
+                """
+            )
+        )
+
+    rows = connection.execute(
+        text(
+            """
+            SELECT id, field_name FROM alcohol_field_requirement
+            """
+        )
+    ).fetchall()
+
+    for requirement_id, field_name in rows:
+        field = connection.execute(
+            text(
+                """
+                SELECT id, display_order FROM bottle_field_definition
+                WHERE name = :name
+                """
+            ),
+            {"name": field_name},
+        ).first()
+
+        if field is None:
+            display_order = connection.execute(
+                text(
+                    "SELECT COALESCE(MAX(display_order), 0) + 10 FROM bottle_field_definition"
+                )
+            ).scalar()
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO bottle_field_definition (
+                        name, label, input_type, form_width, is_builtin, display_order
+                    ) VALUES (
+                        :name, :label, 'text', 12, 0, :display_order
+                    )
+                    """
+                ),
+                {
+                    "name": field_name,
+                    "label": field_name.replace('_', ' ').title(),
+                    "display_order": display_order or 0,
+                },
+            )
+            field = connection.execute(
+                text(
+                    """
+                    SELECT id, display_order FROM bottle_field_definition
+                    WHERE name = :name
+                    """
+                ),
+                {"name": field_name},
+            ).first()
+
+        field_id, display_order = field
+        connection.execute(
+            text(
+                """
+                UPDATE alcohol_field_requirement
+                SET field_id = :field_id,
+                    display_order = :display_order
+                WHERE id = :requirement_id
+                """
+            ),
+            {
+                "field_id": field_id,
+                "display_order": display_order,
+                "requirement_id": requirement_id,
+            },
+        )
 
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
@@ -737,6 +929,10 @@ MIGRATIONS: Iterable[Migration] = (
     ("0010_add_wine_volume_column", _add_wine_volume_column),
     ("0011_create_field_requirement_table", _create_field_requirement_table),
     ("0012_populate_field_requirements", _populate_default_field_requirements),
+    ("0013_create_field_definition_table", _create_field_definition_table),
+    ("0014_populate_field_definitions", _populate_default_field_definitions),
+    ("0015_add_wine_extra_attributes", _add_wine_extra_attributes),
+    ("0016_link_field_requirements", _link_requirements_to_field_definitions),
 )
 
 

@@ -13,6 +13,7 @@ from typing import Iterable, List, Optional
 import requests
 
 from openai import OpenAI, OpenAIError
+from app.field_config import FIELD_STORAGE_MAP, iter_fields
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,20 @@ class WineInfoService:
             details.append(
                 f"Description utilisateur: {self._truncate(str(wine.description), 280)}"
             )
+        try:
+            extra_attributes = getattr(wine, "extra_attributes", {}) or {}
+            for field in iter_fields():
+                if field.name in {"region", "grape", "year", "volume_ml", "description"}:
+                    continue
+                storage = FIELD_STORAGE_MAP.get(field.name)
+                if storage:
+                    value = getattr(wine, storage.get("attribute"), None)
+                else:
+                    value = extra_attributes.get(field.name)
+                if value:
+                    details.append(f"{field.label}: {value}")
+        except Exception:  # pragma: no cover - best effort enrichment
+            pass
         details.append(f"Requête utilisée: {query}")
         
         logger.debug("📋 OpenAI: détails du vin collectés: %s", ", ".join(details))

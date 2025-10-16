@@ -14,7 +14,7 @@ from models import (
     WineConsumption,
     db,
 )
-from app.field_config import FIELD_DEFINITIONS, iter_fields
+from app.field_config import FIELD_STORAGE_MAP, iter_fields
 from app.utils.formatters import resolve_redirect
 from tasks import schedule_wine_enrichment
 
@@ -22,10 +22,10 @@ from tasks import schedule_wine_enrichment
 wines_bp = Blueprint('wines', __name__, url_prefix='/wines')
 
 
-def _initial_field_state() -> dict[str, dict[str, bool]]:
+def _initial_field_state(fields: list) -> dict[str, dict[str, bool]]:
     return {
-        field_name: {"enabled": False, "required": False}
-        for field_name, _ in iter_fields()
+        field.name: {"enabled": False, "required": False}
+        for field in fields
     }
 
 
@@ -59,9 +59,11 @@ def _fetch_requirement_mappings() -> dict[str, dict]:
 
 
 def _resolve_field_config(
-    subcategory: AlcoholSubcategory | None, mappings: dict[str, dict]
+    subcategory: AlcoholSubcategory | None,
+    mappings: dict[str, dict],
+    fields: list,
 ) -> dict[str, dict[str, bool]]:
-    config = _initial_field_state()
+    config = _initial_field_state(fields)
 
     def apply_rules(rules: dict[str, dict[str, bool]]) -> None:
         for field_name, rule in rules.items():
@@ -81,15 +83,19 @@ def _resolve_field_config(
 
 
 def _build_field_settings(
-    categories: list[AlcoholCategory], mappings: dict[str, dict]
+    categories: list[AlcoholCategory],
+    mappings: dict[str, dict],
+    fields: list,
 ) -> dict[str, dict[str, dict[str, bool]]]:
     settings: dict[str, dict[str, dict[str, bool]]] = {
-        "default": _resolve_field_config(None, mappings)
+        "default": _resolve_field_config(None, mappings, fields)
     }
 
     for category in categories:
         for subcategory in category.subcategories:
-            settings[str(subcategory.id)] = _resolve_field_config(subcategory, mappings)
+            settings[str(subcategory.id)] = _resolve_field_config(
+                subcategory, mappings, fields
+            )
 
     return settings
 
@@ -121,12 +127,15 @@ def _parse_field_value(field_name: str, raw_value: str) -> object | None:
 
 
 def _extract_field_values(
-    form_data, field_config: dict[str, dict[str, bool]]
+    form_data,
+    field_config: dict[str, dict[str, bool]],
+    ordered_fields,
 ) -> tuple[dict[str, object | None], list[str]]:
     values: dict[str, object | None] = {}
     errors: list[str] = []
 
-    for field_name, _definition in iter_fields():
+    for field in ordered_fields:
+        field_name = field.name
         config = field_config.get(field_name, {"enabled": True, "required": False})
 
         if not config.get("enabled", True):
@@ -138,7 +147,7 @@ def _extract_field_values(
         if not raw_value.strip():
             if config.get("required", False):
                 errors.append(
-                    f"Le champ {FIELD_DEFINITIONS[field_name]['label']} est obligatoire pour cette catégorie."
+                    f"Le champ {field.label} est obligatoire pour cette catégorie."
                 )
             values[field_name] = None
             continue
@@ -152,6 +161,37 @@ def _extract_field_values(
     return values, errors
 
 
+def _split_field_targets(
+    field_values: dict[str, object | None]
+) -> tuple[dict[str, object | None], dict[str, object]]:
+    """Split field values between Wine attributes and dynamic extras."""
+
+    standard: dict[str, object | None] = {}
+    extras: dict[str, object] = {}
+
+    for field_name, value in field_values.items():
+        storage = FIELD_STORAGE_MAP.get(field_name)
+        if storage:
+            standard[storage["attribute"]] = value
+        elif value is not None:
+            extras[field_name] = value
+
+    return standard, extras
+
+
+def _collect_wine_field_values(wine: Wine | None, ordered_fields) -> dict[str, object | None]:
+    values: dict[str, object | None] = {}
+    extras = (wine.extra_attributes if wine and wine.extra_attributes else {}) or {}
+    for field in ordered_fields:
+        storage = FIELD_STORAGE_MAP.get(field.name)
+        if storage and wine is not None:
+            attribute = storage.get("attribute")
+            values[field.name] = getattr(wine, attribute, None)
+        else:
+            values[field.name] = extras.get(field.name)
+    return values
+
+
 @wines_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_wine():
@@ -161,7 +201,8 @@ def add_wine():
         AlcoholCategory.display_order, AlcoholCategory.name
     ).all()
     mappings = _fetch_requirement_mappings()
-    field_settings = _build_field_settings(categories, mappings)
+    ordered_fields = list(iter_fields())
+    field_settings = _build_field_settings(categories, mappings, ordered_fields)
 
     if not cellars:
         flash("Créez d'abord une cave avant d'ajouter des bouteilles.")
@@ -200,7 +241,9 @@ def add_wine():
         field_config = (
             field_settings.get(str(subcategory_id)) if subcategory_id is not None else None
         ) or field_settings["default"]
-        field_values, field_errors = _extract_field_values(request.form, field_config)
+        field_values, field_errors = _extract_field_values(
+            request.form, field_config, ordered_fields
+        )
         errors.extend(field_errors)
 
         image_url = None
@@ -231,23 +274,25 @@ def add_wine():
                 selected_cellar_id=selected_cellar_id,
                 selected_subcategory_id=selected_subcategory_id,
                 field_settings=field_settings,
-                field_definitions=FIELD_DEFINITIONS,
+                ordered_fields=ordered_fields,
                 form_data=request.form,
             )
 
-        wine = Wine(
-            name=name or 'Bouteille sans nom',
-            region=field_values.get('region'),
-            grape=field_values.get('grape'),
-            year=field_values.get('year'),
-            volume_ml=field_values.get('volume_ml'),
-            barcode=barcode,
-            description=field_values.get('description'),
-            image_url=image_url,
-            quantity=quantity or 1,
-            cellar=cellar,
-            subcategory=subcategory,
-        )
+        standard_values, extra_values = _split_field_targets(field_values)
+        wine_kwargs = {
+            "name": name or 'Bouteille sans nom',
+            "barcode": barcode,
+            "image_url": image_url,
+            "quantity": quantity or 1,
+            "cellar": cellar,
+            "subcategory": subcategory,
+            "extra_attributes": extra_values,
+        }
+        for storage in FIELD_STORAGE_MAP.values():
+            attribute = storage.get("attribute")
+            if attribute:
+                wine_kwargs[attribute] = standard_values.get(attribute)
+        wine = Wine(**wine_kwargs)
         db.session.add(wine)
         db.session.commit()
         schedule_wine_enrichment(wine.id)
@@ -261,7 +306,7 @@ def add_wine():
         selected_cellar_id=selected_cellar_id,
         selected_subcategory_id=selected_subcategory_id,
         field_settings=field_settings,
-        field_definitions=FIELD_DEFINITIONS,
+        ordered_fields=ordered_fields,
     )
 
 
@@ -278,7 +323,14 @@ def wine_detail(wine_id):
         .filter_by(id=wine_id)
         .first_or_404()
     )
-    return render_template('wine_detail.html', wine=wine)
+    ordered_fields = list(iter_fields())
+    field_values = _collect_wine_field_values(wine, ordered_fields)
+    return render_template(
+        'wine_detail.html',
+        wine=wine,
+        ordered_fields=ordered_fields,
+        field_values=field_values,
+    )
 
 
 @wines_bp.route('/<int:wine_id>/edit', methods=['GET', 'POST'])
@@ -291,8 +343,10 @@ def edit_wine(wine_id):
         AlcoholCategory.display_order, AlcoholCategory.name
     ).all()
     mappings = _fetch_requirement_mappings()
-    field_settings = _build_field_settings(categories, mappings)
+    ordered_fields = list(iter_fields())
+    field_settings = _build_field_settings(categories, mappings, ordered_fields)
     selected_subcategory_id = wine.subcategory_id
+    existing_field_values = _collect_wine_field_values(wine, ordered_fields)
 
     if request.method == 'POST':
         name = (request.form.get('name') or '').strip()
@@ -325,7 +379,9 @@ def edit_wine(wine_id):
         field_config = (
             field_settings.get(str(subcategory_id)) if subcategory_id is not None else None
         ) or field_settings["default"]
-        field_values, field_errors = _extract_field_values(request.form, field_config)
+        field_values, field_errors = _extract_field_values(
+            request.form, field_config, ordered_fields
+        )
         errors.extend(field_errors)
 
         if errors:
@@ -337,17 +393,19 @@ def edit_wine(wine_id):
                 cellars=cellars,
                 categories=categories,
                 field_settings=field_settings,
-                field_definitions=FIELD_DEFINITIONS,
+                ordered_fields=ordered_fields,
                 selected_subcategory_id=selected_subcategory_id,
                 form_data=request.form,
+                existing_field_values=existing_field_values,
             )
 
+        standard_values, extra_values = _split_field_targets(field_values)
         wine.name = name
-        wine.region = field_values.get('region')
-        wine.grape = field_values.get('grape')
-        wine.year = field_values.get('year')
-        wine.volume_ml = field_values.get('volume_ml')
-        wine.description = field_values.get('description')
+        for storage in FIELD_STORAGE_MAP.values():
+            attribute = storage.get("attribute")
+            if attribute:
+                setattr(wine, attribute, standard_values.get(attribute))
+        wine.extra_attributes = extra_values
         wine.quantity = quantity
         wine.cellar = cellar
         wine.subcategory = subcategory
@@ -362,8 +420,9 @@ def edit_wine(wine_id):
         cellars=cellars,
         categories=categories,
         field_settings=field_settings,
-        field_definitions=FIELD_DEFINITIONS,
+        ordered_fields=ordered_fields,
         selected_subcategory_id=selected_subcategory_id,
+        existing_field_values=existing_field_values,
     )
 
 
