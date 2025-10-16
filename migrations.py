@@ -323,23 +323,34 @@ def _populate_default_alcohol_categories(connection: Connection) -> None:
 def _add_subcategory_colors(connection: Connection) -> None:
     """Ajouter les colonnes de couleurs et migrer les valeurs existantes."""
 
-    connection.execute(
-        text(
-            f"""
-            ALTER TABLE alcohol_subcategory
-            ADD COLUMN badge_bg_color VARCHAR(20) DEFAULT '{DEFAULT_BADGE_BG_COLOR}'
-            """
+    # Vérifier si les colonnes existent déjà
+    table_info = connection.execute(
+        text("PRAGMA table_info(alcohol_subcategory)")
+    ).fetchall()
+    
+    existing_columns = {row[1] for row in table_info}
+    
+    # Ajouter badge_bg_color seulement si elle n'existe pas
+    if "badge_bg_color" not in existing_columns:
+        connection.execute(
+            text(
+                f"""
+                ALTER TABLE alcohol_subcategory
+                ADD COLUMN badge_bg_color VARCHAR(20) DEFAULT '{DEFAULT_BADGE_BG_COLOR}'
+                """
+            )
         )
-    )
 
-    connection.execute(
-        text(
-            f"""
-            ALTER TABLE alcohol_subcategory
-            ADD COLUMN badge_text_color VARCHAR(20) DEFAULT '{DEFAULT_BADGE_TEXT_COLOR}'
-            """
+    # Ajouter badge_text_color seulement si elle n'existe pas
+    if "badge_text_color" not in existing_columns:
+        connection.execute(
+            text(
+                f"""
+                ALTER TABLE alcohol_subcategory
+                ADD COLUMN badge_text_color VARCHAR(20) DEFAULT '{DEFAULT_BADGE_TEXT_COLOR}'
+                """
+            )
         )
-    )
 
     rows = connection.execute(
         text(
