@@ -157,6 +157,8 @@ class WineInfoService:
             details.append(f"Région: {wine.region}")
         if getattr(wine, "grape", None):
             details.append(f"Cépage: {wine.grape}")
+        if getattr(wine, "volume_ml", None):
+            details.append(f"Contenance: {wine.volume_ml} mL")
         if getattr(wine, "subcategory", None):
             subcategory_name = wine.subcategory.name
             category_name = wine.subcategory.category.name if wine.subcategory.category else None

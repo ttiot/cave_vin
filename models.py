@@ -84,12 +84,17 @@ class AlcoholCategory(db.Model):
     name = db.Column(db.String(80), nullable=False, unique=True)
     description = db.Column(db.Text)
     display_order = db.Column(db.Integer, default=0)
-    
+
     subcategories = db.relationship(
         "AlcoholSubcategory",
         back_populates="category",
         cascade="all, delete-orphan",
         order_by="AlcoholSubcategory.display_order, AlcoholSubcategory.name",
+    )
+    field_requirements = db.relationship(
+        "AlcoholFieldRequirement",
+        back_populates="category",
+        cascade="all, delete-orphan",
     )
 
 
@@ -105,6 +110,11 @@ class AlcoholSubcategory(db.Model):
 
     category = db.relationship("AlcoholCategory", back_populates="subcategories")
     wines = db.relationship("Wine", back_populates="subcategory")
+    field_requirements = db.relationship(
+        "AlcoholFieldRequirement",
+        back_populates="subcategory",
+        cascade="all, delete-orphan",
+    )
     
     __table_args__ = (
         UniqueConstraint("category_id", "name", name="uq_category_subcategory"),
@@ -117,6 +127,7 @@ class Wine(db.Model):
     region = db.Column(db.String(120))
     grape = db.Column(db.String(80))
     year = db.Column(db.Integer)
+    volume_ml = db.Column(db.Integer)
     barcode = db.Column(db.String(20), unique=True)
     description = db.Column(db.Text)
     image_url = db.Column(db.String(255))
@@ -152,6 +163,31 @@ class Wine(db.Model):
                 }
             )
         return preview
+
+
+class AlcoholFieldRequirement(db.Model):
+    """Configure quelles informations sont attendues pour une catégorie donnée."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    field_name = db.Column(db.String(50), nullable=False)
+    category_id = db.Column(
+        db.Integer, db.ForeignKey("alcohol_category.id"), nullable=True
+    )
+    subcategory_id = db.Column(
+        db.Integer, db.ForeignKey("alcohol_subcategory.id"), nullable=True
+    )
+    is_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    is_required = db.Column(db.Boolean, nullable=False, default=False)
+    display_order = db.Column(db.Integer, nullable=False, default=0)
+
+    category = db.relationship("AlcoholCategory", back_populates="field_requirements")
+    subcategory = db.relationship(
+        "AlcoholSubcategory", back_populates="field_requirements"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("field_name", "category_id", "subcategory_id"),
+    )
 
 
 class WineInsight(db.Model):

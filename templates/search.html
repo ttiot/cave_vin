@@ -82,7 +82,8 @@
         </p>
         <p class="card-text">
           {{ wine.region or 'Région inconnue' }}{% if wine.year %} — {{ wine.year }}{% endif %}<br>
-          Cépage : {{ wine.grape or 'Inconnu' }}
+          {% if wine.volume_ml %}Contenance : {{ wine.volume_ml }} mL<br>{% endif %}
+          {% if wine.grape %}Cépage : {{ wine.grape }}{% endif %}
         </p>
         {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
         

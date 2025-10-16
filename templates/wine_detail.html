@@ -15,7 +15,8 @@
           {% endif %}
           <strong>Année :</strong> {{ wine.year or 'Non renseigné' }}<br>
           <strong>Région :</strong> {{ wine.region or 'Non renseignée' }}<br>
-          <strong>Cépage :</strong> {{ wine.grape or 'Inconnu' }}<br>
+          {% if wine.grape %}<strong>Cépage :</strong> {{ wine.grape }}<br>{% endif %}
+          <strong>Contenance :</strong> {{ wine.volume_ml and wine.volume_ml ~ ' mL' or 'Non renseignée' }}<br>
           <strong>Cave :</strong> {{ wine.cellar.name }}<br>
           <strong>Quantité :</strong> {{ wine.quantity }}
         </p>

@@ -58,6 +58,9 @@
           {% if wine.region %}
           <strong>Région :</strong> {{ wine.region }}<br>
           {% endif %}
+          {% if wine.volume_ml %}
+          <strong>Contenance :</strong> {{ wine.volume_ml }} mL<br>
+          {% endif %}
           {% if wine.grape %}
           <strong>Cépage :</strong> {{ wine.grape }}<br>
           {% endif %}
