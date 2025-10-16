@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, List, Tuple
 
+import unicodedata
+
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -11,6 +13,9 @@ from models import db
 
 
 Migration = Tuple[str, Callable[[Connection], None]]
+
+DEFAULT_BADGE_BG_COLOR = "#6366f1"
+DEFAULT_BADGE_TEXT_COLOR = "#ffffff"
 
 
 def _ensure_migration_table(connection: Connection) -> None:
@@ -315,12 +320,160 @@ def _populate_default_alcohol_categories(connection: Connection) -> None:
         )
 
 
+def _add_subcategory_colors(connection: Connection) -> None:
+    """Ajouter les colonnes de couleurs et migrer les valeurs existantes."""
+
+    # Vérifier si les colonnes existent déjà
+    table_info = connection.execute(
+        text("PRAGMA table_info(alcohol_subcategory)")
+    ).fetchall()
+    
+    existing_columns = {row[1] for row in table_info}
+    
+    # Ajouter badge_bg_color seulement si elle n'existe pas
+    if "badge_bg_color" not in existing_columns:
+        connection.execute(
+            text(
+                f"""
+                ALTER TABLE alcohol_subcategory
+                ADD COLUMN badge_bg_color VARCHAR(20) DEFAULT '{DEFAULT_BADGE_BG_COLOR}'
+                """
+            )
+        )
+
+    # Ajouter badge_text_color seulement si elle n'existe pas
+    if "badge_text_color" not in existing_columns:
+        connection.execute(
+            text(
+                f"""
+                ALTER TABLE alcohol_subcategory
+                ADD COLUMN badge_text_color VARCHAR(20) DEFAULT '{DEFAULT_BADGE_TEXT_COLOR}'
+                """
+            )
+        )
+
+    rows = connection.execute(
+        text(
+            """
+            SELECT id, name FROM alcohol_subcategory
+            """
+        )
+    ).fetchall()
+
+    color_map = {
+        # Vins
+        "vin rouge": ("#7f1d1d", "#ffffff"),
+        "red wine": ("#7f1d1d", "#ffffff"),
+        "rouge": ("#7f1d1d", "#ffffff"),
+        "vin blanc": ("#fef3c7", "#78350f"),
+        "white wine": ("#fef3c7", "#78350f"),
+        "blanc": ("#fef3c7", "#78350f"),
+        "vin rose": ("#fce7f3", "#9f1239"),
+        "rose wine": ("#fce7f3", "#9f1239"),
+        "rose": ("#fce7f3", "#9f1239"),
+        "vin orange": ("#fed7aa", "#7c2d12"),
+        "orange wine": ("#fed7aa", "#7c2d12"),
+        "orange": ("#fed7aa", "#7c2d12"),
+
+        # Effervescents
+        "champagne": ("#fef08a", "#713f12"),
+        "cremant": ("#fef3c7", "#78350f"),
+        "crémant": ("#fef3c7", "#78350f"),
+        "prosecco": ("#fef3c7", "#78350f"),
+        "cava": ("#fef3c7", "#78350f"),
+        "mousseux": ("#fef3c7", "#78350f"),
+
+        # Whiskies
+        "whisky": ("#92400e", "#ffffff"),
+        "scotch": ("#92400e", "#ffffff"),
+        "bourbon": ("#b45309", "#ffffff"),
+        "irish whiskey": ("#a16207", "#ffffff"),
+
+        # Rhums
+        "rhum blanc": ("#f5f5f4", "#44403c"),
+        "rhum ambre": ("#d97706", "#ffffff"),
+        "rhum ambré": ("#d97706", "#ffffff"),
+        "rhum vieux": ("#78350f", "#ffffff"),
+        "rhum": ("#78350f", "#ffffff"),
+
+        # Spiritueux
+        "cognac": ("#92400e", "#ffffff"),
+        "armagnac": ("#92400e", "#ffffff"),
+        "vodka": ("#e5e7eb", "#1f2937"),
+        "gin": ("#dbeafe", "#1e3a8a"),
+        "tequila": ("#fef3c7", "#78350f"),
+        "mezcal": ("#d1d5db", "#1f2937"),
+
+        # Bières
+        "biere blonde": ("#fbbf24", "#78350f"),
+        "bière blonde": ("#fbbf24", "#78350f"),
+        "blonde": ("#fbbf24", "#78350f"),
+        "biere brune": ("#78350f", "#ffffff"),
+        "bière brune": ("#78350f", "#ffffff"),
+        "brune": ("#78350f", "#ffffff"),
+        "biere blanche": ("#fef3c7", "#78350f"),
+        "bière blanche": ("#fef3c7", "#78350f"),
+        "blanche": ("#fef3c7", "#78350f"),
+        "biere ambree": ("#d97706", "#ffffff"),
+        "bière ambrée": ("#d97706", "#ffffff"),
+        "ambree": ("#d97706", "#ffffff"),
+        "ipa": ("#f59e0b", "#ffffff"),
+        "stout": ("#1c1917", "#ffffff"),
+        "porter": ("#292524", "#ffffff"),
+
+        # Liqueurs & apéritifs
+        "liqueur": ("#ec4899", "#ffffff"),
+        "creme": ("#fce7f3", "#9f1239"),
+        "crème": ("#fce7f3", "#9f1239"),
+        "aperitif": ("#10b981", "#ffffff"),
+        "apéritif": ("#10b981", "#ffffff"),
+        "vermouth": ("#dc2626", "#ffffff"),
+        "pastis": ("#fef3c7", "#78350f"),
+        "porto": ("#7f1d1d", "#ffffff"),
+
+        # Autres
+        "sake": ("#e0e7ff", "#3730a3"),
+        "saké": ("#e0e7ff", "#3730a3"),
+        "cidre": ("#fca5a5", "#7f1d1d"),
+        "cider": ("#fca5a5", "#7f1d1d"),
+    }
+
+    for subcategory_id, name in rows:
+        normalized = ''.join(
+            c for c in unicodedata.normalize('NFD', name.lower())
+            if unicodedata.category(c) != 'Mn'
+        )
+
+        colors = color_map.get(normalized)
+        if not colors:
+            for key, value in color_map.items():
+                if key in normalized:
+                    colors = value
+                    break
+
+        if not colors:
+            continue
+
+        bg_color, text_color = colors
+        connection.execute(
+            text(
+                """
+                UPDATE alcohol_subcategory
+                SET badge_bg_color = :bg, badge_text_color = :text
+                WHERE id = :id
+                """
+            ),
+            {"bg": bg_color, "text": text_color, "id": subcategory_id},
+        )
+
+
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
     ("0002_create_wine_insight", _create_wine_insight_table),
     ("0003_create_wine_consumption", _create_wine_consumption_table),
     ("0004_create_alcohol_categories", _create_alcohol_categories_tables),
     ("0005_populate_default_categories", _populate_default_alcohol_categories),
+    ("0006_add_subcategory_colors", _add_subcategory_colors),
 )
 
 

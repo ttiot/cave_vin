@@ -85,7 +85,9 @@ class AlcoholSubcategory(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey("alcohol_category.id"), nullable=False)
     description = db.Column(db.Text)
     display_order = db.Column(db.Integer, default=0)
-    
+    badge_bg_color = db.Column(db.String(20), nullable=False, default="#6366f1")
+    badge_text_color = db.Column(db.String(20), nullable=False, default="#ffffff")
+
     category = db.relationship("AlcoholCategory", back_populates="subcategories")
     wines = db.relationship("Wine", back_populates="subcategory")
     
