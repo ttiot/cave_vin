@@ -100,9 +100,9 @@
       
       <div class="card-actions border-top bg-light p-3">
         <div class="btn-group d-flex" role="group">
-          <a href="{{ url_for('wine_detail', wine_id=wine.id) }}" class="btn btn-outline-primary btn-sm flex-fill">Détails</a>
-          <form method="post" action="{{ url_for('consume_wine', wine_id=wine.id) }}" class="flex-fill">
-            <input type="hidden" name="redirect" value="{{ url_for('wines_to_consume') }}">
+          <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="btn btn-outline-primary btn-sm flex-fill">Détails</a>
+          <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill">
+            <input type="hidden" name="redirect" value="{{ url_for('search.wines_to_consume') }}">
             <button type="submit" class="btn btn-outline-success btn-sm w-100">Consommer</button>
           </form>
         </div>
@@ -117,12 +117,12 @@
   <h5>Aucun vin à afficher</h5>
   <p class="mb-0">Aucun vin avec un millésime n'a été trouvé dans votre cave, ou aucune information de garde n'est disponible.</p>
   <p class="mb-0 mt-2">
-    <a href="{{ url_for('index') }}" class="alert-link">Retour à la liste des vins</a>
+    <a href="{{ url_for('main.index') }}" class="alert-link">Retour à la liste des vins</a>
   </p>
 </div>
 {% endif %}
 
 <div class="mt-4">
-  <a href="{{ url_for('index') }}" class="btn btn-secondary">← Retour à la cave</a>
+  <a href="{{ url_for('main.index') }}" class="btn btn-secondary">← Retour à la cave</a>
 </div>
 {% endblock %}
