@@ -16,7 +16,7 @@
 {% endif %}
 
 <h3>Modifier "{{ wine.name }}"</h3>
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
   <div class="mb-3">
     <label class="form-label">Cave</label>
@@ -45,6 +45,30 @@
   <div class="mb-3">
     <label class="form-label">Nom</label>
     <input type="text" class="form-control" name="name" value="{{ form_data.get('name', wine.name) }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Image de l'étiquette</label>
+    {% if wine.label_image_data %}
+    <div class="mb-2">
+      <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="Étiquette actuelle" class="img-thumbnail" style="max-height: 200px; max-width: 100%; object-fit: contain;">
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" name="remove_image" id="remove_image" value="1">
+        <label class="form-check-label" for="remove_image">
+          Supprimer l'image actuelle
+        </label>
+      </div>
+    </div>
+    {% elif wine.image_url %}
+    <div class="mb-2">
+      <img src="{{ wine.image_url }}" alt="Image actuelle" class="img-thumbnail" style="max-height: 200px; max-width: 100%; object-fit: contain;">
+      <div class="form-text">Image provenant d'Open Food Facts</div>
+    </div>
+    {% endif %}
+    <input type="file" class="form-control" name="label_image" id="label_image" accept="image/*">
+    <div class="form-text">Téléchargez une photo de l'étiquette (formats acceptés : JPG, PNG, WebP). L'image sera optimisée automatiquement.</div>
+    <div id="image-preview" class="mt-2" style="display: none;">
+      <img id="preview-img" src="" alt="Aperçu" class="img-thumbnail" style="max-height: 200px; max-width: 100%; object-fit: contain;">
+    </div>
   </div>
   <div class="row" data-dynamic-fields>
     {% for field in ordered_fields %}
@@ -102,6 +126,37 @@
       select.addEventListener('change', updateFieldVisibility);
     }
     updateFieldVisibility();
+
+    // Gestion de l'aperçu de l'image
+    const fileInput = document.getElementById('label_image');
+    const previewContainer = document.getElementById('image-preview');
+    const previewImg = document.getElementById('preview-img');
+    const removeCheckbox = document.getElementById('remove_image');
+
+    if (fileInput) {
+      fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            previewContainer.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        } else {
+          previewContainer.style.display = 'none';
+        }
+      });
+    }
+
+    if (removeCheckbox) {
+      removeCheckbox.addEventListener('change', function() {
+        if (this.checked && fileInput) {
+          fileInput.value = '';
+          previewContainer.style.display = 'none';
+        }
+      });
+    }
   });
 })();
 </script>

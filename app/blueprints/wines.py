@@ -1,11 +1,14 @@
 """Blueprint pour la gestion des bouteilles d'alcool."""
 
 from collections import defaultdict
+import base64
+from io import BytesIO
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from sqlalchemy.orm import selectinload
 import requests
+from PIL import Image
 
 from models import (
     AlcoholCategory,
@@ -418,6 +421,7 @@ def edit_wine(wine_id):
         quantity = request.form.get('quantity', type=int)
         cellar_id = request.form.get('cellar_id', type=int)
         subcategory_id = request.form.get('subcategory_id', type=int)
+        remove_image = request.form.get('remove_image') == '1'
 
         selected_subcategory_id = subcategory_id
 
@@ -470,6 +474,58 @@ def edit_wine(wine_id):
         wine.quantity = quantity
         wine.cellar = cellar
         wine.subcategory = subcategory
+
+        # Gestion de l'image
+        if remove_image:
+            wine.label_image_data = None
+        
+        if 'label_image' in request.files:
+            file = request.files['label_image']
+            if file and file.filename:
+                try:
+                    # Lire et traiter l'image
+                    image = Image.open(file.stream)
+                    
+                    # Convertir en RGB si nécessaire (pour les PNG avec transparence)
+                    if image.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', image.size, (255, 255, 255))
+                        if image.mode == 'P':
+                            image = image.convert('RGBA')
+                        background.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
+                        image = background
+                    elif image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    
+                    # Redimensionner l'image pour optimiser la taille (max 800px de largeur)
+                    max_width = 800
+                    if image.width > max_width:
+                        ratio = max_width / image.width
+                        new_height = int(image.height * ratio)
+                        image = image.resize((max_width, new_height), Image.Resampling.LANCZOS)
+                    
+                    # Convertir en base64
+                    buffer = BytesIO()
+                    image.save(buffer, format='JPEG', quality=85, optimize=True)
+                    image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    
+                    wine.label_image_data = image_data
+                except Exception as e:
+                    errors.append(f"Erreur lors du traitement de l'image : {str(e)}")
+
+        if errors:
+            for error in errors:
+                flash(error)
+            return render_template(
+                'edit_wine.html',
+                wine=wine,
+                cellars=cellars,
+                categories=categories,
+                field_settings=field_settings,
+                ordered_fields=ordered_fields,
+                selected_subcategory_id=selected_subcategory_id,
+                form_data=request.form,
+                existing_field_values=existing_field_values,
+            )
 
         db.session.commit()
         flash('Bouteille modifiée avec succès.')
