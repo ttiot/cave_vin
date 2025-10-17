@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .stat-chip {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 1.25rem;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    min-width: 160px;
+  }
+  .stat-chip .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+  }
+  .stat-chip .stat-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+  }
+  .modern-tabs .nav-link {
+    border-radius: 0.85rem;
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    color: #374151;
+    background-color: #f3f4f6;
+    margin-right: 0.75rem;
+    transition: all 0.2s ease;
+  }
+  .modern-tabs .nav-link.active {
+    background: linear-gradient(120deg, #111827, #1f2937);
+    color: #fff;
+    box-shadow: 0 10px 25px rgba(17, 24, 39, 0.25);
+  }
+  .modern-tabs .nav-link small {
+    display: block;
+    font-weight: 400;
+  }
+  .alcohol-card {
+    border: none;
+    border-radius: 1.25rem;
+    background: #ffffff;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .alcohol-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.18);
+  }
+  .alcohol-card .card-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+  }
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    background-color: #f3f4f6;
+    font-size: 0.85rem;
+    color: #4b5563;
+  }
+  .insight-snippet {
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    border-left: 3px solid #1d4ed8;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-5">
+  <div>
+    <h1 class="display-6 fw-bold mb-2">Collection complète</h1>
+    <p class="lead text-muted mb-0">Visualisez tous vos alcools, élégamment regroupés par cave.</p>
+  </div>
+  <div class="d-flex flex-wrap gap-3">
+    <div class="stat-chip">
+      <span class="stat-value">{{ overview.total_bottles }}</span>
+      <span class="stat-label">Bouteilles en cave</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value">{{ overview.total_references }}</span>
+      <span class="stat-label">Références uniques</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value">{{ overview.total_cellars }}</span>
+      <span class="stat-label">Caves</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value">{{ overview.distinct_categories }}</span>
+      <span class="stat-label">Univers explorés</span>
+    </div>
+  </div>
+</div>
+
+{% if top_categories %}
+<div class="mb-5">
+  <h5 class="fw-semibold text-uppercase text-muted mb-3">Vos univers les plus fournis</h5>
+  <div class="d-flex flex-wrap gap-2">
+    {% for label, count in top_categories %}
+    <span class="meta-chip">
+      <i class="bi bi-stars"></i>
+      {{ label }}
+      <span class="badge text-bg-dark ms-1">{{ count }}</span>
+    </span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if cellar_views %}
+<ul class="nav modern-tabs flex-nowrap overflow-auto pb-3" id="cellarTabs" role="tablist">
+  {% for view in cellar_views %}
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if loop.first %}active{% endif %}" id="tab-{{ view.cellar.id }}" data-bs-toggle="pill" data-bs-target="#panel-{{ view.cellar.id }}" type="button" role="tab" aria-controls="panel-{{ view.cellar.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+      <span class="d-block">{{ view.cellar.name }}</span>
+      <small class="text-muted">{{ view.total_quantity }} bouteilles · {{ view.reference_count }} références</small>
+    </button>
+  </li>
+  {% endfor %}
+  {% if unassigned_wines %}
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-unassigned" data-bs-toggle="pill" data-bs-target="#panel-unassigned" type="button" role="tab" aria-controls="panel-unassigned" aria-selected="false">
+      <span class="d-block">Sans cave</span>
+      <small class="text-muted">{{ orphan_summary.total_quantity }} bouteilles · {{ unassigned_wines|length }} références</small>
+    </button>
+  </li>
+  {% endif %}
+</ul>
+
+<div class="tab-content pt-4" id="cellarTabsContent">
+  {% for view in cellar_views %}
+  <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="panel-{{ view.cellar.id }}" role="tabpanel" aria-labelledby="tab-{{ view.cellar.id }}">
+    {% if view.wines %}
+    <div class="row g-4">
+      {% for wine in view.wines %}
+      <div class="col-md-6 col-xl-4">
+        <div class="card alcohol-card h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div class="d-flex flex-column">
+                {% if wine.subcategory %}
+                <span class="badge rounded-pill" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
+                {% endif %}
+                {% if wine.subcategory and wine.subcategory.category %}
+                <small class="text-muted">{{ wine.subcategory.category.name }}</small>
+                {% endif %}
+              </div>
+              <span class="meta-chip"><i class="bi bi-collection"></i> {{ wine.quantity or 0 }} en cave</span>
+            </div>
+
+            <h4 class="fw-semibold mb-1">{{ wine.name }}</h4>
+            {% set year = wine.extra_attributes.year if wine.extra_attributes else None %}
+            <p class="text-muted mb-3">{{ wine.extra_attributes.region if wine.extra_attributes and wine.extra_attributes.region else 'Origine à préciser' }}</p>
+
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <span class="meta-chip"><i class="bi bi-calendar3"></i> {{ year if year else 'Millésime N.C.' }}</span>
+              {% if wine.extra_attributes and wine.extra_attributes.grape_varieties %}
+              <span class="meta-chip"><i class="bi bi-flower3"></i> {{ wine.extra_attributes.grape_varieties }}</span>
+              {% endif %}
+              {% if wine.extra_attributes and wine.extra_attributes.volume_ml %}
+              <span class="meta-chip"><i class="bi bi-droplet-half"></i> {{ wine.extra_attributes.volume_ml }} ml</span>
+              {% endif %}
+            </div>
+
+            {% set highlights = wine.preview_insights(1) %}
+            {% if highlights %}
+            {% set insight = highlights[0] %}
+            <div class="insight-snippet p-3 mb-3">
+              <div class="small text-uppercase text-muted fw-semibold mb-1">{{ insight.title }}</div>
+              <div class="text-muted small">{{ insight.content }}</div>
+            </div>
+            {% endif %}
+
+            <div class="mt-auto d-flex justify-content-between align-items-center">
+              <div class="text-muted small">
+                {% if wine.extra_attributes and wine.extra_attributes.tasting_notes %}
+                « {{ wine.extra_attributes.tasting_notes }} »
+                {% else %}
+                Ajoutez des notes de dégustation pour compléter cette fiche.
+                {% endif %}
+              </div>
+              <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="btn btn-outline-dark btn-sm stretched-link">Voir la fiche</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-light border rounded-4 py-4">
+      <h5 class="fw-semibold mb-1">Aucune référence enregistrée dans cette cave.</h5>
+      <p class="mb-0 text-muted">Ajoutez une bouteille pour commencer à constituer votre collection.</p>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if unassigned_wines %}
+  <div class="tab-pane fade" id="panel-unassigned" role="tabpanel" aria-labelledby="tab-unassigned">
+    <div class="alert alert-warning rounded-4">
+      Certaines références n'ont pas encore été associées à une cave.
+    </div>
+    <div class="row g-4">
+      {% for wine in unassigned_wines %}
+      <div class="col-md-6 col-xl-4">
+        <div class="card alcohol-card h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              {% if wine.subcategory %}
+              <span class="badge rounded-pill" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
+              {% endif %}
+              <span class="meta-chip"><i class="bi bi-collection"></i> {{ wine.quantity or 0 }} en cave</span>
+            </div>
+            <h4 class="fw-semibold mb-1">{{ wine.name }}</h4>
+            <p class="text-muted mb-3">Origine à préciser</p>
+            <a href="{{ url_for('wines.edit_wine', wine_id=wine.id) }}" class="btn btn-outline-dark btn-sm">Associer à une cave</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-warning rounded-4">
+  Aucune cave enregistrée pour le moment. Commencez par <a href="{{ url_for('cellars.add_cellar') }}" class="alert-link">créer une cave</a> pour organiser vos alcools.
+</div>
+{% endif %}
+{% endblock %}

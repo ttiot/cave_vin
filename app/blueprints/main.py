@@ -422,6 +422,106 @@ def index():
     )
 
 
+@main_bp.route('/alcools', methods=['GET'])
+@login_required
+def all_alcohols():
+    """Affiche l'ensemble des alcools regroupés par cave dans une vue moderne."""
+
+    cellars = (
+        Cellar.query.options(selectinload(Cellar.category))
+        .order_by(Cellar.name.asc())
+        .all()
+    )
+
+    wines = (
+        Wine.query.options(
+            selectinload(Wine.cellar),
+            selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
+            selectinload(Wine.insights),
+        )
+        .filter(Wine.quantity > 0)
+        .order_by(Wine.name.asc())
+        .all()
+    )
+
+    wines_by_cellar: dict[int, list[Wine]] = {cellar.id: [] for cellar in cellars}
+    unassigned_wines: list[Wine] = []
+
+    for wine in wines:
+        if wine.cellar_id and wine.cellar_id in wines_by_cellar:
+            wines_by_cellar[wine.cellar_id].append(wine)
+        else:
+            unassigned_wines.append(wine)
+
+    cellar_views: list[dict[str, object]] = []
+    for cellar in cellars:
+        cellar_wines = wines_by_cellar.get(cellar.id, [])
+        total_quantity = sum(wine.quantity or 0 for wine in cellar_wines)
+        unique_categories = sorted(
+            {
+                wine.subcategory.category.name
+                if wine.subcategory and wine.subcategory.category
+                else 'Non catégorisé'
+                for wine in cellar_wines
+            }
+        )
+
+        cellar_views.append(
+            {
+                'cellar': cellar,
+                'wines': cellar_wines,
+                'total_quantity': total_quantity,
+                'reference_count': len(cellar_wines),
+                'unique_categories': unique_categories,
+            }
+        )
+
+    orphan_summary = None
+    if unassigned_wines:
+        orphan_summary = {
+            'total_quantity': sum(wine.quantity or 0 for wine in unassigned_wines),
+            'unique_categories': sorted(
+                {
+                    wine.subcategory.category.name
+                    if wine.subcategory and wine.subcategory.category
+                    else 'Non catégorisé'
+                    for wine in unassigned_wines
+                }
+            ),
+        }
+
+    total_bottles = sum(wine.quantity or 0 for wine in wines)
+    category_breakdown: dict[str, int] = defaultdict(int)
+    for wine in wines:
+        if wine.subcategory and wine.subcategory.category:
+            label = f"{wine.subcategory.category.name} — {wine.subcategory.name}"
+        elif wine.subcategory:
+            label = wine.subcategory.name
+        else:
+            label = 'Non catégorisé'
+        category_breakdown[label] += wine.quantity or 0
+
+    top_categories = sorted(
+        category_breakdown.items(), key=lambda item: item[1], reverse=True
+    )[:6]
+
+    overview = {
+        'total_cellars': len(cellars),
+        'total_references': len(wines),
+        'total_bottles': total_bottles,
+        'distinct_categories': len(category_breakdown),
+    }
+
+    return render_template(
+        'all_alcohols.html',
+        cellar_views=cellar_views,
+        overview=overview,
+        top_categories=top_categories,
+        unassigned_wines=unassigned_wines,
+        orphan_summary=orphan_summary,
+    )
+
+
 @main_bp.route('/consommations', methods=['GET'])
 @login_required
 def consumption_history():

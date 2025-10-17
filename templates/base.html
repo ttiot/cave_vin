@@ -16,6 +16,7 @@
     <div>
       {% if current_user.is_authenticated %}
       <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-light btn-sm me-2">🔍 Recherche</a>
+      <a href="{{ url_for('main.all_alcohols') }}" class="btn btn-outline-light btn-sm me-2">🍸 Tous les alcools</a>
       <a href="{{ url_for('search.wines_to_consume') }}" class="btn btn-outline-light btn-sm me-2">⏰ À consommer</a>
       <a href="{{ url_for('cellars.list_cellars') }}" class="btn btn-outline-light btn-sm me-2">Mes caves</a>
       <a href="{{ url_for('categories.list_categories') }}" class="btn btn-outline-light btn-sm me-2">Catégories</a>
