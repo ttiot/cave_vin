@@ -64,7 +64,7 @@
           <div class="mb-4">
             <div class="d-flex justify-content-between align-items-start">
               <div>
-                <h6 class="mb-1">{{ item.wine.name }}{% if item.wine.year %} — {{ item.wine.year }}{% endif %}</h6>
+                <h6 class="mb-1">{{ item.wine.name }}{% if item.wine.extra_attributes.year %} — {{ item.wine.extra_attributes.year }}{% endif %}</h6>
                 <div class="text-muted small">
                   {{ item.wine.cellar.name if item.wine.cellar else 'Sans cave' }}
                   {% if item.wine.subcategory %}
@@ -102,7 +102,7 @@
             {% for wine in recent_wines %}
             <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="list-group-item list-group-item-action py-3">
               <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1">{{ wine.name }}{% if wine.year %} — {{ wine.year }}{% endif %}</h6>
+                <h6 class="mb-1">{{ wine.name }}{% if wine.extra_attributes.year %} — {{ wine.extra_attributes.year }}{% endif %}</h6>
                 <small class="text-muted">{{ wine.cellar.name if wine.cellar else 'Sans cave' }}</small>
               </div>
               <p class="mb-1 text-muted small">
@@ -111,7 +111,7 @@
                 {% else %}
                   <span class="badge bg-secondary me-1">Non catégorisé</span>
                 {% endif %}
-                {% if wine.region %}{{ wine.region }}{% else %}Région inconnue{% endif %}
+                {% if wine.extra_attributes.region %}{{ wine.extra_attributes.region }}{% else %}Région inconnue{% endif %}
               </p>
               <small class="text-muted">Quantité : {{ wine.quantity }}</small>
             </a>

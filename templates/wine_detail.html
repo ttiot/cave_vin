@@ -13,17 +13,27 @@
           {% if wine.subcategory %}
           <strong>Type :</strong> {{ wine.subcategory.category.name }} - {{ wine.subcategory.name }}<br>
           {% endif %}
-          <strong>Année :</strong> {{ wine.year or 'Non renseigné' }}<br>
-          <strong>Région :</strong> {{ wine.region or 'Non renseignée' }}<br>
-          <strong>Cépage :</strong> {{ wine.grape or 'Inconnu' }}<br>
+          {% for field in ordered_fields %}
+            {% if field.name != 'description' %}
+              {% set value = field_values.get(field.name) %}
+              {% if value %}
+                <strong>{{ field.label }} :</strong>
+                {% if field.name == 'volume_ml' %}
+                  {{ value }} mL
+                {% else %}
+                  {{ value }}
+                {% endif %}<br>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
           <strong>Cave :</strong> {{ wine.cellar.name }}<br>
           <strong>Quantité :</strong> {{ wine.quantity }}
         </p>
         {% if wine.barcode %}
         <p class="card-text"><span class="badge text-bg-secondary">EAN : {{ wine.barcode }}</span></p>
         {% endif %}
-        {% if wine.description %}
-        <p class="card-text text-muted">{{ wine.description }}</p>
+        {% if field_values.get('description') %}
+        <p class="card-text text-muted">{{ field_values.get('description') }}</p>
         {% endif %}
       </div>
       <div class="card-footer bg-light">

@@ -1,13 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
+{% set form_data = form_data or {} %}
+{% set base_values = existing_field_values or {} %}
+{% set raw_cellar = form_data.get('cellar_id') %}
+{% if raw_cellar %}
+  {% set current_cellar_id = raw_cellar|int %}
+{% else %}
+  {% set current_cellar_id = wine.cellar_id %}
+{% endif %}
+{% set raw_subcategory = form_data.get('subcategory_id') %}
+{% if raw_subcategory %}
+  {% set current_subcategory_id = raw_subcategory|int %}
+{% else %}
+  {% set current_subcategory_id = selected_subcategory_id %}
+{% endif %}
+
 <h3>Modifier "{{ wine.name }}"</h3>
 <form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
   <div class="mb-3">
     <label class="form-label">Cave</label>
     <select class="form-select" name="cellar_id" required>
       {% for cellar in cellars %}
-      <option value="{{ cellar.id }}" {% if wine.cellar_id==cellar.id %}selected{% endif %}>
-        {{ cellar.name }} — {{ 'Naturelle' if cellar.cellar_type == 'naturelle' else 'Électrique' }}
+      <option value="{{ cellar.id }}" {% if current_cellar_id==cellar.id %}selected{% endif %}>
+        {{ cellar.name }}{% if cellar.category %} — {{ cellar.category.name }}{% endif %}
       </option>
       {% endfor %}
     </select>
@@ -15,13 +31,11 @@
   <div class="mb-3">
     <label class="form-label">Type d'alcool</label>
     <select class="form-select" name="subcategory_id" id="subcategory_id">
-      <option value="">Non spécifié</option>
+      <option value="" {% if not current_subcategory_id %}selected{% endif %}>Non spécifié</option>
       {% for category in categories %}
         <optgroup label="{{ category.name }}">
           {% for subcategory in category.subcategories %}
-            <option value="{{ subcategory.id }}" {% if wine.subcategory_id==subcategory.id %}selected{% endif %}>
-              {{ subcategory.name }}
-            </option>
+            <option value="{{ subcategory.id }}" {% if current_subcategory_id==subcategory.id %}selected{% endif %}>{{ subcategory.name }}</option>
           {% endfor %}
         </optgroup>
       {% endfor %}
@@ -30,35 +44,65 @@
   </div>
   <div class="mb-3">
     <label class="form-label">Nom</label>
-    <input type="text" class="form-control" name="name" value="{{ wine.name }}" required>
+    <input type="text" class="form-control" name="name" value="{{ form_data.get('name', wine.name) }}" required>
+  </div>
+  <div class="row" data-dynamic-fields>
+    {% for field in ordered_fields %}
+    {% set submitted_value = form_data.get(field.name) if form_data.get(field.name) is not none else base_values.get(field.name) %}
+    {% set display_value = submitted_value if submitted_value is not none else '' %}
+    <div class="col-md-{{ field.form_width or 12 }} mb-3" data-field="{{ field.name }}">
+      <label class="form-label">{{ field.label }}</label>
+      {% if field.input_type == 'textarea' %}
+        <textarea class="form-control" name="{{ field.name }}" rows="3" placeholder="{{ field.placeholder or '' }}">{{ display_value }}</textarea>
+      {% elif field.input_type == 'number' %}
+        <input type="number" class="form-control" name="{{ field.name }}" value="{{ display_value }}" placeholder="{{ field.placeholder or '' }}" {% if field.name == 'year' %}min="1000" max="3000"{% elif field.name == 'volume_ml' %}min="10" step="10"{% endif %}>
+      {% else %}
+        <input type="text" class="form-control" name="{{ field.name }}" value="{{ display_value }}" placeholder="{{ field.placeholder or '' }}">
+      {% endif %}
+      {% if field.help_text %}
+      <div class="form-text">{{ field.help_text }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
   </div>
   <div class="row">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Région</label>
-      <input type="text" class="form-control" name="region" value="{{ wine.region or '' }}">
-    </div>
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Cépage</label>
-      <input type="text" class="form-control" name="grape" value="{{ wine.grape or '' }}">
-    </div>
-  </div>
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      <label class="form-label">Année</label>
-      <input type="number" class="form-control" name="year" value="{{ wine.year or '' }}" min="1900" max="2100">
-    </div>
-    <div class="col-md-6 mb-3">
+    <div class="col-md-3 mb-3">
       <label class="form-label">Quantité</label>
-      <input type="number" class="form-control" name="quantity" value="{{ wine.quantity }}" min="0" required>
+      <input type="number" class="form-control" name="quantity" value="{{ form_data.get('quantity', wine.quantity) }}" min="0" required>
     </div>
-  </div>
-  <div class="mb-3">
-    <label class="form-label">Description</label>
-    <textarea class="form-control" name="description" rows="3">{{ wine.description or '' }}</textarea>
   </div>
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-dark">Enregistrer</button>
     <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="btn btn-secondary">Annuler</a>
   </div>
 </form>
+
+<script>
+(function() {
+  const fieldSettings = {{ field_settings|tojson }};
+  function updateFieldVisibility() {
+    const select = document.getElementById('subcategory_id');
+    const key = (select && select.value) ? select.value : 'default';
+    const config = fieldSettings[key] || fieldSettings['default'];
+    document.querySelectorAll('[data-field]').forEach((container) => {
+      const fieldName = container.getAttribute('data-field');
+      const settings = config[fieldName];
+      const isEnabled = settings ? settings.enabled : true;
+      const isRequired = settings ? settings.required : false;
+      container.classList.toggle('d-none', !isEnabled);
+      container.querySelectorAll('input, textarea, select').forEach((input) => {
+        input.required = !!(isEnabled && isRequired);
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('subcategory_id');
+    if (select) {
+      select.addEventListener('change', updateFieldVisibility);
+    }
+    updateFieldVisibility();
+  });
+})();
+</script>
 {% endblock %}

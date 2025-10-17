@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-4">Configuration des champs des bouteilles</h3>
+<p class="text-muted">Définissez pour chaque type d'alcool quels champs doivent être visibles et/ou obligatoires lors de la création d'une bouteille.</p>
+
+<form method="POST" class="mb-5">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+  <div class="card mb-4">
+    <div class="card-header">Configuration globale</div>
+    <div class="card-body p-0">
+      {% for field in ordered_fields %}
+      {% set settings = field_settings['global'][field.name] %}
+      <div class="row g-0 align-items-center px-3 py-3 border-bottom" data-field-toggle>
+        <div class="col-md-5">
+          <strong>{{ field.label }}</strong>
+          {% if field.help_text %}
+          <div class="text-muted small">{{ field.help_text }}</div>
+          {% endif %}
+        </div>
+        <div class="col-md-2">
+          <a href="{{ url_for('categories.edit_field', field_id=field.id) }}"
+             class="btn btn-sm btn-outline-secondary"
+             title="Modifier ce champ">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </div>
+        <div class="col-md-2">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('global', None, field.name, 'enabled') }}" data-role="enabled" {% if settings.enabled %}checked{% endif %}>
+            <label class="form-check-label">Visible</label>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('global', None, field.name, 'required') }}" data-role="required" {% if settings.required %}checked{% endif %}>
+            <label class="form-check-label">Obligatoire</label>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if categories %}
+    {% for category in categories %}
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>{{ category.name }}</span>
+        <span class="text-muted small">S'applique à toutes les sous-catégories de {{ category.name }}</span>
+      </div>
+      <div class="card-body p-0">
+        {% set category_settings = field_settings['category'].get(category.id) or {} %}
+        {% for field in ordered_fields %}
+        {% set settings = category_settings.get(field.name) or {'enabled': False, 'required': False} %}
+        <div class="row g-0 align-items-center px-3 py-3 border-bottom" data-field-toggle data-scope="category" data-scope-id="{{ category.id }}" data-field-name="{{ field.name }}">
+          <div class="col-md-5">
+            <strong>{{ field.label }}</strong>
+          </div>
+          <div class="col-md-1">
+            <a href="{{ url_for('categories.edit_field', field_id=field.id) }}"
+               class="btn btn-sm btn-outline-secondary"
+               title="Modifier ce champ">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('category', category.id, field.name, 'enabled') }}" data-role="enabled" {% if settings.enabled %}checked{% endif %}>
+              <label class="form-check-label">Visible</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('category', category.id, field.name, 'required') }}" data-role="required" {% if settings.required %}checked{% endif %}>
+              <label class="form-check-label">Obligatoire</label>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if category.subcategories %}
+      <div class="list-group list-group-flush">
+        {% for subcategory in category.subcategories %}
+        {% set sub_settings = field_settings['subcategory'].get(subcategory.id) or {} %}
+        <div class="list-group-item">
+          <h6 class="mb-3">{{ subcategory.name }}</h6>
+          {% for field in ordered_fields %}
+          {% set settings = sub_settings.get(field.name) or {'enabled': False, 'required': False} %}
+          <div class="row align-items-center py-2" data-field-toggle data-scope="subcategory" data-scope-id="{{ subcategory.id }}" data-parent-category-id="{{ category.id }}" data-field-name="{{ field.name }}">
+            <div class="col-md-5">
+              <span>{{ field.label }}</span>
+            </div>
+            <div class="col-md-1">
+              <a href="{{ url_for('categories.edit_field', field_id=field.id) }}"
+                 class="btn btn-sm btn-outline-secondary"
+                 title="Modifier ce champ">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('subcategory', subcategory.id, field.name, 'enabled') }}" data-role="enabled" {% if settings.enabled %}checked{% endif %}>
+                <label class="form-check-label">Visible</label>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" value="1" name="{{ input_name('subcategory', subcategory.id, field.name, 'required') }}" data-role="required" {% if settings.required %}checked{% endif %}>
+                <label class="form-check-label">Obligatoire</label>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="alert alert-info">Aucune catégorie n'est encore configurée. Ajoutez des catégories pour gérer la configuration spécifique.</div>
+  {% endif %}
+
+  <div class="d-flex justify-content-between">
+    <a href="{{ url_for('categories.list_categories') }}" class="btn btn-outline-secondary">← Retour aux catégories</a>
+    <button type="submit" class="btn btn-dark">Enregistrer la configuration</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-header">Ajouter un nouveau champ</div>
+  <div class="card-body">
+    <form method="POST" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="action" value="add_field" />
+      <div class="col-md-4">
+        <label class="form-label">Libellé du champ</label>
+        <input type="text" class="form-control" name="label" placeholder="Ex: Pays" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Portée par défaut</label>
+        <select class="form-select" name="scope_ref">
+          <option value="global">Toutes les bouteilles</option>
+          {% for category in categories %}
+            <option value="category:{{ category.id }}">{{ category.name }} (catégorie)</option>
+            {% for subcategory in category.subcategories %}
+              <option value="subcategory:{{ subcategory.id }}">{{ category.name }} — {{ subcategory.name }}</option>
+            {% endfor %}
+          {% endfor %}
+        </select>
+        <div class="form-text">Choisissez où activer ce champ par défaut. Vous pourrez modifier les réglages ensuite.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Type de saisie</label>
+        <select class="form-select" name="input_type">
+          <option value="text">Texte court</option>
+          <option value="number">Nombre</option>
+          <option value="textarea">Texte long</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Placeholder</label>
+        <input type="text" class="form-control" name="placeholder" placeholder="Texte d'aide facultatif">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Texte d'aide</label>
+        <input type="text" class="form-control" name="help_text" placeholder="Information affichée sous le champ">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Largeur (1-12)</label>
+        <input type="number" class="form-control" name="form_width" min="1" max="12" value="12">
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="enabled" value="1">
+          <label class="form-check-label">Activer</label>
+        </div>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="required" value="1">
+          <label class="form-check-label">Obligatoire</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary">Créer le champ</button>
+      </div>
+    </form>
+    <p class="text-muted small mt-3 mb-0">
+      Les champs intégrés par défaut sont : {{ default_field_definitions | map(attribute='label') | join(', ') }}. Vous pouvez ajouter autant de champs personnalisés que nécessaire.
+    </p>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Fonction pour synchroniser enabled/required dans un container
+  function syncEnabledRequired(container) {
+    var enabledInput = container.querySelector('[data-role="enabled"]');
+    var requiredInput = container.querySelector('[data-role="required"]');
+    if (!enabledInput || !requiredInput) {
+      return;
+    }
+    if (!enabledInput.checked) {
+      requiredInput.checked = false;
+    }
+    requiredInput.disabled = !enabledInput.checked;
+  }
+
+  // Extraire le nom du champ depuis le nom de l'input
+  function getFieldNameFromInput(inputName) {
+    // Format: "global__field_name__enabled" ou "category_1__field_name__enabled"
+    var parts = inputName.split('__');
+    if (parts.length >= 3) {
+      return parts[1];
+    }
+    return null;
+  }
+
+  // Fonction pour cascader les changements depuis le niveau global
+  function cascadeFromGlobal(fieldName, isEnabled, isRequired) {
+    // Trouver tous les inputs pour ce champ dans les catégories et sous-catégories
+    document.querySelectorAll('[data-field-toggle]').forEach(function(container) {
+      var containerFieldName = container.getAttribute('data-field-name');
+      if (containerFieldName === fieldName) {
+        var enabledInput = container.querySelector('[data-role="enabled"]');
+        var requiredInput = container.querySelector('[data-role="required"]');
+        
+        if (enabledInput && !enabledInput.name.startsWith('global__')) {
+          enabledInput.checked = isEnabled;
+          if (requiredInput) {
+            requiredInput.checked = isRequired && isEnabled;
+          }
+          syncEnabledRequired(container);
+        }
+      }
+    });
+  }
+
+  // Fonction pour cascader les changements depuis une catégorie vers ses sous-catégories
+  function cascadeFromCategory(categoryId, fieldName, isEnabled, isRequired) {
+    // Trouver tous les containers de sous-catégories appartenant à cette catégorie
+    document.querySelectorAll('[data-field-toggle][data-scope="subcategory"]').forEach(function(container) {
+      var parentCategoryId = container.getAttribute('data-parent-category-id');
+      var containerFieldName = container.getAttribute('data-field-name');
+      
+      if (parentCategoryId === categoryId && containerFieldName === fieldName) {
+        var enabledInput = container.querySelector('[data-role="enabled"]');
+        var requiredInput = container.querySelector('[data-role="required"]');
+        
+        if (enabledInput) {
+          enabledInput.checked = isEnabled;
+          if (requiredInput) {
+            requiredInput.checked = isRequired && isEnabled;
+          }
+          syncEnabledRequired(container);
+        }
+      }
+    });
+  }
+
+  // Initialiser tous les containers
+  document.querySelectorAll('[data-field-toggle]').forEach(function(container) {
+    syncEnabledRequired(container);
+    
+    var enabledInput = container.querySelector('[data-role="enabled"]');
+    var requiredInput = container.querySelector('[data-role="required"]');
+    
+    // Gérer les changements sur l'interrupteur "Visible"
+    if (enabledInput) {
+      enabledInput.addEventListener('change', function() {
+        syncEnabledRequired(container);
+        
+        var fieldName = getFieldNameFromInput(enabledInput.name);
+        if (!fieldName) return;
+        
+        var isEnabled = enabledInput.checked;
+        var isRequired = requiredInput ? requiredInput.checked : false;
+        
+        // Si c'est un toggle global, cascader vers toutes les catégories et sous-catégories
+        if (enabledInput.name.startsWith('global__')) {
+          cascadeFromGlobal(fieldName, isEnabled, isRequired);
+        }
+        // Si c'est un toggle de catégorie, cascader vers ses sous-catégories
+        else if (container.getAttribute('data-scope') === 'category') {
+          var categoryId = container.getAttribute('data-scope-id');
+          if (categoryId) {
+            cascadeFromCategory(categoryId, fieldName, isEnabled, isRequired);
+          }
+        }
+      });
+    }
+    
+    // Gérer les changements sur l'interrupteur "Obligatoire"
+    if (requiredInput) {
+      requiredInput.addEventListener('change', function() {
+        var fieldName = getFieldNameFromInput(requiredInput.name);
+        if (!fieldName) return;
+        
+        var isRequired = requiredInput.checked;
+        var isEnabled = enabledInput ? enabledInput.checked : false;
+        
+        // Si c'est un toggle global, cascader vers toutes les catégories et sous-catégories
+        if (requiredInput.name.startsWith('global__')) {
+          cascadeFromGlobal(fieldName, isEnabled, isRequired);
+        }
+        // Si c'est un toggle de catégorie, cascader vers ses sous-catégories
+        else if (container.getAttribute('data-scope') === 'category') {
+          var categoryId = container.getAttribute('data-scope-id');
+          if (categoryId) {
+            cascadeFromCategory(categoryId, fieldName, isEnabled, isRequired);
+          }
+        }
+      });
+    }
+  });
+})();
+</script>
+{% endblock %}
