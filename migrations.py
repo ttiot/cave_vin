@@ -938,6 +938,20 @@ def _add_wine_timestamps(connection: Connection) -> None:
             )
         )
 
+
+def _add_wine_label_image(connection: Connection) -> None:
+    """Ajouter la colonne label_image_data si elle est absente."""
+
+    existing_columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(wine)"))
+    }
+
+    if "label_image_data" in existing_columns:
+        return
+
+    connection.execute(text("ALTER TABLE wine ADD COLUMN label_image_data TEXT"))
+
+
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
     ("0002_create_wine_insight", _create_wine_insight_table),
@@ -956,6 +970,7 @@ MIGRATIONS: Iterable[Migration] = (
     ("0015_add_wine_extra_attributes", _add_wine_extra_attributes),
     ("0016_link_field_requirements", _link_requirements_to_field_definitions),
     ("0017_add_wine_timestamps", _add_wine_timestamps),
+    ("0018_add_wine_label_image", _add_wine_label_image),
 )
 
 

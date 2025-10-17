@@ -127,6 +127,7 @@ class Wine(db.Model):
     barcode = db.Column(db.String(20), unique=True)
     extra_attributes = db.Column(db.JSON, nullable=False, default=dict)
     image_url = db.Column(db.String(255))
+    label_image_data = db.Column(db.Text)
     quantity = db.Column(db.Integer, default=1)
     cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id"), nullable=False)
     subcategory_id = db.Column(db.Integer, db.ForeignKey("alcohol_subcategory.id"))

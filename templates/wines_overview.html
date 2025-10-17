@@ -74,7 +74,14 @@
     border-top-left-radius: 1rem;
     border-top-right-radius: 1rem;
     height: 190px;
+    object-fit: contain;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 0.5rem;
+  }
+
+  .wine-card img.card-img-top[src*="openfoodfacts"] {
     object-fit: cover;
+    padding: 0;
   }
 
   .wine-card.card {
@@ -215,7 +222,9 @@
             <div class="card shadow-sm h-100 wine-card"
                  data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
                  data-wine-preview='{{ wine.preview_insights()|tojson }}'>
-              {% if wine.image_url %}
+              {% if wine.label_image_data %}
+              <img src="data:image/png;base64,{{ wine.label_image_data }}" class="card-img-top" alt="Étiquette stylisée de {{ wine.name }}">
+              {% elif wine.image_url %}
               <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
               {% else %}
               <div class="wine-card-cover" aria-hidden="true">{{ wine.name[:1] }}</div>
@@ -257,14 +266,17 @@
               <div class="card-footer bg-white border-0 pt-0">
                 <div class="btn-group d-flex" role="group">
                   <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
                     <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
                   </form>
                   <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
                     <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
                   </form>
                   <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
                   </form>
