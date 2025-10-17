@@ -2,8 +2,9 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
+from urllib.parse import urlparse
+
 from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.urls import url_parse
 
 from models import User, db
 
@@ -25,7 +26,7 @@ def login():
         if user and check_password_hash(user.password, password):
             login_user(user, remember=True)
 
-            if not next_url or url_parse(next_url).netloc != '':
+            if not next_url or urlparse(next_url).netloc != '':
                 next_url = url_for('main.index')
 
             return redirect(next_url)
