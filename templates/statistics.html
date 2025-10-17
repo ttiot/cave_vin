@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+<style>
+  #worldMap { height: 360px; }
+  .stat-card { min-height: 140px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Tableau de bord statistiques</h2>
+
+<ul class="nav nav-tabs" id="statsTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="composition-tab" data-bs-toggle="tab" data-bs-target="#composition" type="button" role="tab" aria-controls="composition" aria-selected="true">Composition</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="finance-tab" data-bs-toggle="tab" data-bs-target="#finance" type="button" role="tab" aria-controls="finance" aria-selected="false">Finance</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="evolution-tab" data-bs-toggle="tab" data-bs-target="#evolution" type="button" role="tab" aria-controls="evolution" aria-selected="false">Évolution</button>
+  </li>
+</ul>
+
+<div class="tab-content pt-4" id="statsTabsContent">
+  <div class="tab-pane fade show active" id="composition" role="tabpanel" aria-labelledby="composition-tab">
+    <div class="row g-3">
+      {% for label in maturity_order %}
+      <div class="col-md-3">
+        <div class="card shadow-sm stat-card">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted text-uppercase">{{ label }}</h6>
+            <h3 class="card-title mb-0">{{ maturity_counts.get(label, 0) }}</h3>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="row g-4 mt-1">
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">Répartition des bouteilles par catégorie</h5>
+            <canvas id="categoryPie"></canvas>
+            {% if not category_distribution %}
+            <p class="text-muted small mb-0 mt-2">Aucune donnée de catégorie disponible.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">Répartition des sous-catégories</h5>
+            <canvas id="subcategoryPie"></canvas>
+            {% if not subcategory_distribution %}
+            <p class="text-muted small mb-0 mt-2">Aucune donnée de sous-catégorie disponible.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h5 class="card-title">Origine géographique</h5>
+        <div id="worldMap" class="rounded border"></div>
+        {% if not map_markers %}
+        <p class="text-muted small mt-2 mb-0">Ajoutez un pays d'origine à vos bouteilles pour afficher cette carte.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="finance" role="tabpanel" aria-labelledby="finance-tab">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="card shadow-sm stat-card">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Montant investi</h6>
+            <h4 class="card-title mb-0">{% if total_invested %}{{ format_currency(total_invested) }} €{% else %}<span class="text-muted">N/D</span>{% endif %}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm stat-card">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Prix d'achat moyen</h6>
+            <h4 class="card-title mb-0">{% if average_purchase_price %}{{ format_currency(average_purchase_price) }} €{% else %}<span class="text-muted">N/D</span>{% endif %}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm stat-card">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Valeur théorique</h6>
+            <h4 class="card-title mb-0">{% if theoretical_value %}{{ format_currency(theoretical_value) }} €{% else %}<span class="text-muted">N/D</span>{% endif %}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm stat-card">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Plus / moins-value</h6>
+            <h4 class="card-title mb-0">
+              {% if plus_minus_value is not none %}
+              <span class="{% if plus_minus_value >= 0 %}text-success{% else %}text-danger{% endif %}">{{ format_currency(plus_minus_value) }} €</span>
+              {% else %}
+              <span class="text-muted">N/D</span>
+              {% endif %}
+            </h4>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Top plus-values</h5>
+        {% if top_gains %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Bouteille</th>
+                <th>Prix d'achat</th>
+                <th>Estimation</th>
+                <th>Gain total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in top_gains %}
+              <tr>
+                <td>
+                  <div>{{ item.wine.name }}</div>
+                  {% if item.wine.subcategory %}
+                  <div class="text-muted small">{{ item.wine.subcategory.category.name }} — {{ item.wine.subcategory.name }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ format_currency(item.purchase) }} €</td>
+                <td>{{ format_currency(item.current) }} €</td>
+                <td class="{% if item.delta >= 0 %}text-success{% else %}text-danger{% endif %}">{{ format_currency(item.delta) }} €</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Ajoutez des prix d'achat et des estimations pour voir les plus-values.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="evolution" role="tabpanel" aria-labelledby="evolution-tab">
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="card-title mb-0">Stock total ({{ total_current_stock }} bouteilles)</h5>
+            </div>
+            <canvas id="stockLine"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">Ajouts vs consommations</h5>
+            <canvas id="flowBar"></canvas>
+            <p class="text-muted small mt-2 mb-0">Les ajouts sont basés sur les dates de création des bouteilles sur la période.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script
+  src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"
+  integrity="sha256-llOggT23Q7vngzKjiW4ox7x1RuT/9R5+l56QjR8EcdE="
+  crossorigin="anonymous"
+></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script>
+  const categoryData = {{ category_distribution|tojson }};
+  const subcategoryData = {{ subcategory_distribution|tojson }};
+  const mapMarkers = {{ map_markers|tojson }};
+  const monthLabels = {{ months_labels|tojson }};
+  const additionsData = {{ additions_by_month|tojson }};
+  const consumptionData = {{ consumption_by_month|tojson }};
+  const stockData = {{ stock_by_month|tojson }};
+
+  function buildPieChart(canvasId, dataset, label) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || Object.keys(dataset).length === 0) {
+      return;
+    }
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: Object.keys(dataset),
+        datasets: [{
+          data: Object.values(dataset),
+        }],
+      },
+      options: {
+        plugins: {
+          legend: {
+            position: 'bottom',
+          },
+          title: {
+            display: false,
+          },
+        },
+      },
+    });
+  }
+
+  function buildStockChart() {
+    const ctx = document.getElementById('stockLine');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: monthLabels,
+        datasets: [{
+          label: 'Stock (bouteilles)',
+          data: stockData,
+          fill: false,
+          borderColor: '#6366f1',
+          tension: 0.2,
+        }],
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+          },
+        },
+      },
+    });
+  }
+
+  function buildFlowChart() {
+    const ctx = document.getElementById('flowBar');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: monthLabels,
+        datasets: [
+          {
+            label: 'Bouteilles ajoutées',
+            data: additionsData,
+            backgroundColor: 'rgba(34, 197, 94, 0.7)',
+          },
+          {
+            label: 'Bouteilles consommées',
+            data: consumptionData,
+            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+          },
+        },
+      },
+    });
+  }
+
+  let leafletMap = null;
+
+  function buildMap() {
+    const mapElement = document.getElementById('worldMap');
+    if (!mapElement || mapMarkers.length === 0) {
+      return;
+    }
+
+    if (!leafletMap) {
+      leafletMap = L.map('worldMap').setView([20, 0], 2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(leafletMap);
+
+      const quantities = mapMarkers.map(item => item.total);
+      const min = Math.min(...quantities);
+      const max = Math.max(...quantities);
+
+      const radiusFor = (value) => {
+        if (min === max) {
+          return 12;
+        }
+        const normalized = (value - min) / (max - min);
+        return 8 + normalized * 18;
+      };
+
+      mapMarkers.forEach(marker => {
+        const circle = L.circleMarker([marker.lat, marker.lng], {
+          radius: radiusFor(marker.total),
+          color: '#c026d3',
+          fillColor: '#e879f9',
+          fillOpacity: 0.6,
+          weight: 2,
+        }).addTo(leafletMap);
+        circle.bindPopup(`<strong>${marker.country}</strong><br>${marker.total} bouteilles`);
+      });
+    } else {
+      setTimeout(() => leafletMap.invalidateSize(), 100);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    buildPieChart('categoryPie', categoryData, 'Catégories');
+    buildPieChart('subcategoryPie', subcategoryData, 'Sous-catégories');
+    buildStockChart();
+    buildFlowChart();
+    buildMap();
+
+    const tabsContainer = document.getElementById('statsTabs');
+    if (tabsContainer) {
+      tabsContainer.addEventListener('shown.bs.tab', (event) => {
+        if (event.target?.id === 'composition-tab') {
+          buildMap();
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}
