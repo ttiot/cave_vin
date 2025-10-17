@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Iterable
 
 from flask import current_app
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import Wine, WineInsight, db
-from services.wine_info_service import InsightData, WineInfoService
+from services.wine_info_service import EnrichmentResult, WineInfoService
 
 logger = logging.getLogger(__name__)
 
@@ -33,49 +32,65 @@ def _run_enrichment(app, wine_id: int) -> None:
         logger.info("Starting enrichment for wine %s", wine.name)
 
         service = WineInfoService.from_app(app)
-        insights = service.fetch(wine)
-        if not insights:
-            logger.info("No insights available for wine %s", wine.name)
+        enrichment = service.fetch(wine)
+        if not enrichment.has_payload():
+            logger.info("No enrichment data available for wine %s", wine.name)
             return
 
-        _store_insights(wine, insights)
+        _store_enrichment(wine, enrichment)
 
 
-def _store_insights(wine: Wine, insights: Iterable[InsightData]) -> None:
-    # Convertir l'itérable en liste pour pouvoir le parcourir plusieurs fois
-    insights_list = list(insights)
-    
-    if not insights_list:
-        logger.info("No new insights to store for wine %s", wine.name)
-        return
-    
-    # Supprimer tous les anciens insights avant d'ajouter les nouveaux
-    # Cela garantit qu'on remplace complètement les données
+def _store_enrichment(wine: Wine, enrichment: EnrichmentResult) -> None:
+    insights_list = list(enrichment.insights or [])
+
     old_insights_count = len(wine.insights)
-    if old_insights_count > 0:
-        logger.info("Removing %s old insights for wine %s", old_insights_count, wine.name)
+    added = 0
+
+    if insights_list:
+        logger.info(
+            "Preparing to replace %s insights with %s new ones for wine %s",
+            old_insights_count,
+            len(insights_list),
+            wine.name,
+        )
+
         for old_insight in list(wine.insights):
             db.session.delete(old_insight)
-    
-    # Ajouter les nouveaux insights
-    added = 0
-    for data in insights_list:
-        model = WineInsight(
-            wine=wine,
-            category=data.category,
-            title=data.title,
-            content=data.content,
-            source_name=data.source_name,
-            source_url=data.source_url,
-            weight=data.weight,
-        )
-        db.session.add(model)
-        added += 1
+
+        for data in insights_list:
+            model = WineInsight(
+                wine=wine,
+                category=data.category,
+                title=data.title,
+                content=data.content,
+                source_name=data.source_name,
+                source_url=data.source_url,
+                weight=data.weight,
+            )
+            db.session.add(model)
+            added += 1
+    else:
+        logger.info("No new insights to store for wine %s", wine.name)
+
+    if enrichment.label_image_data:
+        logger.info("Updating generated label image for wine %s", wine.name)
+        wine.label_image_data = enrichment.label_image_data
+
+    if not insights_list and not enrichment.label_image_data:
+        logger.info("No enrichment data to persist for wine %s", wine.name)
+        return
 
     try:
         db.session.commit()
-        logger.info("Replaced %s old insights with %s new insights for wine %s",
-                   old_insights_count, added, wine.name)
+        if insights_list:
+            logger.info(
+                "Replaced %s old insights with %s new insights for wine %s",
+                old_insights_count,
+                added,
+                wine.name,
+            )
+        if enrichment.label_image_data:
+            logger.info("Stored label image for wine %s", wine.name)
     except SQLAlchemyError:  # pragma: no cover - defensive commit
         db.session.rollback()
-        logger.exception("Failed to persist insights for wine %s", wine.name)
+        logger.exception("Failed to persist enrichment for wine %s", wine.name)

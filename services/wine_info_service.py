@@ -30,6 +30,18 @@ class InsightData:
     weight: int = 0
 
 
+@dataclass
+class EnrichmentResult:
+    """Aggregate payload produced for a wine enrichment run."""
+
+    insights: List[InsightData]
+    label_image_data: Optional[str] = None
+    label_image_mime_type: str = "image/png"
+
+    def has_payload(self) -> bool:
+        return bool(self.insights or self.label_image_data)
+
+
 class WineInfoService:
     """Aggregate data from public APIs (OpenAI)."""
 
@@ -39,11 +51,13 @@ class WineInfoService:
         *,
         openai_client: Optional[OpenAI] = None,
         openai_model: Optional[str] = None,
+        openai_image_model: Optional[str] = None,
         openai_source_name: str = "OpenAI",
     ) -> None:
         self.session = session or requests.Session()
         self.openai_client = openai_client
         self.openai_model = openai_model
+        self.openai_image_model = openai_image_model
         self.openai_source_name = openai_source_name
 
     @classmethod
@@ -80,32 +94,41 @@ class WineInfoService:
         )
         logger.info("📋 Modèle OpenAI configuré: %s", openai_model)
 
+        raw_image_model = (app.config.get("OPENAI_IMAGE_MODEL") or "").strip()
+        openai_image_model = raw_image_model or ("gpt-image-1" if openai_client else None)
+        if openai_image_model:
+            logger.info("🖼️ Modèle d'image OpenAI configuré: %s", openai_image_model)
+        else:
+            logger.info("🖼️ Génération d'étiquettes désactivée (aucun modèle configuré)")
+
         source_name = (app.config.get("OPENAI_SOURCE_NAME") or "OpenAI").strip() or "OpenAI"
         logger.debug("Source name: %s", source_name)
 
         return cls(
             openai_client=openai_client,
             openai_model=openai_model,
+            openai_image_model=openai_image_model,
             openai_source_name=source_name,
         )
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def fetch(self, wine) -> List[InsightData]:
-        """Return a list of insights for the provided wine model instance."""
+    def fetch(self, wine) -> EnrichmentResult:
+        """Return insights and optional label artwork for the provided wine."""
         logger.info("=" * 80)
         logger.info("🍷 Début de la récupération d'informations pour le vin: %s", wine.name)
 
         query = self._build_query(wine)
         logger.debug("🔍 Requête construite: '%s'", query)
-        
+
         if not query:
             logger.warning("⚠️ Requête vide, abandon de la récupération")
-            return []
+            return EnrichmentResult(insights=[])
 
         logger.info("📊 Fetching contextual data for wine: %s", query)
         insights: List[InsightData] = []
+        label_image_data: Optional[str] = None
 
         providers = []
 
@@ -131,16 +154,25 @@ class WineInfoService:
         logger.info("🔄 Déduplication des insights (%d avant déduplication)", len(insights))
         deduplicated = self._deduplicate(insights)
         logger.info("✅ Récupération terminée: %d insights uniques", len(deduplicated))
+
+        if self.openai_client and self.openai_image_model:
+            logger.info("🖼️ Tentative de génération d'une étiquette stylisée")
+            label_image_data = self._openai_label_image(wine, query)
+            if label_image_data:
+                logger.info("🖼️ Étiquette générée avec succès (%d caractères)", len(label_image_data))
+            else:
+                logger.info("⚠️ Aucune étiquette générée pour ce vin")
+
         logger.info("=" * 80)
-        
-        return deduplicated
+
+        return EnrichmentResult(insights=deduplicated, label_image_data=label_image_data)
 
     # ------------------------------------------------------------------
     # Providers
     # ------------------------------------------------------------------
     def _openai_insights(self, wine, query: str) -> Iterable[InsightData]:
         logger.info("🤖 OpenAI: début de la génération d'insights")
-        
+
         if not self.openai_client:
             logger.warning("⚠️ OpenAI: client non disponible")
             return []
@@ -339,6 +371,86 @@ class WineInfoService:
         
         logger.info("✅ OpenAI: %d insight(s) créé(s) avec succès", len(insights))
         return insights
+
+    def _openai_label_image(self, wine, query: str) -> Optional[str]:
+        if not self.openai_client or not self.openai_image_model:
+            return None
+
+        prompt = self._build_label_prompt(wine, query)
+        if not prompt:
+            return None
+
+        try:
+            response = self.openai_client.images.generate(
+                model=self.openai_image_model,
+                prompt=prompt,
+                size="512x512",
+                quality="high",
+                n=1,
+            )
+        except OpenAIError as exc:
+            logger.warning("❌ OpenAI image generation failed: %s", exc)
+            return None
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("❌ Unexpected error during image generation: %s", exc)
+            return None
+
+        payload = getattr(response, "data", None) or []
+        if not payload:
+            logger.info("⚠️ OpenAI image generation returned no data")
+            return None
+
+        first_item = payload[0]
+        image_b64 = None
+
+        if isinstance(first_item, dict):
+            image_b64 = first_item.get("b64_json")
+        else:
+            image_b64 = getattr(first_item, "b64_json", None)
+
+        if not image_b64:
+            logger.info("⚠️ OpenAI image payload missing b64_json field")
+            return None
+
+        return image_b64.strip()
+
+    def _build_label_prompt(self, wine, query: str) -> str:
+        details = [
+            f"Nom du vin : {wine.name}" if wine.name else None,
+        ]
+
+        extras = getattr(wine, "extra_attributes", {}) or {}
+
+        if extras.get("year"):
+            details.append(f"Millésime : {extras.get('year')}")
+        if extras.get("region"):
+            details.append(f"Région : {extras.get('region')}")
+        if extras.get("grape"):
+            details.append(f"Cépage : {extras.get('grape')}")
+        if extras.get("description"):
+            details.append(
+                f"Notes du propriétaire : {self._truncate(str(extras.get('description')), 120)}"
+            )
+        if getattr(wine, "subcategory", None):
+            subtype = wine.subcategory
+            if subtype and subtype.category:
+                details.append(
+                    f"Catégorie : {subtype.category.name} / {subtype.name}"
+                )
+            elif subtype:
+                details.append(f"Catégorie : {subtype.name}")
+
+        detail_text = "; ".join(filter(None, details))
+
+        base_prompt = (
+            "Design a flat, poster-like illustration of a refined French wine label. "
+            "Use elegant typography, subtle texture, and muted natural colors. "
+            "Show only the label on a neutral background, no bottle photo. "
+            "Incorporate the following information in French: "
+        )
+
+        prompt = f"{base_prompt}{detail_text}. Requête de référence: {query}."
+        return prompt.strip()
 
     def _parse_openai_payload(self, response) -> Optional[dict]:
         logger.debug("🔍 Parsing de la réponse OpenAI")
