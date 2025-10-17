@@ -925,22 +925,16 @@ def _add_wine_timestamps(connection: Connection) -> None:
     }
 
     if "created_at" not in existing_columns:
+        connection.execute(text("ALTER TABLE wine ADD COLUMN created_at DATETIME"))
         connection.execute(
-            text(
-                """
-                ALTER TABLE wine
-                ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
-                """
-            )
+            text("UPDATE wine SET created_at = datetime('now') WHERE created_at IS NULL")
         )
 
     if "updated_at" not in existing_columns:
+        connection.execute(text("ALTER TABLE wine ADD COLUMN updated_at DATETIME"))
         connection.execute(
             text(
-                """
-                ALTER TABLE wine
-                ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
-                """
+                "UPDATE wine SET updated_at = datetime('now') WHERE updated_at IS NULL"
             )
         )
 
