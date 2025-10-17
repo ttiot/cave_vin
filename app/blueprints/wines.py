@@ -1,5 +1,7 @@
 """Blueprint pour la gestion des bouteilles d'alcool."""
 
+from collections import defaultdict
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from sqlalchemy.orm import selectinload
@@ -20,6 +22,81 @@ from tasks import schedule_wine_enrichment
 
 
 wines_bp = Blueprint('wines', __name__, url_prefix='/wines')
+
+
+@wines_bp.route('/overview')
+@login_required
+def overview():
+    """Afficher une vue moderne de l'ensemble des alcools par cave."""
+
+    cellars = (
+        Cellar.query.options(selectinload(Cellar.category))
+        .order_by(Cellar.name.asc())
+        .all()
+    )
+
+    wines = (
+        Wine.query.options(
+            selectinload(Wine.subcategory),
+            selectinload(Wine.cellar),
+        )
+        .order_by(Wine.cellar_id.asc(), Wine.name.asc())
+        .all()
+    )
+
+    wines_by_cellar: dict[int, list[Wine]] = defaultdict(list)
+    for wine in wines:
+        wines_by_cellar[wine.cellar_id].append(wine)
+
+    cellar_panels: list[dict] = []
+    for cellar in cellars:
+        cellar_wines = wines_by_cellar.get(cellar.id, [])
+        total_quantity = sum((wine.quantity or 0) for wine in cellar_wines)
+
+        subcategory_labels = sorted(
+            {wine.subcategory.name for wine in cellar_wines if wine.subcategory},
+            key=str.lower,
+        )
+
+        region_labels = sorted(
+            {
+                (wine.extra_attributes or {}).get("region")
+                for wine in cellar_wines
+                if (wine.extra_attributes or {}).get("region")
+            },
+            key=str.lower,
+        )
+
+        year_values: set[int] = set()
+        for wine in cellar_wines:
+            year_raw = (wine.extra_attributes or {}).get("year")
+            if year_raw is None:
+                continue
+            try:
+                year = int(year_raw)
+            except (TypeError, ValueError):
+                continue
+            year_values.add(year)
+
+        cellar_panels.append(
+            {
+                "cellar": cellar,
+                "wines": cellar_wines,
+                "total_quantity": total_quantity,
+                "subcategory_labels": subcategory_labels,
+                "region_labels": region_labels,
+                "vintage_range": (
+                    (min(year_values), max(year_values)) if year_values else None
+                ),
+            }
+        )
+
+    return render_template(
+        'wines_overview.html',
+        cellar_panels=cellar_panels,
+        has_cellars=bool(cellars),
+        total_wine_count=len(wines),
+    )
 
 
 def _initial_field_state(fields: list) -> dict[str, dict[str, bool]]:
