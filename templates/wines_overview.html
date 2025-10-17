@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .cellar-tabs {
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+  }
+
+  .cellar-tabs .nav-link {
+    border-radius: 1.5rem;
+    padding: 0.75rem 1.25rem;
+    background: rgba(33, 37, 41, 0.06);
+    color: #1f2933;
+    transition: all 0.2s ease-in-out;
+    min-width: 220px;
+    text-align: left;
+  }
+
+  .cellar-tabs .nav-link small {
+    font-size: 0.75rem;
+  }
+
+  .cellar-tabs .nav-link.active {
+    background: linear-gradient(135deg, #6b46c1, #3182ce);
+    color: #fff;
+    box-shadow: 0 0.75rem 1.5rem rgba(79, 70, 229, 0.2);
+  }
+
+  .cellar-tabs .nav-link.active small {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .cellar-metric {
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.08);
+    height: 100%;
+  }
+
+  .cellar-metric .metric-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+    color: #6b7280;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .cellar-metric .metric-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2933;
+    display: block;
+  }
+
+  .wine-card-cover {
+    height: 190px;
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.75), rgba(14, 165, 233, 0.75));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 2.5rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .wine-card img.card-img-top {
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    height: 190px;
+    object-fit: cover;
+  }
+
+  .wine-card.card {
+    border: none;
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+
+  .wine-highlight-chip {
+    background: rgba(79, 70, 229, 0.08);
+    color: #4338ca;
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  @media (max-width: 767.98px) {
+    .cellar-tabs {
+      flex-wrap: nowrap;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <h3 class="m-0">Panorama des alcools</h3>
+    <p class="text-muted mb-0">Parcourez vos bouteilles par cave, avec une mise en page moderne et immersive.</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-search me-1"></i> Recherche avancée
+    </a>
+    <a href="{{ url_for('wines.add_wine') }}" class="btn btn-dark">
+      <i class="bi bi-plus-lg me-1"></i> Ajouter une bouteille
+    </a>
+  </div>
+</div>
+
+{% if not has_cellars %}
+  <div class="alert alert-info">
+    Vous n'avez pas encore créé de cave. <a href="{{ url_for('cellars.add_cellar') }}" class="alert-link">Ajoutez votre première cave</a>
+    pour commencer à organiser vos alcools.
+  </div>
+{% else %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-3">
+      <div>
+        <h5 class="mb-1">Votre collection</h5>
+        <p class="text-muted mb-0">{{ total_wine_count }} référence{% if total_wine_count > 1 %}s{% endif %} suivie{% if total_wine_count > 1 %}s{% endif %} dans l'application.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge text-bg-dark">Vue interactive par cave</span>
+        <span class="badge text-bg-light text-dark">Mises à jour en temps réel</span>
+      </div>
+    </div>
+  </div>
+
+  <ul class="nav nav-pills cellar-tabs mb-4" id="cellarTab" role="tablist">
+    {% for panel in cellar_panels %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link{% if loop.first %} active{% endif %}" id="cellar-{{ panel.cellar.id }}-tab"
+                data-bs-toggle="pill" data-bs-target="#cellar-{{ panel.cellar.id }}" type="button" role="tab"
+                aria-controls="cellar-{{ panel.cellar.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+          <span class="fw-semibold d-block">{{ panel.cellar.name }}</span>
+          <small>{{ panel.total_quantity }} bouteille{% if panel.total_quantity > 1 %}s{% endif %} · {{ panel.wines|length }} référence{% if panel.wines|length > 1 %}s{% endif %}</small>
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="tab-content" id="cellarTabContent">
+    {% for panel in cellar_panels %}
+      <div class="tab-pane fade{% if loop.first %} show active{% endif %}" id="cellar-{{ panel.cellar.id }}" role="tabpanel"
+           aria-labelledby="cellar-{{ panel.cellar.id }}-tab">
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6 col-xl-3">
+            <div class="cellar-metric">
+              <span class="metric-label">Bouteilles en stock</span>
+              <span class="metric-value">{{ panel.total_quantity }}</span>
+              <small class="text-muted">Quantité totale disponible</small>
+            </div>
+          </div>
+          <div class="col-sm-6 col-xl-3">
+            <div class="cellar-metric">
+              <span class="metric-label">Références suivies</span>
+              <span class="metric-value">{{ panel.wines|length }}</span>
+              <small class="text-muted">Fiches individuelles</small>
+            </div>
+          </div>
+          <div class="col-sm-6 col-xl-3">
+            <div class="cellar-metric">
+              <span class="metric-label">Styles représentés</span>
+              <span class="metric-value">{{ panel.subcategory_labels|length }}</span>
+              <small class="text-muted">Catégories et sous-catégories</small>
+            </div>
+          </div>
+          {% if panel.vintage_range %}
+          <div class="col-sm-6 col-xl-3">
+            <div class="cellar-metric">
+              <span class="metric-label">Millésimes</span>
+              <span class="metric-value">{{ panel.vintage_range[0] }} – {{ panel.vintage_range[1] }}</span>
+              <small class="text-muted">Amplitude des années</small>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if panel.subcategory_labels %}
+        <div class="mb-3">
+          <span class="text-uppercase text-muted small d-block mb-2">Styles en cave</span>
+          <div class="d-flex flex-wrap gap-2">
+            {% for label in panel.subcategory_labels %}
+            <span class="wine-highlight-chip">{{ label }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if panel.region_labels %}
+        <div class="mb-4">
+          <span class="text-uppercase text-muted small d-block mb-2">Origines</span>
+          <div class="d-flex flex-wrap gap-2">
+            {% for label in panel.region_labels %}
+            <span class="badge rounded-pill text-bg-light text-dark border">{{ label }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if panel.wines %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+          {% for wine in panel.wines %}
+          {% set extras = wine.extra_attributes or {} %}
+          <div class="col">
+            <div class="card shadow-sm h-100 wine-card"
+                 data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
+                 data-wine-preview='{{ wine.preview_insights()|tojson }}'>
+              {% if wine.image_url %}
+              <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
+              {% else %}
+              <div class="wine-card-cover" aria-hidden="true">{{ wine.name[:1] }}</div>
+              {% endif %}
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <h5 class="card-title mb-1">{{ wine.name }}</h5>
+                    {% if extras.year %}
+                      <small class="text-muted">Millésime {{ extras.year }}</small>
+                    {% elif extras.get('aging_potential') %}
+                      <small class="text-muted">{{ extras.get('aging_potential') }}</small>
+                    {% else %}
+                      <small class="text-muted">Millésime non renseigné</small>
+                    {% endif %}
+                  </div>
+                  <span class="badge text-bg-dark">x{{ wine.quantity }}</span>
+                </div>
+                <p class="mb-2">
+                  {% if wine.subcategory %}
+                    <span class="badge" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Non catégorisé</span>
+                  {% endif %}
+                </p>
+                <ul class="list-unstyled small text-muted mb-3">
+                  <li><i class="bi bi-geo-alt me-1"></i>{{ extras.region or 'Région inconnue' }}</li>
+                  {% if extras.get('grape') %}
+                  <li><i class="bi bi-flower2 me-1"></i>{{ extras.get('grape') }}</li>
+                  {% endif %}
+                  {% if extras.get('volume_ml') %}
+                  <li><i class="bi bi-droplet-half me-1"></i>{{ extras.get('volume_ml') }} mL</li>
+                  {% endif %}
+                </ul>
+                {% if wine.barcode %}
+                <span class="badge text-bg-secondary">EAN {{ wine.barcode }}</span>
+                {% endif %}
+              </div>
+              <div class="card-footer bg-white border-0 pt-0">
+                <div class="btn-group d-flex" role="group">
+                  <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                    <input type="hidden" name="redirect" value="{{ request.path }}">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
+                  </form>
+                  <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                    <input type="hidden" name="redirect" value="{{ request.path }}">
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
+                  </form>
+                  <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+                    <input type="hidden" name="redirect" value="{{ request.path }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-light border shadow-sm">
+          Cette cave est prête à accueillir de nouvelles bouteilles. <a href="{{ url_for('wines.add_wine') }}" class="alert-link">Ajoutez un premier alcool</a>
+          pour remplir cette section.
+        </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}
