@@ -259,14 +259,17 @@
               <div class="card-footer bg-white border-0 pt-0">
                 <div class="btn-group d-flex" role="group">
                   <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
                     <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
                   </form>
                   <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
                     <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
                   </form>
                   <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
                   </form>
