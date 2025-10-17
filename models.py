@@ -130,6 +130,10 @@ class Wine(db.Model):
     quantity = db.Column(db.Integer, default=1)
     cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id"), nullable=False)
     subcategory_id = db.Column(db.Integer, db.ForeignKey("alcohol_subcategory.id"))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     cellar = db.relationship("Cellar", back_populates="wines")
     subcategory = db.relationship("AlcoholSubcategory", back_populates="wines")

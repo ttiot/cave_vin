@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from datetime import datetime
 from typing import Iterable
 
@@ -14,6 +15,62 @@ from models import AlcoholSubcategory, Cellar, Wine, WineConsumption
 
 
 PRICE_PATTERN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:€|euros?)", re.IGNORECASE)
+YEAR_SPAN_PATTERN = re.compile(r"(\d+)\s*(?:à|-|–)\s*(\d+)\s*ans?", re.IGNORECASE)
+YEAR_SINGLE_PATTERN = re.compile(r"(\d+)\s*ans?", re.IGNORECASE)
+
+COUNTRY_COORDINATES = {
+    "france": (46.2276, 2.2137),
+    "italie": (41.8719, 12.5674),
+    "italy": (41.8719, 12.5674),
+    "espagne": (40.4637, -3.7492),
+    "spain": (40.4637, -3.7492),
+    "portugal": (39.3999, -8.2245),
+    "allemagne": (51.1657, 10.4515),
+    "germany": (51.1657, 10.4515),
+    "suisse": (46.8182, 8.2275),
+    "switzerland": (46.8182, 8.2275),
+    "etats-unis": (37.0902, -95.7129),
+    "united states": (37.0902, -95.7129),
+    "usa": (37.0902, -95.7129),
+    "argentine": (-38.4161, -63.6167),
+    "argentina": (-38.4161, -63.6167),
+    "chili": (-35.6751, -71.5430),
+    "chile": (-35.6751, -71.5430),
+    "australie": (-25.2744, 133.7751),
+    "australia": (-25.2744, 133.7751),
+    "nouvelle-zélande": (-40.9006, 174.8860),
+    "nouvelle-zelande": (-40.9006, 174.8860),
+    "new zealand": (-40.9006, 174.8860),
+    "afrique du sud": (-30.5595, 22.9375),
+    "south africa": (-30.5595, 22.9375),
+    "canada": (56.1304, -106.3468),
+}
+
+REGION_COUNTRY_HINTS = {
+    "france": [
+        "bordeaux",
+        "bourgogne",
+        "champagne",
+        "loire",
+        "alsace",
+        "languedoc",
+        "provence",
+        "côtes du rhône",
+        "cote du rhone",
+        "beaujolais",
+        "sud-ouest",
+    ],
+    "italie": ["piémont", "toscane", "sicile", "veneto", "piemonte"],
+    "espagne": ["rioja", "ribera", "priorat", "andalousie"],
+    "portugal": ["douro", "alentejo", "dao"],
+    "allemagne": ["mosel", "pfalz", "baden"],
+    "etats-unis": ["napa", "sonoma", "californie", "washington"],
+    "argentine": ["mendoza", "patagonie"],
+    "chili": ["casablanca", "maipo"],
+    "australie": ["barossa", "mclaren", "margaret river"],
+    "nouvelle-zélande": ["marlborough", "central otago"],
+    "afrique du sud": ["stellenbosch", "paarl"],
+}
 
 
 main_bp = Blueprint('main', __name__)
@@ -40,6 +97,78 @@ def _parse_price_from_text(text: str) -> float | None:
     return values[0]
 
 
+def _extract_guardian_window(wine: Wine) -> tuple[int, int] | None:
+    """Extracts an aging recommendation window (min_years, max_years)."""
+
+    for insight in wine.insights:
+        content = insight.content or ""
+        lowered = content.lower()
+        if not lowered:
+            continue
+        if not any(
+            keyword in lowered
+            for keyword in [
+                "garde",
+                "vieillissement",
+                "apogée",
+                "apogee",
+                "consommer",
+                "boire",
+            ]
+        ):
+            continue
+
+        span_match = YEAR_SPAN_PATTERN.search(content)
+        if span_match:
+            min_years = int(span_match.group(1))
+            max_years = int(span_match.group(2))
+            if min_years > max_years:
+                min_years, max_years = max_years, min_years
+            return min_years, max_years
+
+        single_match = YEAR_SINGLE_PATTERN.search(content)
+        if single_match:
+            value = int(single_match.group(1))
+            return value, value
+
+    return None
+
+
+def _classify_wine_maturity(wine: Wine, current_year: int) -> str:
+    """Return the maturity state for the given wine."""
+
+    year = wine.extra_attributes.get("year") if wine.extra_attributes else None
+    if not year:
+        return "à maturité"
+
+    try:
+        vintage_year = int(year)
+    except (TypeError, ValueError):
+        return "à maturité"
+
+    age = max(current_year - vintage_year, 0)
+    window = _extract_guardian_window(wine)
+
+    if window:
+        min_years, max_years = window
+        if age < min_years:
+            return "trop jeune"
+        if age > max_years:
+            return "en déclin"
+        if max_years > min_years:
+            progress = (age - min_years) / (max_years - min_years)
+            return "à maturité" if progress < 0.5 else "dans l'apogée"
+        return "dans l'apogée"
+
+    if age < 3:
+        return "trop jeune"
+    if age < 6:
+        return "à maturité"
+    if age < 12:
+        return "dans l'apogée"
+    return "en déclin"
+
+
 def _estimate_wine_price(wine: Wine) -> float | None:
     """Retourne l'estimation de prix d'un vin à partir de ses insights."""
 
@@ -54,6 +183,73 @@ def _estimate_wine_price(wine: Wine) -> float | None:
             return price
 
     return None
+
+
+def _parse_purchase_price(wine: Wine) -> float | None:
+    """Read purchase price from the wine extra attributes when available."""
+
+    extras = wine.extra_attributes or {}
+    candidate_keys = [
+        "purchase_price",
+        "price_paid",
+        "prix_achat",
+        "prix_achat_unitaire",
+        "prix",
+    ]
+
+    for key in candidate_keys:
+        raw_value = extras.get(key)
+        if raw_value is None:
+            continue
+        if isinstance(raw_value, (int, float)):
+            value = float(raw_value)
+        else:
+            cleaned = str(raw_value).replace("€", "").strip()
+            cleaned = cleaned.replace(",", ".")
+            try:
+                value = float(cleaned)
+            except ValueError:
+                price = _parse_price_from_text(str(raw_value))
+                if price is None:
+                    continue
+                value = price
+        if value >= 0:
+            return value
+    return None
+
+
+def _infer_country(wine: Wine) -> str | None:
+    """Infer the country of a wine from its attributes or region hints."""
+
+    extras = wine.extra_attributes or {}
+    for key in ("country", "pays", "origin", "origine"):
+        value = extras.get(key)
+        if value:
+            return str(value)
+
+    region = extras.get("region")
+    if region:
+        lowered_region = region.lower()
+        for country_key, hints in REGION_COUNTRY_HINTS.items():
+            if any(hint in lowered_region for hint in hints):
+                return country_key
+    return None
+
+
+def _normalize_country_key(name: str) -> str:
+    return name.strip().lower()
+
+
+def _shift_month(date: datetime, offset: int) -> datetime:
+    """Shift a date by a number of months, preserving the day as 1."""
+
+    year = date.year + (date.month - 1 + offset) // 12
+    month = (date.month - 1 + offset) % 12 + 1
+    return datetime(year, month, 1)
+
+
+def _month_key(date: datetime) -> str:
+    return date.strftime("%Y-%m")
 
 
 def _format_currency(value: float) -> str:
@@ -130,6 +326,15 @@ def _compute_wines_to_consume_preview(wines: Iterable[Wine], limit: int = 3) -> 
     return wines_with_urgency[:limit], current_year
 
 
+def _build_month_series(month_count: int = 12) -> list[datetime]:
+    """Return a list of month starts for the last `month_count` months."""
+
+    now = datetime.now()
+    current_month = datetime(now.year, now.month, 1)
+    start = _shift_month(current_month, -(month_count - 1))
+    return [_shift_month(start, idx) for idx in range(month_count)]
+
+
 @main_bp.route('/')
 @login_required
 def index():
@@ -193,3 +398,179 @@ def consumption_history():
         .all()
     )
     return render_template('consumption_history.html', consumptions=consumptions)
+
+
+@main_bp.route('/stats', methods=['GET'])
+@login_required
+def statistics():
+    """Render a detailed analytics dashboard for the wine cellar."""
+
+    wines = (
+        Wine.query.options(
+            selectinload(Wine.cellar),
+            selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
+            selectinload(Wine.insights),
+            selectinload(Wine.consumptions),
+        )
+        .filter(Wine.quantity >= 0)
+        .all()
+    )
+
+    total_current_stock = sum(wine.quantity or 0 for wine in wines)
+    current_year = datetime.now().year
+
+    maturity_counts: dict[str, int] = defaultdict(int)
+    for wine in wines:
+        if (wine.quantity or 0) <= 0:
+            continue
+        state = _classify_wine_maturity(wine, current_year)
+        maturity_counts[state] += wine.quantity or 0
+
+    category_distribution: dict[str, int] = defaultdict(int)
+    subcategory_distribution: dict[str, int] = defaultdict(int)
+    country_distribution: dict[str, int] = defaultdict(int)
+
+    total_invested = 0.0
+    total_purchase_units = 0
+    estimated_value_total = 0.0
+    total_consumed_all_time = 0
+    gain_candidates: list[dict[str, object]] = []
+
+    for wine in wines:
+        quantity = wine.quantity or 0
+        if quantity < 0:
+            quantity = 0
+
+        if wine.subcategory and wine.subcategory.category:
+            category_name = wine.subcategory.category.name
+        else:
+            category_name = "Non catégorisé"
+        category_distribution[category_name] += quantity
+
+        if wine.subcategory:
+            sub_label = f"{category_name} — {wine.subcategory.name}"
+        else:
+            sub_label = f"{category_name} — Sans sous-catégorie"
+        subcategory_distribution[sub_label] += quantity
+
+        country = _infer_country(wine)
+        if country:
+            country_distribution[_normalize_country_key(country)] += quantity
+
+        purchase_price = _parse_purchase_price(wine)
+        estimated_price = _estimate_wine_price(wine)
+
+        if purchase_price is not None:
+            total_invested += purchase_price * max(quantity, 0)
+            total_purchase_units += max(quantity, 0)
+
+        if estimated_price is not None:
+            estimated_value_total += estimated_price * max(quantity, 0)
+
+        if purchase_price is not None and estimated_price is not None:
+            delta = (estimated_price - purchase_price) * max(quantity, 0)
+            gain_candidates.append(
+                {
+                    "wine": wine,
+                    "delta": delta,
+                    "purchase": purchase_price,
+                    "current": estimated_price,
+                }
+            )
+
+        total_consumed_all_time += sum(
+            consumption.quantity or 0 for consumption in wine.consumptions
+        )
+
+    gain_candidates.sort(key=lambda item: item["delta"], reverse=True)
+    top_gains = gain_candidates[:5]
+
+    average_purchase_price = (
+        (total_invested / total_purchase_units) if total_purchase_units else None
+    )
+
+    theoretical_value = estimated_value_total if estimated_value_total > 0 else None
+    plus_minus_value = (
+        (theoretical_value - total_invested)
+        if theoretical_value is not None and total_invested > 0
+        else None
+    )
+
+    months = _build_month_series(12)
+    month_labels = [month.strftime("%b %Y") for month in months]
+    month_keys = [_month_key(month) for month in months]
+    month_index = {key: idx for idx, key in enumerate(month_keys)}
+
+    additions_by_month = [0 for _ in months]
+    consumption_by_month = [0 for _ in months]
+
+    if wines:
+        first_month_start = months[0]
+        consumptions = (
+            WineConsumption.query.filter(
+                WineConsumption.consumed_at >= first_month_start
+            ).all()
+        )
+    else:
+        consumptions = []
+
+    for consumption in consumptions:
+        if not consumption.consumed_at:
+            continue
+        key = _month_key(datetime(consumption.consumed_at.year, consumption.consumed_at.month, 1))
+        idx = month_index.get(key)
+        if idx is not None:
+            consumption_by_month[idx] += consumption.quantity or 0
+
+    for wine in wines:
+        if not getattr(wine, "created_at", None):
+            continue
+        key = _month_key(datetime(wine.created_at.year, wine.created_at.month, 1))
+        idx = month_index.get(key)
+        if idx is None:
+            continue
+        consumed_total = sum(consumption.quantity or 0 for consumption in wine.consumptions)
+        initial_quantity = (wine.quantity or 0) + consumed_total
+        additions_by_month[idx] += initial_quantity
+
+    stock_by_month = []
+    running_stock = total_current_stock
+    for idx in reversed(range(len(months))):
+        stock_by_month.append(running_stock)
+        running_stock -= additions_by_month[idx]
+        running_stock += consumption_by_month[idx]
+    stock_by_month = list(reversed(stock_by_month))
+
+    map_markers: list[dict[str, object]] = []
+    for country_key, total in country_distribution.items():
+        coords = COUNTRY_COORDINATES.get(country_key)
+        if not coords:
+            continue
+        map_markers.append(
+            {
+                "country": country_key.title(),
+                "lat": coords[0],
+                "lng": coords[1],
+                "total": total,
+            }
+        )
+
+    return render_template(
+        'statistics.html',
+        maturity_counts=dict(maturity_counts),
+        category_distribution=dict(category_distribution),
+        subcategory_distribution=dict(subcategory_distribution),
+        map_markers=map_markers,
+        total_invested=total_invested if total_invested > 0 else None,
+        average_purchase_price=average_purchase_price,
+        theoretical_value=theoretical_value,
+        plus_minus_value=plus_minus_value,
+        top_gains=top_gains,
+        format_currency=_format_currency,
+        months_labels=month_labels,
+        additions_by_month=additions_by_month,
+        consumption_by_month=consumption_by_month,
+        stock_by_month=stock_by_month,
+        maturity_order=["trop jeune", "à maturité", "dans l'apogée", "en déclin"],
+        total_current_stock=total_current_stock,
+    )

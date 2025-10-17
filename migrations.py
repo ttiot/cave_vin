@@ -916,6 +916,34 @@ def _link_requirements_to_field_definitions(connection: Connection) -> None:
             },
         )
 
+
+def _add_wine_timestamps(connection: Connection) -> None:
+    """Ajouter created_at et updated_at à la table wine si nécessaire."""
+
+    existing_columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(wine)"))
+    }
+
+    if "created_at" not in existing_columns:
+        connection.execute(
+            text(
+                """
+                ALTER TABLE wine
+                ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                """
+            )
+        )
+
+    if "updated_at" not in existing_columns:
+        connection.execute(
+            text(
+                """
+                ALTER TABLE wine
+                ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                """
+            )
+        )
+
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
     ("0002_create_wine_insight", _create_wine_insight_table),
@@ -933,6 +961,7 @@ MIGRATIONS: Iterable[Migration] = (
     ("0014_populate_field_definitions", _populate_default_field_definitions),
     ("0015_add_wine_extra_attributes", _add_wine_extra_attributes),
     ("0016_link_field_requirements", _link_requirements_to_field_definitions),
+    ("0017_add_wine_timestamps", _add_wine_timestamps),
 )
 
 
