@@ -152,14 +152,23 @@ class WineInfoService:
         logger.debug("🤖 OpenAI: modèle utilisé: %s", self.openai_model)
 
         details = [f"Nom: {wine.name}"]
-        if getattr(wine, "year", None):
-            details.append(f"Millésime: {wine.year}")
-        if getattr(wine, "region", None):
-            details.append(f"Région: {wine.region}")
-        if getattr(wine, "grape", None):
-            details.append(f"Cépage: {wine.grape}")
-        if getattr(wine, "volume_ml", None):
-            details.append(f"Contenance: {wine.volume_ml} mL")
+        extra_attrs = getattr(wine, "extra_attributes", {}) or {}
+        
+        year = extra_attrs.get("year")
+        if year:
+            details.append(f"Millésime: {year}")
+        
+        region = extra_attrs.get("region")
+        if region:
+            details.append(f"Région: {region}")
+        
+        grape = extra_attrs.get("grape")
+        if grape:
+            details.append(f"Cépage: {grape}")
+        
+        volume_ml = extra_attrs.get("volume_ml")
+        if volume_ml:
+            details.append(f"Contenance: {volume_ml} mL")
         if getattr(wine, "subcategory", None):
             subcategory_name = wine.subcategory.name
             category_name = wine.subcategory.category.name if wine.subcategory.category else None
@@ -167,9 +176,10 @@ class WineInfoService:
                 details.append(f"Type: {category_name} - {subcategory_name}")
             else:
                 details.append(f"Type: {subcategory_name}")
-        if getattr(wine, "description", None):
+        description = extra_attrs.get("description")
+        if description:
             details.append(
-                f"Description utilisateur: {self._truncate(str(wine.description), 280)}"
+                f"Description utilisateur: {self._truncate(str(description), 280)}"
             )
         try:
             extra_attributes = getattr(wine, "extra_attributes", {}) or {}
@@ -427,11 +437,17 @@ class WineInfoService:
     def _build_query(self, wine) -> str:
         logger.debug("🔨 Construction de la requête pour le vin: %s", wine.name)
         parts = [wine.name]
-        if getattr(wine, "year", None):
-            parts.append(str(wine.year))
-        if getattr(wine, "region", None):
-            parts.append(wine.region)
-        grape = getattr(wine, "grape", None)
+        extra_attrs = getattr(wine, "extra_attributes", {}) or {}
+        
+        year = extra_attrs.get("year")
+        if year:
+            parts.append(str(year))
+        
+        region = extra_attrs.get("region")
+        if region:
+            parts.append(region)
+        
+        grape = extra_attrs.get("grape")
         if grape:
             parts.append(grape)
         query = " ".join(filter(None, parts)).strip()

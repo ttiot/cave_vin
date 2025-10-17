@@ -69,10 +69,11 @@ def _compute_wines_to_consume_preview(wines: Iterable[Wine], limit: int = 3) -> 
     wines_with_urgency: list[dict] = []
 
     for wine in wines:
-        if not wine.year:
+        year = wine.extra_attributes.get('year')
+        if not year:
             continue
 
-        wine_age = current_year - wine.year
+        wine_age = current_year - year
         urgency_score = 0
         garde_info = None
         recommended_years = None

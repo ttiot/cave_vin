@@ -53,16 +53,16 @@
         </p>
         
         <p class="card-text mb-2">
-          <strong>Millésime :</strong> {{ wine.year }}<br>
+          <strong>Millésime :</strong> {{ wine.extra_attributes.year }}<br>
           <strong>Âge actuel :</strong> {{ age }} an{{ 's' if age > 1 else '' }}<br>
-          {% if wine.region %}
-          <strong>Région :</strong> {{ wine.region }}<br>
+          {% if wine.extra_attributes.region %}
+          <strong>Région :</strong> {{ wine.extra_attributes.region }}<br>
           {% endif %}
-          {% if wine.volume_ml %}
-          <strong>Contenance :</strong> {{ wine.volume_ml }} mL<br>
+          {% if wine.extra_attributes.volume_ml %}
+          <strong>Contenance :</strong> {{ wine.extra_attributes.volume_ml }} mL<br>
           {% endif %}
-          {% if wine.grape %}
-          <strong>Cépage :</strong> {{ wine.grape }}<br>
+          {% if wine.extra_attributes.grape %}
+          <strong>Cépage :</strong> {{ wine.extra_attributes.grape }}<br>
           {% endif %}
         </p>
         

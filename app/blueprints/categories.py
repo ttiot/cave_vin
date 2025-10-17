@@ -40,39 +40,71 @@ def _blank_field_state() -> dict[str, dict[str, bool]]:
 
 
 def _build_settings_snapshot(categories: list[AlcoholCategory]) -> dict[str, dict]:
-    settings: dict[str, dict] = {
-        "global": _blank_field_state(),
-        "category": {},
-        "subcategory": {},
-    }
-
-    for category in categories:
-        settings["category"][category.id] = _blank_field_state()
-        for subcategory in category.subcategories:
-            settings["subcategory"][subcategory.id] = _blank_field_state()
-
+    """
+    Construit un snapshot des paramètres de champs avec héritage appliqué.
+    - Les catégories héritent de la config globale
+    - Les sous-catégories héritent de leur catégorie (qui hérite de la globale)
+    """
+    # Charger tous les requirements depuis la base de données
     requirements = AlcoholFieldRequirement.query.all()
+    
+    # Organiser les requirements par scope
+    global_reqs: dict[str, dict] = {}
+    category_reqs: dict[int, dict[str, dict]] = {}
+    subcategory_reqs: dict[int, dict[str, dict]] = {}
+    
     for requirement in requirements:
         rule = {
             "enabled": bool(requirement.is_enabled),
             "required": bool(requirement.is_required),
         }
-
+        
         if requirement.subcategory_id:
-            target = settings["subcategory"].setdefault(
-                requirement.subcategory_id, _blank_field_state()
-            )
+            if requirement.subcategory_id not in subcategory_reqs:
+                subcategory_reqs[requirement.subcategory_id] = {}
+            subcategory_reqs[requirement.subcategory_id][requirement.field_name] = rule
         elif requirement.category_id:
-            target = settings["category"].setdefault(
-                requirement.category_id, _blank_field_state()
-            )
+            if requirement.category_id not in category_reqs:
+                category_reqs[requirement.category_id] = {}
+            category_reqs[requirement.category_id][requirement.field_name] = rule
         else:
-            target = settings["global"]
-
-        field_name = requirement.field_name
-        if field_name not in target:
-            target[field_name] = {"enabled": False, "required": False}
-        target[field_name] = rule
+            global_reqs[requirement.field_name] = rule
+    
+    # Construire les settings avec héritage
+    settings: dict[str, dict] = {
+        "global": {},
+        "category": {},
+        "subcategory": {},
+    }
+    
+    # 1. Configuration globale : partir d'un état vide et appliquer les requirements globaux
+    all_fields = _blank_field_state()
+    settings["global"] = {
+        field_name: global_reqs.get(field_name, field_config)
+        for field_name, field_config in all_fields.items()
+    }
+    
+    # 2. Pour chaque catégorie : hériter de global puis appliquer les surcharges
+    for category in categories:
+        settings["category"][category.id] = {}
+        for field_name in all_fields.keys():
+            # Hériter de la config globale
+            inherited = {**settings["global"][field_name]}
+            # Appliquer la surcharge de la catégorie si elle existe
+            if category.id in category_reqs and field_name in category_reqs[category.id]:
+                inherited = {**category_reqs[category.id][field_name]}
+            settings["category"][category.id][field_name] = inherited
+        
+        # 3. Pour chaque sous-catégorie : hériter de la catégorie puis appliquer les surcharges
+        for subcategory in category.subcategories:
+            settings["subcategory"][subcategory.id] = {}
+            for field_name in all_fields.keys():
+                # Hériter de la config de la catégorie parente
+                inherited = {**settings["category"][category.id][field_name]}
+                # Appliquer la surcharge de la sous-catégorie si elle existe
+                if subcategory.id in subcategory_reqs and field_name in subcategory_reqs[subcategory.id]:
+                    inherited = {**subcategory_reqs[subcategory.id][field_name]}
+                settings["subcategory"][subcategory.id][field_name] = inherited
 
     return settings
 
@@ -208,6 +240,16 @@ def manage_field_requirements():
     )
     field_settings = _build_settings_snapshot(categories)
     ordered_fields = list(iter_fields())
+    
+    # DEBUG: Afficher les settings pour le champ 'region'
+    import sys
+    print("=== DEBUG field_settings pour 'region' ===", file=sys.stderr)
+    print(f"Global: {field_settings['global'].get('region', 'NOT FOUND')}", file=sys.stderr)
+    for cat_id, cat_settings in field_settings['category'].items():
+        print(f"Category {cat_id}: {cat_settings.get('region', 'NOT FOUND')}", file=sys.stderr)
+    for sub_id, sub_settings in field_settings['subcategory'].items():
+        print(f"Subcategory {sub_id}: {sub_settings.get('region', 'NOT FOUND')}", file=sys.stderr)
+    print("==========================================", file=sys.stderr)
 
     if request.method == 'POST':
         if request.form.get('action') == 'add_field':

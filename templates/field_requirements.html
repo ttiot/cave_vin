@@ -53,7 +53,7 @@
         {% set category_settings = field_settings['category'].get(category.id) or {} %}
         {% for field in ordered_fields %}
         {% set settings = category_settings.get(field.name) or {'enabled': False, 'required': False} %}
-        <div class="row g-0 align-items-center px-3 py-3 border-bottom" data-field-toggle>
+        <div class="row g-0 align-items-center px-3 py-3 border-bottom" data-field-toggle data-scope="category" data-scope-id="{{ category.id }}" data-field-name="{{ field.name }}">
           <div class="col-md-5">
             <strong>{{ field.label }}</strong>
           </div>
@@ -88,7 +88,7 @@
           <h6 class="mb-3">{{ subcategory.name }}</h6>
           {% for field in ordered_fields %}
           {% set settings = sub_settings.get(field.name) or {'enabled': False, 'required': False} %}
-          <div class="row align-items-center py-2" data-field-toggle>
+          <div class="row align-items-center py-2" data-field-toggle data-scope="subcategory" data-scope-id="{{ subcategory.id }}" data-parent-category-id="{{ category.id }}" data-field-name="{{ field.name }}">
             <div class="col-md-5">
               <span>{{ field.label }}</span>
             </div>
@@ -196,20 +196,125 @@
 
 <script>
 (function() {
-  document.querySelectorAll('[data-field-toggle]').forEach(function(container) {
+  // Fonction pour synchroniser enabled/required dans un container
+  function syncEnabledRequired(container) {
     var enabledInput = container.querySelector('[data-role="enabled"]');
     var requiredInput = container.querySelector('[data-role="required"]');
     if (!enabledInput || !requiredInput) {
       return;
     }
-    function sync() {
-      if (!enabledInput.checked) {
-        requiredInput.checked = false;
-      }
-      requiredInput.disabled = !enabledInput.checked;
+    if (!enabledInput.checked) {
+      requiredInput.checked = false;
     }
-    enabledInput.addEventListener('change', sync);
-    sync();
+    requiredInput.disabled = !enabledInput.checked;
+  }
+
+  // Extraire le nom du champ depuis le nom de l'input
+  function getFieldNameFromInput(inputName) {
+    // Format: "global__field_name__enabled" ou "category_1__field_name__enabled"
+    var parts = inputName.split('__');
+    if (parts.length >= 3) {
+      return parts[1];
+    }
+    return null;
+  }
+
+  // Fonction pour cascader les changements depuis le niveau global
+  function cascadeFromGlobal(fieldName, isEnabled, isRequired) {
+    // Trouver tous les inputs pour ce champ dans les catégories et sous-catégories
+    document.querySelectorAll('[data-field-toggle]').forEach(function(container) {
+      var containerFieldName = container.getAttribute('data-field-name');
+      if (containerFieldName === fieldName) {
+        var enabledInput = container.querySelector('[data-role="enabled"]');
+        var requiredInput = container.querySelector('[data-role="required"]');
+        
+        if (enabledInput && !enabledInput.name.startsWith('global__')) {
+          enabledInput.checked = isEnabled;
+          if (requiredInput) {
+            requiredInput.checked = isRequired && isEnabled;
+          }
+          syncEnabledRequired(container);
+        }
+      }
+    });
+  }
+
+  // Fonction pour cascader les changements depuis une catégorie vers ses sous-catégories
+  function cascadeFromCategory(categoryId, fieldName, isEnabled, isRequired) {
+    // Trouver tous les containers de sous-catégories appartenant à cette catégorie
+    document.querySelectorAll('[data-field-toggle][data-scope="subcategory"]').forEach(function(container) {
+      var parentCategoryId = container.getAttribute('data-parent-category-id');
+      var containerFieldName = container.getAttribute('data-field-name');
+      
+      if (parentCategoryId === categoryId && containerFieldName === fieldName) {
+        var enabledInput = container.querySelector('[data-role="enabled"]');
+        var requiredInput = container.querySelector('[data-role="required"]');
+        
+        if (enabledInput) {
+          enabledInput.checked = isEnabled;
+          if (requiredInput) {
+            requiredInput.checked = isRequired && isEnabled;
+          }
+          syncEnabledRequired(container);
+        }
+      }
+    });
+  }
+
+  // Initialiser tous les containers
+  document.querySelectorAll('[data-field-toggle]').forEach(function(container) {
+    syncEnabledRequired(container);
+    
+    var enabledInput = container.querySelector('[data-role="enabled"]');
+    var requiredInput = container.querySelector('[data-role="required"]');
+    
+    // Gérer les changements sur l'interrupteur "Visible"
+    if (enabledInput) {
+      enabledInput.addEventListener('change', function() {
+        syncEnabledRequired(container);
+        
+        var fieldName = getFieldNameFromInput(enabledInput.name);
+        if (!fieldName) return;
+        
+        var isEnabled = enabledInput.checked;
+        var isRequired = requiredInput ? requiredInput.checked : false;
+        
+        // Si c'est un toggle global, cascader vers toutes les catégories et sous-catégories
+        if (enabledInput.name.startsWith('global__')) {
+          cascadeFromGlobal(fieldName, isEnabled, isRequired);
+        }
+        // Si c'est un toggle de catégorie, cascader vers ses sous-catégories
+        else if (container.getAttribute('data-scope') === 'category') {
+          var categoryId = container.getAttribute('data-scope-id');
+          if (categoryId) {
+            cascadeFromCategory(categoryId, fieldName, isEnabled, isRequired);
+          }
+        }
+      });
+    }
+    
+    // Gérer les changements sur l'interrupteur "Obligatoire"
+    if (requiredInput) {
+      requiredInput.addEventListener('change', function() {
+        var fieldName = getFieldNameFromInput(requiredInput.name);
+        if (!fieldName) return;
+        
+        var isRequired = requiredInput.checked;
+        var isEnabled = enabledInput ? enabledInput.checked : false;
+        
+        // Si c'est un toggle global, cascader vers toutes les catégories et sous-catégories
+        if (requiredInput.name.startsWith('global__')) {
+          cascadeFromGlobal(fieldName, isEnabled, isRequired);
+        }
+        // Si c'est un toggle de catégorie, cascader vers ses sous-catégories
+        else if (container.getAttribute('data-scope') === 'category') {
+          var categoryId = container.getAttribute('data-scope-id');
+          if (categoryId) {
+            cascadeFromCategory(categoryId, fieldName, isEnabled, isRequired);
+          }
+        }
+      });
+    }
   });
 })();
 </script>
