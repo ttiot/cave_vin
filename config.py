@@ -16,6 +16,8 @@ class Config:
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL')
     OPENAI_FREE_MODEL = os.environ.get('OPENAI_FREE_MODEL', 'gpt-4o-mini')
     OPENAI_SOURCE_NAME = os.environ.get('OPENAI_SOURCE_NAME', 'OpenAI')
+    OPENAI_IMAGE_MODEL = os.environ.get('OPENAI_IMAGE_MODEL', 'gpt-image-1')
+    OPENAI_IMAGE_SIZE = os.environ.get('OPENAI_IMAGE_SIZE', '512x512')
     REMEMBER_COOKIE_DURATION = timedelta(days=30)
     
     @staticmethod

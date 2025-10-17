@@ -68,7 +68,9 @@
     <div class="card shadow-sm h-100 wine-card"
          data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
          data-wine-preview='{{ wine.preview_insights()|tojson }}'>
-      {% if wine.image_url %}
+      {% if wine.label_image_data_uri %}
+      <img src="{{ wine.label_image_data_uri }}" class="card-img-top" alt="{{ wine.label_image_alt_text }}">
+      {% elif wine.image_url %}
       <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
       {% endif %}
       <div class="card-body">

@@ -4,7 +4,9 @@
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="card h-100 shadow-sm">
-      {% if wine.image_url %}
+      {% if wine.label_image_data_uri %}
+      <img src="{{ wine.label_image_data_uri }}" class="card-img-top" alt="{{ wine.label_image_alt_text }}">
+      {% elif wine.image_url %}
       <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
       {% endif %}
       <div class="card-body">

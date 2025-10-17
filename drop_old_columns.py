@@ -43,6 +43,7 @@ def drop_old_columns():
                 barcode VARCHAR(20) UNIQUE,
                 extra_attributes JSON NOT NULL DEFAULT '{}',
                 image_url VARCHAR(255),
+                label_image TEXT,
                 quantity INTEGER DEFAULT 1,
                 cellar_id INTEGER NOT NULL,
                 subcategory_id INTEGER,
@@ -54,8 +55,8 @@ def drop_old_columns():
         
         # 2. Copier les données
         cursor.execute('''
-            INSERT INTO wine_new (id, name, barcode, extra_attributes, image_url, quantity, cellar_id, subcategory_id)
-            SELECT id, name, barcode, extra_attributes, image_url, quantity, cellar_id, subcategory_id
+            INSERT INTO wine_new (id, name, barcode, extra_attributes, image_url, label_image, quantity, cellar_id, subcategory_id)
+            SELECT id, name, barcode, extra_attributes, image_url, label_image, quantity, cellar_id, subcategory_id
             FROM wine
         ''')
         print("✓ Données copiées")

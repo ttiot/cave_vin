@@ -10,7 +10,7 @@ from flask import current_app
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import Wine, WineInsight, db
-from services.wine_info_service import InsightData, WineInfoService
+from services.wine_info_service import InsightData, LabelImageData, WineInfoService
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,19 @@ def _run_enrichment(app, wine_id: int) -> None:
         logger.info("Starting enrichment for wine %s", wine.name)
 
         service = WineInfoService.from_app(app)
-        insights = service.fetch(wine)
-        if not insights:
-            logger.info("No insights available for wine %s", wine.name)
+        insights, label_image = service.fetch(wine)
+
+        if not insights and not label_image:
+            logger.info("No enrichment data available for wine %s", wine.name)
             return
 
-        _store_insights(wine, insights)
+        if insights:
+            _store_insights(wine, insights)
+        else:
+            logger.info("No textual insights generated for wine %s", wine.name)
+
+        if label_image:
+            _store_label_image(wine, label_image)
 
 
 def _store_insights(wine: Wine, insights: Iterable[InsightData]) -> None:
@@ -79,3 +86,19 @@ def _store_insights(wine: Wine, insights: Iterable[InsightData]) -> None:
     except SQLAlchemyError:  # pragma: no cover - defensive commit
         db.session.rollback()
         logger.exception("Failed to persist insights for wine %s", wine.name)
+
+
+def _store_label_image(wine: Wine, label: LabelImageData) -> None:
+    if not label.image_base64:
+        logger.info("Generated label image is empty for wine %s", wine.name)
+        return
+
+    logger.info("Persisting generated label image for wine %s", wine.name)
+    wine.label_image = label.image_base64
+
+    try:
+        db.session.commit()
+        logger.info("Stored label image for wine %s", wine.name)
+    except SQLAlchemyError:  # pragma: no cover - defensive commit
+        db.session.rollback()
+        logger.exception("Failed to persist label image for wine %s", wine.name)

@@ -26,7 +26,9 @@
   
   <div class="col">
     <div class="card shadow-sm h-100 {% if urgency >= 80 %}border-danger{% elif urgency >= 50 %}border-warning{% endif %}">
-      {% if wine.image_url %}
+      {% if wine.label_image_data_uri %}
+      <img src="{{ wine.label_image_data_uri }}" class="card-img-top" alt="{{ wine.label_image_alt_text }}" style="max-height: 200px; object-fit: cover;">
+      {% elif wine.image_url %}
       <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}" style="max-height: 200px; object-fit: cover;">
       {% endif %}
       

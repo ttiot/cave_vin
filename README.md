@@ -25,6 +25,7 @@ Une application web Flask moderne pour gérer votre cave à vin personnelle avec
 - **Contenu personnalisé** : Histoire du domaine, profil aromatique, accords mets-vins
 - **Potentiel de garde** : Analyse du vieillissement et recommandations de consommation
 - **Estimation de prix** : Évaluation de la valeur actuelle
+- **Étiquettes stylisées** : Génération d'une illustration de l'étiquette pour enrichir les fiches
 - **Mise à jour** : Rafraîchissement des données à la demande
 
 #### 🔍 Recherche et filtrage

@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 import requests
 
@@ -30,6 +30,15 @@ class InsightData:
     weight: int = 0
 
 
+@dataclass
+class LabelImageData:
+    """Transport object describing a generated label image."""
+
+    image_base64: str
+    source_name: str
+    prompt: Optional[str] = None
+
+
 class WineInfoService:
     """Aggregate data from public APIs (OpenAI)."""
 
@@ -40,11 +49,15 @@ class WineInfoService:
         openai_client: Optional[OpenAI] = None,
         openai_model: Optional[str] = None,
         openai_source_name: str = "OpenAI",
+        openai_image_model: Optional[str] = None,
+        openai_image_size: str = "512x512",
     ) -> None:
         self.session = session or requests.Session()
         self.openai_client = openai_client
         self.openai_model = openai_model
         self.openai_source_name = openai_source_name
+        self.openai_image_model = openai_image_model
+        self.openai_image_size = openai_image_size
 
     @classmethod
     def from_app(cls, app) -> "WineInfoService":
@@ -83,17 +96,26 @@ class WineInfoService:
         source_name = (app.config.get("OPENAI_SOURCE_NAME") or "OpenAI").strip() or "OpenAI"
         logger.debug("Source name: %s", source_name)
 
+        image_model = (
+            (app.config.get("OPENAI_IMAGE_MODEL") or "").strip() or "gpt-image-1"
+        )
+        image_size = (
+            (app.config.get("OPENAI_IMAGE_SIZE") or "").strip() or "512x512"
+        )
+
         return cls(
             openai_client=openai_client,
             openai_model=openai_model,
             openai_source_name=source_name,
+            openai_image_model=image_model,
+            openai_image_size=image_size,
         )
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def fetch(self, wine) -> List[InsightData]:
-        """Return a list of insights for the provided wine model instance."""
+    def fetch(self, wine) -> Tuple[List[InsightData], Optional[LabelImageData]]:
+        """Return insights and a generated label image for the wine."""
         logger.info("=" * 80)
         logger.info("🍷 Début de la récupération d'informations pour le vin: %s", wine.name)
 
@@ -133,7 +155,11 @@ class WineInfoService:
         logger.info("✅ Récupération terminée: %d insights uniques", len(deduplicated))
         logger.info("=" * 80)
         
-        return deduplicated
+        label_image: Optional[LabelImageData] = None
+        if self.openai_client:
+            label_image = self._openai_label_image(wine, query)
+
+        return deduplicated, label_image
 
     # ------------------------------------------------------------------
     # Providers
@@ -340,6 +366,54 @@ class WineInfoService:
         logger.info("✅ OpenAI: %d insight(s) créé(s) avec succès", len(insights))
         return insights
 
+    def _openai_label_image(
+        self, wine, query: str
+    ) -> Optional[LabelImageData]:  # pragma: no cover - network code
+        if not self.openai_client or not self.openai_image_model:
+            logger.info("⚠️ Aucun modèle d'image configuré ; génération d'étiquette ignorée")
+            return None
+
+        prompt = self._build_label_prompt(wine, query)
+        if not prompt:
+            return None
+
+        try:
+            logger.info(
+                "🎨 OpenAI: génération d'une étiquette pour %s avec le modèle %s",
+                wine.name,
+                self.openai_image_model,
+            )
+            response = self.openai_client.images.generate(
+                model=self.openai_image_model,
+                prompt=prompt,
+                size=self.openai_image_size,
+            )
+        except Exception as exc:
+            logger.exception(
+                "❌ Impossible de générer une étiquette pour %s: %s", wine.name, exc
+            )
+            return None
+
+        data = getattr(response, "data", None) or []
+        if not data:
+            logger.warning("⚠️ OpenAI n'a retourné aucune image pour %s", wine.name)
+            return None
+
+        first = data[0]
+        image_base64 = getattr(first, "b64_json", None)
+        if not image_base64:
+            logger.warning(
+                "⚠️ La réponse OpenAI ne contient pas de payload base64 pour %s",
+                wine.name,
+            )
+            return None
+
+        return LabelImageData(
+            image_base64=image_base64,
+            source_name=self.openai_source_name,
+            prompt=prompt,
+        )
+
     def _parse_openai_payload(self, response) -> Optional[dict]:
         logger.debug("🔍 Parsing de la réponse OpenAI")
         
@@ -438,7 +512,7 @@ class WineInfoService:
         logger.debug("🔨 Construction de la requête pour le vin: %s", wine.name)
         parts = [wine.name]
         extra_attrs = getattr(wine, "extra_attributes", {}) or {}
-        
+
         year = extra_attrs.get("year")
         if year:
             parts.append(str(year))
@@ -453,6 +527,39 @@ class WineInfoService:
         query = " ".join(filter(None, parts)).strip()
         logger.debug("✅ Requête construite: '%s'", query)
         return query
+
+    def _build_label_prompt(self, wine, query: Optional[str]) -> str:
+        details: list[str] = [
+            "Crée une illustration d'étiquette de vin élégante et réaliste.",
+            f"Nom du vin : {wine.name}",
+        ]
+
+        extras = getattr(wine, "extra_attributes", {}) or {}
+        year = extras.get("year")
+        if year:
+            details.append(f"Millésime {year}")
+        region = extras.get("region")
+        if region:
+            details.append(f"Origine : {region}")
+        grape = extras.get("grape")
+        if grape:
+            details.append(f"Cépage : {grape}")
+        tasting_notes = extras.get("tasting_notes") or extras.get("description")
+        if tasting_notes:
+            details.append(f"Notes de dégustation : {self._truncate(str(tasting_notes), 120)}")
+
+        if getattr(wine, "subcategory", None):
+            details.append(f"Style : {wine.subcategory.name}")
+
+        if query:
+            details.append(f"Texte à inclure subtilement : {query}")
+
+        details.append(
+            "Palette riche, texture papier, typographie sophistiquée, mise en scène sur bouteille sombre."
+        )
+        prompt = "\n".join(details)
+        logger.debug("🎨 Prompt d'étiquette généré: %s", prompt)
+        return prompt
 
     @staticmethod
     def _clean_text(value: Optional[str]) -> str:

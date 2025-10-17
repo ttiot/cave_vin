@@ -127,6 +127,7 @@ class Wine(db.Model):
     barcode = db.Column(db.String(20), unique=True)
     extra_attributes = db.Column(db.JSON, nullable=False, default=dict)
     image_url = db.Column(db.String(255))
+    label_image = db.Column(db.Text)
     quantity = db.Column(db.Integer, default=1)
     cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id"), nullable=False)
     subcategory_id = db.Column(db.Integer, db.ForeignKey("alcohol_subcategory.id"))
@@ -163,6 +164,20 @@ class Wine(db.Model):
                 }
             )
         return preview
+
+    @property
+    def label_image_data_uri(self) -> str | None:
+        """Return the base64 image with a prefixed data URI if available."""
+
+        if not self.label_image:
+            return None
+        if self.label_image.startswith("data:"):
+            return self.label_image
+        return f"data:image/png;base64,{self.label_image}"
+
+    @property
+    def label_image_alt_text(self) -> str:
+        return f"Étiquette stylisée pour {self.name}"
 
 
 class AlcoholFieldRequirement(db.Model):
