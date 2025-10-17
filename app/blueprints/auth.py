@@ -2,6 +2,8 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
+from urllib.parse import urlparse
+
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import User, db
@@ -13,18 +15,25 @@ auth_bp = Blueprint('auth', __name__)
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Page de connexion."""
+    next_url = request.args.get('next')
+
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        next_url = request.form.get('next') or next_url
         user = User.query.filter_by(username=username).first()
-        
+
         if user and check_password_hash(user.password, password):
-            login_user(user)
-            return redirect(url_for('main.index'))
-        
+            login_user(user, remember=True)
+
+            if not next_url or urlparse(next_url).netloc != '':
+                next_url = url_for('main.index')
+
+            return redirect(next_url)
+
         flash("Identifiants incorrects.")
-    
-    return render_template('login.html')
+
+    return render_template('login.html', next_url=next_url)
 
 
 @auth_bp.route('/logout')

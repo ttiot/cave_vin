@@ -1,6 +1,7 @@
 import os
 import secrets
 import string
+from datetime import timedelta
 
 class Config:
     # Génération automatique d'une SECRET_KEY sécurisée si non définie
@@ -15,6 +16,7 @@ class Config:
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL')
     OPENAI_FREE_MODEL = os.environ.get('OPENAI_FREE_MODEL', 'gpt-4o-mini')
     OPENAI_SOURCE_NAME = os.environ.get('OPENAI_SOURCE_NAME', 'OpenAI')
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
     
     @staticmethod
     def get_default_admin_password():
