@@ -369,6 +369,12 @@ def _build_month_series(month_count: int = 12) -> list[datetime]:
     return [_shift_month(start, idx) for idx in range(month_count)]
 
 
+@main_bp.route('/health')
+def health():
+    """Endpoint de santé pour vérifier que l'application fonctionne."""
+    return {"status": "OK"}, 200
+
+
 @main_bp.route('/')
 @login_required
 def index():
