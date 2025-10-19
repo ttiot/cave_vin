@@ -27,6 +27,21 @@ def create_app(config_class=Config):
     # Initialiser les extensions
     db.init_app(flask_app)
     CSRFProtect(flask_app)
+
+    @flask_app.after_request
+    def set_security_headers(response):
+        """Ajoute des en-têtes de sécurité de base pour toutes les réponses."""
+
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; connect-src 'self' https://api.openai.com"
+        )
+        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        return response
     
     # Configuration du logging
     logging.basicConfig(

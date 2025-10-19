@@ -1,6 +1,9 @@
 """Blueprint pour l'authentification."""
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from collections import defaultdict
+from time import time
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse
 
@@ -11,6 +14,10 @@ from models import User, db
 
 auth_bp = Blueprint('auth', __name__)
 
+_login_attempts = defaultdict(list)
+MAX_ATTEMPTS = 5
+WINDOW_SECONDS = 900
+
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -18,13 +25,25 @@ def login():
     next_url = request.args.get('next')
 
     if request.method == 'POST':
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown').split(',')[0].strip()
+        now = time()
+        attempts = _login_attempts[client_ip]
+        _login_attempts[client_ip] = [ts for ts in attempts if now - ts < WINDOW_SECONDS]
+
+        if len(_login_attempts[client_ip]) >= MAX_ATTEMPTS:
+            current_app.logger.warning("Trop de tentatives de connexion pour %s", client_ip)
+            flash("Trop de tentatives. Réessayez dans quelques minutes.")
+            return render_template('login.html', next_url=next_url), 429
+
         username = request.form['username']
         password = request.form['password']
         next_url = request.form.get('next') or next_url
+        remember_me = bool(request.form.get('remember_me'))
         user = User.query.filter_by(username=username).first()
 
         if user and check_password_hash(user.password, password):
-            login_user(user, remember=True)
+            login_user(user, remember=remember_me)
+            _login_attempts.pop(client_ip, None)
 
             if not next_url or urlparse(next_url).netloc != '':
                 next_url = url_for('main.index')
@@ -32,6 +51,7 @@ def login():
             return redirect(next_url)
 
         flash("Identifiants incorrects.")
+        _login_attempts[client_ip].append(now)
 
     return render_template('login.html', next_url=next_url)
 
