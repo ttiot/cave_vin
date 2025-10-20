@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Optional
+from urllib.parse import urlparse
 
+import bleach
 import requests
 
 from openai import OpenAI, OpenAIError
@@ -53,12 +55,14 @@ class WineInfoService:
         openai_model: Optional[str] = None,
         openai_image_model: Optional[str] = None,
         openai_source_name: str = "OpenAI",
+        log_openai_payloads: bool = False,
     ) -> None:
         self.session = session or requests.Session()
         self.openai_client = openai_client
         self.openai_model = openai_model
         self.openai_image_model = openai_image_model
         self.openai_source_name = openai_source_name
+        self.log_openai_payloads = log_openai_payloads
 
     @classmethod
     def from_app(cls, app) -> "WineInfoService":
@@ -109,6 +113,7 @@ class WineInfoService:
             openai_model=openai_model,
             openai_image_model=openai_image_model,
             openai_source_name=source_name,
+            log_openai_payloads=bool(app.config.get("OPENAI_LOG_REQUESTS")),
         )
 
     # ------------------------------------------------------------------
@@ -272,8 +277,11 @@ class WineInfoService:
         }
 
         logger.info("📤 OpenAI: envoi de la requête à l'API")
-        logger.debug("System prompt: %s", system_prompt[:100] + "...")
-        logger.debug("User prompt: %s", user_prompt[:100] + "...")
+        logger.debug(
+            "Longueurs des prompts - système: %d, utilisateur: %d",
+            len(system_prompt),
+            len(user_prompt),
+        )
 
         try:
             # Utilisation de l'API Responses avec le type correct 'input_text'
@@ -346,10 +354,13 @@ class WineInfoService:
                 logger.debug("⚠️ OpenAI: insight #%d ignoré (contenu vide)", index)
                 continue
 
-            category = (item.get("category") or "").strip() or "analyse"
+            category = self._sanitize_text(item.get("category")) or "analyse"
             logger.debug("✅ OpenAI: création insight #%d - catégorie: %s", index, category)
-            title = (item.get("title") or "").strip() or None
-            source_name = (item.get("source") or self.openai_source_name).strip() or self.openai_source_name
+            title = self._sanitize_text(item.get("title"))
+            source_name = (
+                self._sanitize_text(item.get("source"))
+                or self.openai_source_name
+            )
 
             weight = item.get("weight")
             try:
@@ -362,9 +373,9 @@ class WineInfoService:
                 InsightData(
                     category=category,
                     title=title,
-                    content=self._truncate(raw_content, 900),
+                    content=self._sanitize_content(self._truncate(raw_content, 900)),
                     source_name=source_name,
-                    source_url=None,
+                    source_url=self._sanitize_source_url(item.get("url") or item.get("source_url")),
                     weight=weight_value,
                 )
             )
@@ -578,6 +589,30 @@ class WineInfoService:
             return value
         return value[: max_length - 1].rstrip() + "…"
 
+    @staticmethod
+    def _sanitize_text(value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = bleach.clean(str(value), tags=[], attributes={}, strip=True).strip()
+        return cleaned or None
+
+    @classmethod
+    def _sanitize_content(cls, value: Optional[str]) -> str:
+        cleaned = cls._sanitize_text(value)
+        return cleaned or ""
+
+    @staticmethod
+    def _sanitize_source_url(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return None
+        candidate = str(value).strip()
+        parsed = urlparse(candidate)
+        if parsed.scheme not in {"http", "https"}:
+            return None
+        if not parsed.netloc:
+            return None
+        return candidate
+
     def _log_openai_request_response(
         self,
         system_prompt: str,
@@ -587,6 +622,9 @@ class WineInfoService:
         error: Optional[str]
     ) -> None:
         """Enregistre la requête et la réponse OpenAI dans un fichier JSON."""
+        if not self.log_openai_payloads:
+            return
+
         try:
             # Créer le répertoire si nécessaire
             log_dir = Path("logs/openai_responses")

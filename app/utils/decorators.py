@@ -34,8 +34,12 @@ def ensure_db():
             
             # Créer l'utilisateur admin par défaut si nécessaire
             if not User.query.filter_by(username="admin").first():
-                admin_password, is_temporary = Config.get_default_admin_password()
-                
+                try:
+                    admin_password, is_temporary = Config.get_default_admin_password()
+                except RuntimeError as exc:
+                    current_app.logger.error(str(exc))
+                    raise
+
                 admin = User(
                     username="admin",
                     password=generate_password_hash(admin_password),
@@ -43,20 +47,9 @@ def ensure_db():
                 )
                 db.session.add(admin)
                 db.session.commit()
-                
-                # Afficher un message d'information
-                if is_temporary:
-                    print("\n" + "="*60)
-                    print("🔐 COMPTE ADMIN CRÉÉ AVEC MOT DE PASSE TEMPORAIRE")
-                    print("="*60)
-                    print("Nom d'utilisateur : admin")
-                    print(f"Mot de passe temporaire : {admin_password}")
-                    print("\n⚠️  IMPORTANT : Ce mot de passe doit être changé dès la première connexion !")
-                    print("="*60 + "\n")
-                    
-                    current_app.logger.warning("Compte admin créé avec mot de passe temporaire : %s", admin_password)
-                else:
-                    print("\n🔐 Compte admin créé avec le mot de passe défini dans DEFAULT_ADMIN_PASSWORD\n")
-                    current_app.logger.info("Compte admin créé avec mot de passe depuis variable d'environnement")
-        
+
+                current_app.logger.info(
+                    "Compte admin créé. Veuillez modifier le mot de passe via l'interface ou la commande d'administration."
+                )
+
         current_app._db_initialized = True

@@ -83,10 +83,10 @@
             </h2>
             <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#insightsAccordion">
               <div class="accordion-body">
-                <div>{{ insight.content | replace('\n', '<br>') | safe }}</div>
+                <div>{{ insight.content | e | replace('\n', '<br>') | safe }}</div>
                 <div class="mt-3 text-muted small">
                   {% if insight.source_url %}
-                  Source : <a href="{{ insight.source_url }}" target="_blank" rel="noopener">{{ insight.source_name or insight.source_url }}</a>
+                  Source : <a href="{{ insight.source_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ insight.source_name or insight.source_url }}</a>
                   {% elif insight.source_name %}
                   Source : {{ insight.source_name }}
                   {% endif %}
