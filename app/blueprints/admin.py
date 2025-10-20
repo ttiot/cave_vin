@@ -125,3 +125,31 @@ def stop_impersonation():
     login_user(admin_user, remember=False)
     flash("Vous êtes revenu à votre compte administrateur.")
     return redirect(url_for("admin.manage_users"))
+
+
+@admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def delete_user(user_id: int):
+    """Supprimer un utilisateur et toutes ses données associées."""
+
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        flash("Vous ne pouvez pas supprimer votre propre compte depuis cette page.")
+        return redirect(url_for("admin.manage_users"))
+
+    if user.is_admin:
+        remaining_admins = (
+            User.query.filter(User.id != user.id, User.is_admin == True).count()  # noqa: E712
+        )
+        if remaining_admins == 0:
+            flash(
+                "Impossible de supprimer cet utilisateur : il doit rester au moins un administrateur."
+            )
+            return redirect(url_for("admin.manage_users"))
+
+    db.session.delete(user)
+    db.session.commit()
+    flash("L'utilisateur et ses données ont été supprimés.")
+    return redirect(url_for("admin.manage_users"))

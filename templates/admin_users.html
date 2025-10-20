@@ -61,6 +61,17 @@
                   Se connecter
                 </button>
               </form>
+              <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-outline-danger"
+                  {% if user.id == current_user.id %}disabled{% endif %}
+                  onclick="return confirm('Supprimer définitivement cet utilisateur et toutes ses données ?');"
+                >
+                  Supprimer
+                </button>
+              </form>
             </div>
           </div>
           {% else %}
