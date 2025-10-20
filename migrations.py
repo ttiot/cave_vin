@@ -210,15 +210,76 @@ def _create_alcohol_categories_tables(connection: Connection) -> None:
 
 def _populate_default_alcohol_categories(connection: Connection) -> None:
     """Insérer les catégories et sous-catégories par défaut."""
-    
+
     # Vérifier si des catégories existent déjà
     existing = connection.execute(
         text("SELECT COUNT(*) FROM alcohol_category")
     ).scalar()
-    
+
     if existing > 0:
         return  # Ne pas réinsérer si des données existent déjà
-    
+
+    subcategory_columns = {
+        row[1]
+        for row in connection.execute(
+            text("PRAGMA table_info(alcohol_subcategory)")
+        ).fetchall()
+    }
+    has_badge_colors = {
+        "badge_bg_color",
+        "badge_text_color",
+    }.issubset(subcategory_columns)
+
+    def insert_subcategories(
+        category_id: int, subcategories: Iterable[dict[str, object]]
+    ) -> None:
+        for subcategory in subcategories:
+            values = {
+                "name": subcategory["name"],
+                "category_id": category_id,
+                "description": subcategory["description"],
+                "display_order": subcategory["display_order"],
+            }
+
+            columns = [
+                "name",
+                "category_id",
+                "description",
+                "display_order",
+            ]
+
+            if has_badge_colors:
+                columns.extend(["badge_bg_color", "badge_text_color"])
+                values["badge_bg_color"] = subcategory.get(
+                    "badge_bg_color", DEFAULT_BADGE_BG_COLOR
+                )
+                values["badge_text_color"] = subcategory.get(
+                    "badge_text_color", DEFAULT_BADGE_TEXT_COLOR
+                )
+
+            columns_sql = ", ".join(columns)
+            values_sql = ", ".join(f":{column}" for column in columns)
+
+            connection.execute(
+                text(
+                    f"""
+                    INSERT INTO alcohol_subcategory ({columns_sql})
+                    VALUES ({values_sql})
+                    """
+                ),
+                values,
+            )
+
+    def _last_insert_id() -> int:
+        last_id = connection.execute(
+            text("SELECT last_insert_rowid()")
+        ).scalar()
+        if last_id is None:
+            raise RuntimeError(
+                "Impossible de récupérer l'identifiant inséré."
+            )
+        return int(last_id)
+
     # Catégorie Vins
     connection.execute(
         text(
@@ -228,32 +289,49 @@ def _populate_default_alcohol_categories(connection: Connection) -> None:
             """
         )
     )
-    wine_category_id = connection.execute(text("SELECT last_insert_rowid()")).scalar()
-    
-    wine_subcategories = [
-        ("Vin rouge", "Vins rouges", 1),
-        ("Vin blanc", "Vins blancs", 2),
-        ("Vin rosé", "Vins rosés", 3),
-        ("Champagne", "Champagnes et vins effervescents", 4),
-        ("Vin doux", "Vins doux naturels et liquoreux", 5),
-    ]
-    
-    for name, desc, order in wine_subcategories:
-        connection.execute(
-            text(
-                """
-                INSERT INTO alcohol_subcategory (name, category_id, description, display_order)
-                VALUES (:name, :category_id, :description, :display_order)
-                """
-            ),
+    wine_category_id = _last_insert_id()
+
+    insert_subcategories(
+        wine_category_id,
+        (
             {
-                "name": name,
-                "category_id": wine_category_id,
-                "description": desc,
-                "display_order": order,
+                "name": "Vin rouge",
+                "description": "Vins rouges",
+                "display_order": 1,
+                "badge_bg_color": "#7f1d1d",
+                "badge_text_color": "#ffffff",
             },
-        )
-    
+            {
+                "name": "Vin blanc",
+                "description": "Vins blancs",
+                "display_order": 2,
+                "badge_bg_color": "#fef3c7",
+                "badge_text_color": "#78350f",
+            },
+            {
+                "name": "Vin rosé",
+                "description": "Vins rosés",
+                "display_order": 3,
+                "badge_bg_color": "#fce7f3",
+                "badge_text_color": "#9f1239",
+            },
+            {
+                "name": "Champagne",
+                "description": "Champagnes et vins effervescents",
+                "display_order": 4,
+                "badge_bg_color": "#fef08a",
+                "badge_text_color": "#713f12",
+            },
+            {
+                "name": "Vin doux",
+                "description": "Vins doux naturels et liquoreux",
+                "display_order": 5,
+                "badge_bg_color": "#fde68a",
+                "badge_text_color": "#92400e",
+            },
+        ),
+    )
+
     # Catégorie Spiritueux
     connection.execute(
         text(
@@ -263,38 +341,91 @@ def _populate_default_alcohol_categories(connection: Connection) -> None:
             """
         )
     )
-    spirits_category_id = connection.execute(text("SELECT last_insert_rowid()")).scalar()
-    
-    spirits_subcategories = [
-        ("Rhum blanc", "Rhums blancs agricoles ou traditionnels", 1),
-        ("Rhum ambré", "Rhums ambrés vieillis en fût", 2),
-        ("Rhum vieux", "Rhums vieux longuement vieillis", 3),
-        ("Whisky", "Whiskies écossais, irlandais, américains, etc.", 4),
-        ("Cognac", "Cognacs et eaux-de-vie de vin", 5),
-        ("Armagnac", "Armagnacs", 6),
-        ("Calvados", "Calvados et eaux-de-vie de cidre", 7),
-        ("Vodka", "Vodkas", 8),
-        ("Gin", "Gins", 9),
-        ("Tequila", "Tequilas et mezcals", 10),
-        ("Liqueur", "Liqueurs diverses", 11),
-    ]
-    
-    for name, desc, order in spirits_subcategories:
-        connection.execute(
-            text(
-                """
-                INSERT INTO alcohol_subcategory (name, category_id, description, display_order)
-                VALUES (:name, :category_id, :description, :display_order)
-                """
-            ),
+    spirits_category_id = _last_insert_id()
+
+    insert_subcategories(
+        spirits_category_id,
+        (
             {
-                "name": name,
-                "category_id": spirits_category_id,
-                "description": desc,
-                "display_order": order,
+                "name": "Rhum blanc",
+                "description": "Rhums blancs agricoles ou traditionnels",
+                "display_order": 1,
+                "badge_bg_color": "#f5f5f4",
+                "badge_text_color": "#44403c",
             },
-        )
-    
+            {
+                "name": "Rhum ambré",
+                "description": "Rhums ambrés vieillis en fût",
+                "display_order": 2,
+                "badge_bg_color": "#d97706",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Rhum vieux",
+                "description": "Rhums vieux longuement vieillis",
+                "display_order": 3,
+                "badge_bg_color": "#78350f",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Whisky",
+                "description": "Whiskies écossais, irlandais, américains, etc.",
+                "display_order": 4,
+                "badge_bg_color": "#92400e",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Cognac",
+                "description": "Cognacs et eaux-de-vie de vin",
+                "display_order": 5,
+                "badge_bg_color": "#92400e",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Armagnac",
+                "description": "Armagnacs",
+                "display_order": 6,
+                "badge_bg_color": "#92400e",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Calvados",
+                "description": "Calvados et eaux-de-vie de cidre",
+                "display_order": 7,
+                "badge_bg_color": "#f97316",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Vodka",
+                "description": "Vodkas",
+                "display_order": 8,
+                "badge_bg_color": "#e5e7eb",
+                "badge_text_color": "#1f2937",
+            },
+            {
+                "name": "Gin",
+                "description": "Gins",
+                "display_order": 9,
+                "badge_bg_color": "#dbeafe",
+                "badge_text_color": "#1e3a8a",
+            },
+            {
+                "name": "Tequila",
+                "description": "Tequilas et mezcals",
+                "display_order": 10,
+                "badge_bg_color": "#fef3c7",
+                "badge_text_color": "#78350f",
+            },
+            {
+                "name": "Liqueur",
+                "description": "Liqueurs diverses",
+                "display_order": 11,
+                "badge_bg_color": "#fbcfe8",
+                "badge_text_color": "#831843",
+            },
+        ),
+    )
+
     # Catégorie Bières
     connection.execute(
         text(
@@ -304,32 +435,55 @@ def _populate_default_alcohol_categories(connection: Connection) -> None:
             """
         )
     )
-    beer_category_id = connection.execute(text("SELECT last_insert_rowid()")).scalar()
-    
-    beer_subcategories = [
-        ("Bière blonde", "Bières blondes", 1),
-        ("Bière ambrée", "Bières ambrées", 2),
-        ("Bière brune", "Bières brunes et stouts", 3),
-        ("IPA", "India Pale Ales", 4),
-        ("Bière blanche", "Bières blanches", 5),
-        ("Cidre", "Cidres", 6),
-    ]
-    
-    for name, desc, order in beer_subcategories:
-        connection.execute(
-            text(
-                """
-                INSERT INTO alcohol_subcategory (name, category_id, description, display_order)
-                VALUES (:name, :category_id, :description, :display_order)
-                """
-            ),
+    beer_category_id = _last_insert_id()
+
+    insert_subcategories(
+        beer_category_id,
+        (
             {
-                "name": name,
-                "category_id": beer_category_id,
-                "description": desc,
-                "display_order": order,
+                "name": "Bière blonde",
+                "description": "Bières blondes",
+                "display_order": 1,
+                "badge_bg_color": "#fbbf24",
+                "badge_text_color": "#78350f",
             },
-        )
+            {
+                "name": "Bière ambrée",
+                "description": "Bières ambrées",
+                "display_order": 2,
+                "badge_bg_color": "#fb923c",
+                "badge_text_color": "#7c2d12",
+            },
+            {
+                "name": "Bière brune",
+                "description": "Bières brunes et stouts",
+                "display_order": 3,
+                "badge_bg_color": "#78350f",
+                "badge_text_color": "#fef3c7",
+            },
+            {
+                "name": "IPA",
+                "description": "India Pale Ales",
+                "display_order": 4,
+                "badge_bg_color": "#f97316",
+                "badge_text_color": "#ffffff",
+            },
+            {
+                "name": "Bière blanche",
+                "description": "Bières blanches",
+                "display_order": 5,
+                "badge_bg_color": "#fef3c7",
+                "badge_text_color": "#1f2937",
+            },
+            {
+                "name": "Cidre",
+                "description": "Cidres",
+                "display_order": 6,
+                "badge_bg_color": "#fde68a",
+                "badge_text_color": "#92400e",
+            },
+        ),
+    )
 
 
 def _add_subcategory_colors(connection: Connection) -> None:
