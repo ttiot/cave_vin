@@ -2,6 +2,7 @@
 {% block content %}
 <h3>Ajouter une sous-catégorie à "{{ category.name }}"</h3>
 <form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
   <div class="mb-3">
     <label class="form-label">Nom de la sous-catégorie</label>
     <input type="text" class="form-control" name="name" value="{{ name or '' }}" required placeholder="Ex: Vin rouge, Rhum ambré">

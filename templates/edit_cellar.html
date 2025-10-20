@@ -2,6 +2,7 @@
 {% block content %}
 <h3>Modifier la cave</h3>
 <form method="POST" class="mt-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
   <div class="mb-3">
     <label class="form-label">Nom de la cave</label>
     <input type="text" class="form-control" name="name" value="{{ cellar.name }}" required>
