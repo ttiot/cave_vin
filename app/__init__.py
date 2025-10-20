@@ -37,8 +37,12 @@ def create_app(config_class=Config):
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self'; connect-src 'self' https://api.openai.com"
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "font-src 'self' https://cdn.jsdelivr.net data:; "
+            "connect-src 'self' https://api.openai.com"
         )
         response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
         return response
