@@ -2,7 +2,9 @@ name: Build & Push Docker image
 
 on:
   push:
-    branches: [ "master" ]
+    branches: 
+      - master
+      - 'feat/**'
     tags:
       - "*"   # ex: v1.2.3 ou 1.2.3
 
