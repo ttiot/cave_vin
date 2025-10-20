@@ -192,15 +192,20 @@ def _create_alcohol_categories_tables(connection: Connection) -> None:
         )
     )
     
-    # Ajouter la colonne subcategory_id à la table wine
-    connection.execute(
-        text(
-            """
-            ALTER TABLE wine ADD COLUMN subcategory_id INTEGER
-            REFERENCES alcohol_subcategory(id)
-            """
+    # Vérifier si la colonne subcategory_id existe déjà
+    columns = connection.execute(text("PRAGMA table_info(wine)")).fetchall()
+    column_names = {row[1] for row in columns}
+    
+    # Ajouter la colonne subcategory_id à la table wine si elle n'existe pas
+    if "subcategory_id" not in column_names:
+        connection.execute(
+            text(
+                """
+                ALTER TABLE wine ADD COLUMN subcategory_id INTEGER
+                REFERENCES alcohol_subcategory(id)
+                """
+            )
         )
-    )
 
 
 def _populate_default_alcohol_categories(connection: Connection) -> None:
