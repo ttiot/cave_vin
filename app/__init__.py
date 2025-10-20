@@ -8,7 +8,6 @@ import logging
 
 from models import db, User
 from config import Config
-from migrations import run_migrations
 
 
 def create_app(config_class=Config):

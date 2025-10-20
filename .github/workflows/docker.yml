@@ -2,7 +2,9 @@ name: Build & Push Docker image
 
 on:
   push:
-    branches: [ "master" ]
+    branches:
+      - master
+      - 'feat/**'
     tags:
       - "*"   # ex: v1.2.3 ou 1.2.3
 
@@ -38,10 +40,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ----- Métadonnées pour push sur main -----
-      - name: Docker metadata (main)
-        id: meta_main
-        if: github.ref == 'refs/heads/main'
+      # ----- Métadonnées pour push sur branche -----
+      - name: Docker metadata (branch)
+        id: meta_branch
+        if: startsWith(github.ref, 'refs/heads/')
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
@@ -51,16 +53,16 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.repositoryUrl }}
 
-      # ----- Build & push (main) -----
-      - name: Build & Push (main)
-        if: github.ref == 'refs/heads/main'
+      # ----- Build & push (branche) -----
+      - name: Build & Push (branch)
+        if: startsWith(github.ref, 'refs/heads/')
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta_main.outputs.tags }}
-          labels: ${{ steps.meta_main.outputs.labels }}
+          tags: ${{ steps.meta_branch.outputs.tags }}
+          labels: ${{ steps.meta_branch.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

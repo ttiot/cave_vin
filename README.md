@@ -182,7 +182,7 @@ cave_vin/
 ├── models.py              # Modèles de données SQLAlchemy
 ├── config.py              # Configuration de l'application
 ├── tasks.py               # Tâches d'enrichissement en arrière-plan
-├── migrations.py          # Migrations de base de données
+├── app/database_init.py   # Initialisation de la base de données
 ├── requirements.txt       # Dépendances Python
 ├── services/
 │   └── wine_info_service.py  # Service d'enrichissement IA
@@ -331,20 +331,19 @@ L'application calcule un **score d'urgence** pour chaque bouteille :
 4. **Recherche** : Requête vers OpenFoodFacts
 5. **Pré-remplissage** : Insertion automatique des données trouvées
 
-### Système de migrations
+### Initialisation de la base de données
 
-L'application inclut un système de migrations automatiques :
+La base est automatiquement initialisée au premier démarrage via
+`app.database_init.initialize_database()`.
 
-#### Migrations disponibles
-- **0001** : Population des étages de caves existantes
-- **0002** : Création de la table des insights
-- **0003** : Création de l'historique de consommation
-- **0004** : Création des tables de catégories
-- **0005** : Population des catégories par défaut
-- **0006** : Ajout des couleurs de badges
+#### Contenu chargé par défaut
+- Catégories d'alcool (Vins, Spiritueux, Bières) et leurs sous-catégories avec styles
+- Catégories de caves (naturelle, électrique, vieillissement, appoint)
+- Champs dynamiques des bouteilles (région, cépage, millésime, etc.)
+- Configuration des champs requis/optionnels selon les catégories
 
-#### Exécution
-Les migrations s'exécutent automatiquement au démarrage de l'application.
+L'initialisation est idempotente : elle ne duplique pas les données existantes et met à
+jour les valeurs manquantes.
 
 ## 🐛 Dépannage
 
@@ -363,7 +362,7 @@ Les migrations s'exécutent automatiquement au démarrage de l'application.
 #### Erreurs de base de données
 1. Vérifiez les permissions d'écriture sur le fichier SQLite
 2. Contrôlez la syntaxe de `DATABASE_URL` pour PostgreSQL/MySQL
-3. Assurez-vous que les migrations ont été appliquées
+3. Vérifiez que la base a bien été initialisée (supprimez la base locale et relancez si besoin)
 
 ### Logs et debugging
 
@@ -414,9 +413,9 @@ python -m pytest tests/integration/
 3. Mettez à jour les templates d'affichage
 
 #### Nouvelles catégories d'alcool
-1. Ajoutez les données dans `migrations.py`
+1. Ajoutez les données dans `app/database_init.py`
 2. Définissez les couleurs de badges associées
-3. Créez une nouvelle migration
+3. Ré-exécutez l'initialisation (supprimez la base locale ou insérez manuellement)
 
 #### Intégrations externes
 1. Créez un nouveau service dans `services/`

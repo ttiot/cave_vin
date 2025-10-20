@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 
 from models import db, User
 from config import Config
+from app.database_init import initialize_database
 
 
 def check_temporary_password():
@@ -32,10 +33,7 @@ def ensure_db():
         with current_app.app_context():
             db.create_all()
 
-            # Exécuter les migrations
-            from migrations import run_migrations
-
-            run_migrations(current_app)
+            initialize_database()
 
             # Créer l'utilisateur admin par défaut si nécessaire
             admin = User.query.filter_by(username="admin").first()
