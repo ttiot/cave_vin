@@ -19,10 +19,19 @@
       <a href="{{ url_for('search.wines_to_consume') }}" class="btn btn-outline-light btn-sm me-2">⏰ À consommer</a>
       <a href="{{ url_for('wines.overview') }}" class="btn btn-outline-light btn-sm me-2">Collection</a>
       <a href="{{ url_for('cellars.list_cellars') }}" class="btn btn-outline-light btn-sm me-2">Mes caves</a>
+      {% if current_user.is_admin %}
       <a href="{{ url_for('categories.list_categories') }}" class="btn btn-outline-light btn-sm me-2">Catégories</a>
+      <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-light btn-sm me-2">Administration</a>
+      {% endif %}
       <a href="{{ url_for('main.consumption_history') }}" class="btn btn-outline-light btn-sm me-2">Historique</a>
       <a href="{{ url_for('main.statistics') }}" class="btn btn-outline-light btn-sm me-2">📈 Statistiques</a>
       <a href="{{ url_for('wines.add_wine') }}" class="btn btn-outline-light btn-sm me-2">+ Ajouter</a>
+      {% if session.get('impersonator_id') %}
+      <form class="d-inline" method="POST" action="{{ url_for('admin.stop_impersonation') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit" class="btn btn-warning btn-sm me-2">Quitter l'impersonation</button>
+      </form>
+      {% endif %}
       <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Déconnexion</a>
       {% endif %}
     </div>

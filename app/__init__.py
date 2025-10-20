@@ -75,7 +75,8 @@ def create_app(config_class=Config):
     from app.blueprints.cellar_categories import cellar_categories_bp
     from app.blueprints.search import search_bp
     from app.blueprints.main import main_bp
-    
+    from app.blueprints.admin import admin_bp
+
     flask_app.register_blueprint(auth_bp)
     flask_app.register_blueprint(wines_bp)
     flask_app.register_blueprint(cellars_bp)
@@ -83,5 +84,6 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(cellar_categories_bp)
     flask_app.register_blueprint(search_bp)
     flask_app.register_blueprint(main_bp)
-    
+    flask_app.register_blueprint(admin_bp)
+
     return flask_app
