@@ -3,7 +3,16 @@
 from collections import defaultdict
 from time import time
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import (
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    current_app,
+    session,
+)
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse
 
@@ -43,6 +52,7 @@ def login():
 
         if user and check_password_hash(user.password, password):
             login_user(user, remember=remember_me)
+            session.pop('impersonator_id', None)
             _login_attempts.pop(client_ip, None)
 
             if not next_url or urlparse(next_url).netloc != '':
@@ -61,6 +71,7 @@ def login():
 def logout():
     """Déconnexion de l'utilisateur."""
     logout_user()
+    session.pop('impersonator_id', None)
     return redirect(url_for('auth.login'))
 
 

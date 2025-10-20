@@ -952,6 +952,130 @@ def _add_wine_label_image(connection: Connection) -> None:
     connection.execute(text("ALTER TABLE wine ADD COLUMN label_image_data TEXT"))
 
 
+def _add_user_admin_column(connection: Connection) -> None:
+    """Ajouter la colonne is_admin à la table user et promouvoir l'admin par défaut."""
+
+    existing_columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(user)"))
+    }
+
+    if "is_admin" in existing_columns:
+        return
+
+    connection.execute(
+        text("ALTER TABLE user ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0")
+    )
+    connection.execute(
+        text("UPDATE user SET is_admin = 1 WHERE username = 'admin'")
+    )
+
+
+def _add_cellar_user_column(connection: Connection) -> None:
+    """Associer les caves à un utilisateur propriétaire."""
+
+    existing_columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(cellar)"))
+    }
+
+    if "user_id" not in existing_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE cellar ADD COLUMN user_id INTEGER REFERENCES user(id)"
+            )
+        )
+
+    connection.execute(
+        text(
+            """
+            UPDATE cellar
+            SET user_id = (
+                SELECT id FROM user WHERE username = 'admin' ORDER BY id LIMIT 1
+            )
+            WHERE user_id IS NULL
+            """
+        )
+    )
+
+
+def _add_wine_user_column(connection: Connection) -> None:
+    """Ajouter la colonne user_id à la table wine et synchroniser les valeurs."""
+
+    existing_columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(wine)"))
+    }
+
+    if "user_id" not in existing_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE wine ADD COLUMN user_id INTEGER REFERENCES user(id)"
+            )
+        )
+
+    connection.execute(
+        text(
+            """
+            UPDATE wine
+            SET user_id = (
+                SELECT user_id FROM cellar WHERE cellar.id = wine.cellar_id
+            )
+            WHERE user_id IS NULL
+            """
+        )
+    )
+
+    connection.execute(
+        text(
+            """
+            UPDATE wine
+            SET user_id = (
+                SELECT id FROM user WHERE username = 'admin' ORDER BY id LIMIT 1
+            )
+            WHERE user_id IS NULL
+            """
+        )
+    )
+
+
+def _add_consumption_user_column(connection: Connection) -> None:
+    """Ajouter la colonne user_id à la table wine_consumption."""
+
+    existing_columns = {
+        row[1]
+        for row in connection.execute(text("PRAGMA table_info(wine_consumption)"))
+    }
+
+    if "user_id" not in existing_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE wine_consumption ADD COLUMN user_id INTEGER REFERENCES user(id)"
+            )
+        )
+
+    connection.execute(
+        text(
+            """
+            UPDATE wine_consumption
+            SET user_id = (
+                SELECT user_id FROM wine WHERE wine.id = wine_consumption.wine_id
+            )
+            WHERE user_id IS NULL
+            """
+        )
+    )
+
+    connection.execute(
+        text(
+            """
+            UPDATE wine_consumption
+            SET user_id = (
+                SELECT id FROM user WHERE username = 'admin' ORDER BY id LIMIT 1
+            )
+            WHERE user_id IS NULL
+            """
+        )
+    )
+
+
 MIGRATIONS: Iterable[Migration] = (
     ("0001_populate_cellar_floors", _migrate_cellar_floors),
     ("0002_create_wine_insight", _create_wine_insight_table),
@@ -971,6 +1095,10 @@ MIGRATIONS: Iterable[Migration] = (
     ("0016_link_field_requirements", _link_requirements_to_field_definitions),
     ("0017_add_wine_timestamps", _add_wine_timestamps),
     ("0018_add_wine_label_image", _add_wine_label_image),
+    ("0019_add_user_admin_column", _add_user_admin_column),
+    ("0020_add_cellar_user_column", _add_cellar_user_column),
+    ("0021_add_wine_user_column", _add_wine_user_column),
+    ("0022_add_consumption_user_column", _add_consumption_user_column),
 )
 
 

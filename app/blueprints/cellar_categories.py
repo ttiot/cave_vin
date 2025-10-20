@@ -4,12 +4,14 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 
 from models import CellarCategory, Cellar, db
+from app.utils.decorators import admin_required
 
 
 cellar_categories_bp = Blueprint('cellar_categories', __name__, url_prefix='/cellar-categories')
 
 
 @cellar_categories_bp.route('/', methods=['GET'])
+@admin_required
 @login_required
 def list_cellar_categories():
     """Liste toutes les catégories de cave."""
@@ -18,6 +20,7 @@ def list_cellar_categories():
 
 
 @cellar_categories_bp.route('/add', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def add_cellar_category():
     """Ajouter une nouvelle catégorie de cave."""
@@ -46,6 +49,7 @@ def add_cellar_category():
 
 
 @cellar_categories_bp.route('/<int:category_id>/edit', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def edit_cellar_category(category_id):
     """Modifier une catégorie de cave existante."""
@@ -80,6 +84,7 @@ def edit_cellar_category(category_id):
 
 
 @cellar_categories_bp.route('/<int:category_id>/delete', methods=['POST'])
+@admin_required
 @login_required
 def delete_cellar_category(category_id):
     """Supprimer une catégorie de cave."""

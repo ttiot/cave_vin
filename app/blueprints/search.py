@@ -4,7 +4,7 @@ from datetime import datetime
 import re
 
 from flask import Blueprint, render_template, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
@@ -43,7 +43,7 @@ def search_wines():
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory),
         selectinload(Wine.insights)
-    ).filter(Wine.quantity > 0)
+    ).filter(Wine.quantity > 0, Wine.user_id == current_user.id)
     
     # Filtrer par sous-catégorie si spécifié
     if subcategory_id:
@@ -87,7 +87,7 @@ def wines_to_consume():
             selectinload(Wine.subcategory),
             selectinload(Wine.insights)
         )
-        .filter(Wine.quantity > 0)
+        .filter(Wine.quantity > 0, Wine.user_id == current_user.id)
         .all()
     )
     

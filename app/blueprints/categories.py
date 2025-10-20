@@ -19,12 +19,14 @@ from app.field_config import (
     iter_fields,
     sanitize_field_name,
 )
+from app.utils.decorators import admin_required
 
 
 categories_bp = Blueprint('categories', __name__, url_prefix='/categories')
 
 
 @categories_bp.route('/', methods=['GET'])
+@admin_required
 @login_required
 def list_categories():
     """Liste toutes les catégories et sous-catégories d'alcool."""
@@ -229,6 +231,7 @@ def _handle_add_field(request_form, categories):
 
 
 @categories_bp.route('/field-requirements', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def manage_field_requirements():
     """Permettre aux administrateurs de configurer la visibilité des champs."""
@@ -293,6 +296,7 @@ def manage_field_requirements():
 
 
 @categories_bp.route('/fields/<int:field_id>/edit', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def edit_field(field_id):
     """Modifier un champ existant."""
@@ -354,6 +358,7 @@ def edit_field(field_id):
 
 
 @categories_bp.route('/fields/<int:field_id>/delete', methods=['POST'])
+@admin_required
 @login_required
 def delete_field(field_id):
     """Supprimer un champ personnalisé."""
@@ -378,6 +383,7 @@ def delete_field(field_id):
 
 
 @categories_bp.route('/add', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def add_category():
     """Ajouter une nouvelle catégorie."""
@@ -406,6 +412,7 @@ def add_category():
 
 
 @categories_bp.route('/<int:category_id>/edit', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def edit_category(category_id):
     """Modifier une catégorie existante."""
@@ -440,6 +447,7 @@ def edit_category(category_id):
 
 
 @categories_bp.route('/<int:category_id>/delete', methods=['POST'])
+@admin_required
 @login_required
 def delete_category(category_id):
     """Supprimer une catégorie."""
@@ -461,6 +469,7 @@ def delete_category(category_id):
 
 
 @categories_bp.route('/<int:category_id>/subcategories/add', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def add_subcategory(category_id):
     """Ajouter une sous-catégorie à une catégorie."""
@@ -516,6 +525,7 @@ def add_subcategory(category_id):
 
 
 @categories_bp.route('/subcategories/<int:subcategory_id>/edit', methods=['GET', 'POST'])
+@admin_required
 @login_required
 def edit_subcategory(subcategory_id):
     """Modifier une sous-catégorie existante."""
@@ -565,6 +575,7 @@ def edit_subcategory(subcategory_id):
 
 
 @categories_bp.route('/subcategories/<int:subcategory_id>/delete', methods=['POST'])
+@admin_required
 @login_required
 def delete_subcategory(subcategory_id):
     """Supprimer une sous-catégorie."""

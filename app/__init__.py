@@ -37,8 +37,12 @@ def create_app(config_class=Config):
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self'; connect-src 'self' https://api.openai.com"
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "font-src 'self' https://cdn.jsdelivr.net data:; "
+            "connect-src 'self' https://api.openai.com"
         )
         response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
         return response
@@ -75,7 +79,8 @@ def create_app(config_class=Config):
     from app.blueprints.cellar_categories import cellar_categories_bp
     from app.blueprints.search import search_bp
     from app.blueprints.main import main_bp
-    
+    from app.blueprints.admin import admin_bp
+
     flask_app.register_blueprint(auth_bp)
     flask_app.register_blueprint(wines_bp)
     flask_app.register_blueprint(cellars_bp)
@@ -83,5 +88,6 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(cellar_categories_bp)
     flask_app.register_blueprint(search_bp)
     flask_app.register_blueprint(main_bp)
-    
+    flask_app.register_blueprint(admin_bp)
+
     return flask_app

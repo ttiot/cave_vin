@@ -5,7 +5,7 @@ import base64
 from io import BytesIO
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 import requests
 from PIL import Image
@@ -34,6 +34,7 @@ def overview():
 
     cellars = (
         Cellar.query.options(selectinload(Cellar.category))
+        .filter(Cellar.user_id == current_user.id)
         .order_by(Cellar.name.asc())
         .all()
     )
@@ -43,6 +44,7 @@ def overview():
             selectinload(Wine.subcategory),
             selectinload(Wine.cellar),
         )
+        .filter(Wine.user_id == current_user.id)
         .order_by(Wine.cellar_id.asc(), Wine.name.asc())
         .all()
     )
@@ -269,7 +271,11 @@ def _collect_wine_field_values(wine: Wine | None, ordered_fields) -> dict[str, o
 @login_required
 def add_wine():
     """Ajouter une nouvelle bouteille en respectant les contraintes de catégorie."""
-    cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+    cellars = (
+        Cellar.query.filter_by(user_id=current_user.id)
+        .order_by(Cellar.name.asc())
+        .all()
+    )
     categories = AlcoholCategory.query.order_by(
         AlcoholCategory.display_order, AlcoholCategory.name
     ).all()
@@ -301,7 +307,11 @@ def add_wine():
         else:
             quantity = int(quantity)
 
-        cellar = Cellar.query.get(cellar_id) if cellar_id else None
+        cellar = (
+            Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first()
+            if cellar_id
+            else None
+        )
         if not cellar:
             errors.append("Veuillez sélectionner une cave pour y ajouter la bouteille.")
 
@@ -360,6 +370,7 @@ def add_wine():
             cellar=cellar,
             subcategory=subcategory,
             extra_attributes=extra_values,
+            owner=current_user,
         )
         db.session.add(wine)
         db.session.commit()
@@ -388,7 +399,7 @@ def wine_detail(wine_id):
             selectinload(Wine.insights),
             selectinload(Wine.consumptions),
         )
-        .filter_by(id=wine_id)
+        .filter(Wine.id == wine_id, Wine.user_id == current_user.id)
         .first_or_404()
     )
     ordered_fields = list(iter_fields())
@@ -405,8 +416,14 @@ def wine_detail(wine_id):
 @login_required
 def edit_wine(wine_id):
     """Modifier une bouteille existante."""
-    wine = Wine.query.get_or_404(wine_id)
-    cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+    wine = (
+        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+    )
+    cellars = (
+        Cellar.query.filter_by(user_id=current_user.id)
+        .order_by(Cellar.name.asc())
+        .all()
+    )
     categories = AlcoholCategory.query.order_by(
         AlcoholCategory.display_order, AlcoholCategory.name
     ).all()
@@ -435,7 +452,11 @@ def edit_wine(wine_id):
         else:
             quantity = int(quantity)
 
-        cellar = Cellar.query.get(cellar_id) if cellar_id else None
+        cellar = (
+            Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first()
+            if cellar_id
+            else None
+        )
         if not cellar:
             errors.append("Veuillez sélectionner une cave existante.")
 
@@ -547,7 +568,9 @@ def edit_wine(wine_id):
 @login_required
 def refresh_wine(wine_id):
     """Relancer la récupération des informations d'une bouteille."""
-    wine = Wine.query.get_or_404(wine_id)
+    wine = (
+        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+    )
     schedule_wine_enrichment(wine.id)
     flash("La récupération des informations a été relancée.")
     return redirect(resolve_redirect('main.index'))
@@ -557,7 +580,9 @@ def refresh_wine(wine_id):
 @login_required
 def consume_wine(wine_id):
     """Marquer une bouteille comme consommée."""
-    wine = Wine.query.get_or_404(wine_id)
+    wine = (
+        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+    )
     if wine.quantity <= 0:
         flash("Cette bouteille n'est plus disponible dans la cave.")
         return redirect(resolve_redirect('main.index'))
@@ -569,6 +594,7 @@ def consume_wine(wine_id):
     
     consumption = WineConsumption(
         wine=wine,
+        user=wine.owner,
         quantity=1,
         snapshot_name=wine.name,
         snapshot_year=extras.get('year'),
@@ -587,7 +613,9 @@ def consume_wine(wine_id):
 @login_required
 def delete_wine(wine_id):
     """Supprimer une bouteille de la cave."""
-    wine = Wine.query.get_or_404(wine_id)
+    wine = (
+        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+    )
     db.session.delete(wine)
     db.session.commit()
     flash("La bouteille a été supprimée de votre cave.")

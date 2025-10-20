@@ -1,7 +1,7 @@
 """Blueprint pour la gestion des caves."""
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from models import Cellar, CellarCategory, CellarFloor, db
 
@@ -13,7 +13,11 @@ cellars_bp = Blueprint('cellars', __name__, url_prefix='/cellars')
 @login_required
 def list_cellars():
     """Liste toutes les caves."""
-    cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+    cellars = (
+        Cellar.query.filter_by(user_id=current_user.id)
+        .order_by(Cellar.name.asc())
+        .all()
+    )
     return render_template('cellars.html', cellars=cellars)
 
 
@@ -67,7 +71,8 @@ def add_cellar():
             name=name,
             category_id=category_id,
             floor_count=len(floor_capacities),
-            bottles_per_floor=max(floor_capacities)
+            bottles_per_floor=max(floor_capacities),
+            owner=current_user,
         )
         for index, capacity in enumerate(floor_capacities, start=1):
             cellar.levels.append(CellarFloor(level=index, capacity=capacity))
@@ -84,7 +89,7 @@ def add_cellar():
 @login_required
 def edit_cellar(cellar_id):
     """Modifier une cave existante."""
-    cellar = Cellar.query.get_or_404(cellar_id)
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first_or_404()
     categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
     
     if request.method == 'POST':

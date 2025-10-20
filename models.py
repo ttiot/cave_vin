@@ -14,6 +14,23 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     has_temporary_password = db.Column(db.Boolean, default=False, nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+
+    cellars = db.relationship(
+        "Cellar",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    wines = db.relationship(
+        "Wine",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    consumptions = db.relationship(
+        "WineConsumption",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class CellarCategory(db.Model):
@@ -35,9 +52,11 @@ class Cellar(db.Model):
     name = db.Column(db.String(120), nullable=False)
     floor_count = db.Column("floors", db.Integer, nullable=False)
     bottles_per_floor = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     category_id = db.Column(db.Integer, db.ForeignKey("cellar_category.id"), nullable=False)
 
     wines = db.relationship("Wine", back_populates="cellar", lazy="dynamic")
+    owner = db.relationship("User", back_populates="cellars")
     category = db.relationship("CellarCategory", back_populates="cellars")
     levels = db.relationship(
         "CellarFloor",
@@ -130,6 +149,7 @@ class Wine(db.Model):
     label_image_data = db.Column(db.Text)
     quantity = db.Column(db.Integer, default=1)
     cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     subcategory_id = db.Column(db.Integer, db.ForeignKey("alcohol_subcategory.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -137,6 +157,7 @@ class Wine(db.Model):
     )
 
     cellar = db.relationship("Cellar", back_populates="wines")
+    owner = db.relationship("User", back_populates="wines")
     subcategory = db.relationship("AlcoholSubcategory", back_populates="wines")
     insights = db.relationship(
         "WineInsight",
@@ -262,6 +283,7 @@ class WineInsight(db.Model):
 class WineConsumption(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     wine_id = db.Column(db.Integer, db.ForeignKey("wine.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     consumed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     quantity = db.Column(db.Integer, default=1, nullable=False)
     snapshot_name = db.Column(db.String(120), nullable=False)
@@ -271,6 +293,7 @@ class WineConsumption(db.Model):
     snapshot_cellar = db.Column(db.String(120))
 
     wine = db.relationship("Wine", back_populates="consumptions")
+    user = db.relationship("User", back_populates="consumptions")
 
     def describe(self) -> str:
         parts: list[str] = [self.snapshot_name]

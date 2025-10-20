@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Iterable
 
 from flask import Blueprint, render_template
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 
 from models import AlcoholSubcategory, Cellar, Wine, WineConsumption
@@ -386,11 +386,15 @@ def index():
             selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
             selectinload(Wine.insights),
         )
-        .filter(Wine.quantity > 0)
+        .filter(Wine.quantity > 0, Wine.user_id == current_user.id)
         .order_by(Wine.name.asc())
         .all()
     )
-    cellars = Cellar.query.order_by(Cellar.name.asc()).all()
+    cellars = (
+        Cellar.query.filter_by(user_id=current_user.id)
+        .order_by(Cellar.name.asc())
+        .all()
+    )
 
     total_bottles = sum(wine.quantity or 0 for wine in wines)
 
@@ -410,7 +414,7 @@ def index():
             selectinload(Wine.cellar),
             selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
         )
-        .filter(Wine.quantity > 0)
+        .filter(Wine.quantity > 0, Wine.user_id == current_user.id)
         .order_by(Wine.id.desc())
         .limit(4)
         .all()
@@ -434,6 +438,7 @@ def consumption_history():
     """Affiche l'historique des consommations."""
     consumptions = (
         WineConsumption.query.options(selectinload(WineConsumption.wine))
+        .filter(WineConsumption.user_id == current_user.id)
         .order_by(WineConsumption.consumed_at.desc())
         .all()
     )
@@ -452,7 +457,7 @@ def statistics():
             selectinload(Wine.insights),
             selectinload(Wine.consumptions),
         )
-        .filter(Wine.quantity >= 0)
+        .filter(Wine.quantity >= 0, Wine.user_id == current_user.id)
         .all()
     )
 
@@ -548,7 +553,8 @@ def statistics():
         first_month_start = months[0]
         consumptions = (
             WineConsumption.query.filter(
-                WineConsumption.consumed_at >= first_month_start
+                WineConsumption.consumed_at >= first_month_start,
+                WineConsumption.user_id == current_user.id,
             ).all()
         )
     else:
