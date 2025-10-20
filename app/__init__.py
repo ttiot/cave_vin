@@ -39,7 +39,7 @@ def create_app(config_class=Config):
             "default-src 'self'; "
             "img-src 'self' data: https:; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'sha256-4hKDHmDqLVWSW+TPu+1+NAoRjzG4q9APLtGonpZ91U0='; "
             "font-src 'self' https://cdn.jsdelivr.net data:; "
             "connect-src 'self' https://api.openai.com"
         )
