@@ -4,8 +4,6 @@
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-  crossorigin=""
 />
 <style>
   #worldMap { height: 360px; }
@@ -185,13 +183,9 @@
 {% block extra_scripts %}
 <script
   src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"
-  integrity="sha256-llOggT23Q7vngzKjiW4ox7x1RuT/9R5+l56QjR8EcdE="
-  crossorigin="anonymous"
 ></script>
 <script
   src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-  crossorigin=""
 ></script>
 <script>
   const categoryData = {{ category_distribution|tojson }};
