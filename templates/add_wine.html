@@ -54,6 +54,8 @@
         <textarea class="form-control" name="{{ field.name }}" rows="3" placeholder="{{ field.placeholder or '' }}">{{ form_data.get(field.name, '') }}</textarea>
       {% elif field.input_type == 'number' %}
         <input type="number" class="form-control" name="{{ field.name }}" value="{{ form_data.get(field.name, '') }}" placeholder="{{ field.placeholder or '' }}" {% if field.name == 'year' %}min="1000" max="3000"{% elif field.name == 'volume_ml' %}min="10" step="10"{% endif %}>
+      {% elif field.input_type == 'decimal' %}
+        <input type="number" class="form-control" step="any" inputmode="decimal" name="{{ field.name }}" value="{{ form_data.get(field.name, '') }}" placeholder="{{ field.placeholder or '' }}">
       {% else %}
         <input type="text" class="form-control" name="{{ field.name }}" value="{{ form_data.get(field.name, '') }}" placeholder="{{ field.placeholder or '' }}">
       {% endif %}

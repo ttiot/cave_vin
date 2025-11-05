@@ -173,7 +173,7 @@ def _handle_add_field(request_form, categories):
     else:
         scope = scope_ref
     input_type = (request_form.get("input_type") or "text").strip().lower()
-    if input_type not in {"text", "number", "textarea"}:
+    if input_type not in {"text", "number", "decimal", "textarea"}:
         input_type = "text"
     help_text = (request_form.get("help_text") or "").strip() or None
     placeholder = (request_form.get("placeholder") or "").strip() or None
@@ -314,7 +314,7 @@ def edit_field(field_id):
             flash("Le libellé du champ est obligatoire.")
             return render_template('edit_field.html', field=field)
         
-        if input_type not in {'text', 'number', 'textarea'}:
+        if input_type not in {'text', 'number', 'decimal', 'textarea'}:
             input_type = 'text'
         
         form_width = max(1, min(form_width, 12))
