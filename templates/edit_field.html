@@ -26,7 +26,8 @@
           <label class="form-label">Type de saisie</label>
           <select class="form-select" name="input_type">
             <option value="text" {% if field.input_type == 'text' %}selected{% endif %}>Texte court</option>
-            <option value="number" {% if field.input_type == 'number' %}selected{% endif %}>Nombre</option>
+            <option value="number" {% if field.input_type == 'number' %}selected{% endif %}>Nombre entier</option>
+            <option value="decimal" {% if field.input_type == 'decimal' %}selected{% endif %}>Nombre à virgule</option>
             <option value="textarea" {% if field.input_type == 'textarea' %}selected{% endif %}>Texte long</option>
           </select>
         </div>

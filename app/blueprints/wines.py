@@ -1,6 +1,7 @@
 """Blueprint pour la gestion des bouteilles d'alcool."""
 
 from collections import defaultdict
+from decimal import Decimal, InvalidOperation
 import base64
 from io import BytesIO
 
@@ -14,6 +15,7 @@ from models import (
     AlcoholCategory,
     AlcoholFieldRequirement,
     AlcoholSubcategory,
+    BottleFieldDefinition,
     Cellar,
     Wine,
     WineConsumption,
@@ -182,10 +184,12 @@ def _build_field_settings(
     return settings
 
 
-def _parse_field_value(field_name: str, raw_value: str) -> object | None:
+def _parse_field_value(field: BottleFieldDefinition, raw_value: str) -> object | None:
     value = (raw_value or "").strip()
     if not value:
         return None
+
+    field_name = field.name
 
     if field_name == "year":
         try:
@@ -204,6 +208,24 @@ def _parse_field_value(field_name: str, raw_value: str) -> object | None:
         if volume <= 0:
             raise ValueError("La contenance doit être un nombre positif.")
         return volume
+
+    if field.input_type == "number":
+        try:
+            return int(value)
+        except ValueError as exc:  # pragma: no cover - defensive programming
+            raise ValueError(
+                f"Le champ {field.label} doit être un nombre entier."
+            ) from exc
+
+    if field.input_type == "decimal":
+        normalized_value = value.replace(",", ".")
+        try:
+            decimal_value = Decimal(normalized_value)
+        except InvalidOperation as exc:  # pragma: no cover - defensive programming
+            raise ValueError(
+                f"Le champ {field.label} doit être un nombre à virgule."
+            ) from exc
+        return float(decimal_value)
 
     return value
 
@@ -235,7 +257,7 @@ def _extract_field_values(
             continue
 
         try:
-            values[field_name] = _parse_field_value(field_name, raw_value)
+            values[field_name] = _parse_field_value(field, raw_value)
         except ValueError as exc:
             errors.append(str(exc))
             values[field_name] = None
