@@ -286,6 +286,7 @@ class WineConsumption(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     consumed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     quantity = db.Column(db.Integer, default=1, nullable=False)
+    comment = db.Column(db.Text)
     snapshot_name = db.Column(db.String(120), nullable=False)
     snapshot_year = db.Column(db.Integer)
     snapshot_region = db.Column(db.String(120))

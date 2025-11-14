@@ -14,6 +14,7 @@
           <th>Cave</th>
           <th>Quantité</th>
           <th>Consommée le</th>
+          <th>Commentaire</th>
         </tr>
       </thead>
       <tbody>
@@ -36,6 +37,21 @@
           </td>
           <td>{{ item.quantity }}</td>
           <td>{{ item.consumed_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="align-middle">
+            <div class="mb-2">
+              {% if item.comment %}
+              <span>{{ item.comment }}</span>
+              {% else %}
+              <span class="text-muted small">Aucun commentaire</span>
+              {% endif %}
+            </div>
+            <form method="post" action="{{ url_for('main.update_consumption_comment', consumption_id=item.id) }}" class="d-flex gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <input type="hidden" name="redirect" value="{{ request.full_path }}">
+              <input type="text" name="comment" class="form-control form-control-sm flex-grow-1" placeholder="Ajouter un commentaire" value="{{ item.comment or '' }}">
+              <button type="submit" class="btn btn-outline-secondary btn-sm">Enregistrer</button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

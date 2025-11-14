@@ -268,6 +268,7 @@
                   <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
+                    <input type="text" name="comment" class="form-control form-control-sm mb-2" placeholder="Commentaire (optionnel)">
                     <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
                   </form>
                   <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
