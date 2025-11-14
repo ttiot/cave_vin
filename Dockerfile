@@ -20,8 +20,8 @@ RUN useradd -u 10001 -m appuser \
     && chmod 755 /data
 
 # Dépendances système minimales (build puis clean)
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
  && apt-get install -y --no-install-recommends build-essential curl ca-certificates wget \
  && apt-get clean \
