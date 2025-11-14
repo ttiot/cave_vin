@@ -610,14 +610,17 @@ def consume_wine(wine_id):
         return redirect(resolve_redirect('main.index'))
 
     wine.quantity -= 1
-    
+
     # Récupérer les valeurs depuis extra_attributes
     extras = wine.extra_attributes or {}
-    
+
+    comment = request.form.get('comment', '').strip() or None
+
     consumption = WineConsumption(
         wine=wine,
         user=wine.owner,
         quantity=1,
+        comment=comment,
         snapshot_name=wine.name,
         snapshot_year=extras.get('year'),
         snapshot_region=extras.get('region'),

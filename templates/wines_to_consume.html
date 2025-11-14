@@ -105,7 +105,9 @@
         <div class="btn-group d-flex" role="group">
           <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="btn btn-outline-primary btn-sm flex-fill">Détails</a>
           <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <input type="hidden" name="redirect" value="{{ url_for('search.wines_to_consume') }}">
+            <input type="text" name="comment" class="form-control form-control-sm mb-2" placeholder="Commentaire (optionnel)">
             <button type="submit" class="btn btn-outline-success btn-sm w-100">Consommer</button>
           </form>
         </div>

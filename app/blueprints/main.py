@@ -7,11 +7,12 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Iterable
 
-from flask import Blueprint, render_template
+from flask import Blueprint, flash, redirect, render_template, request
 from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 
-from models import AlcoholSubcategory, Cellar, Wine, WineConsumption
+from models import AlcoholSubcategory, Cellar, Wine, WineConsumption, db
+from app.utils.formatters import resolve_redirect
 
 
 PRICE_PATTERN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:€|euros?)", re.IGNORECASE)
@@ -444,6 +445,28 @@ def consumption_history():
         .all()
     )
     return render_template('consumption_history.html', consumptions=consumptions)
+
+
+@main_bp.route('/consommations/<int:consumption_id>/comment', methods=['POST'])
+@login_required
+def update_consumption_comment(consumption_id: int):
+    """Met à jour le commentaire associé à une consommation."""
+    consumption = (
+        WineConsumption.query.filter_by(
+            id=consumption_id, user_id=current_user.id
+        ).first_or_404()
+    )
+
+    comment = request.form.get('comment', '').strip() or None
+    consumption.comment = comment
+    db.session.commit()
+
+    if comment:
+        flash('Commentaire enregistré.')
+    else:
+        flash('Commentaire supprimé.')
+
+    return redirect(resolve_redirect('main.consumption_history'))
 
 
 @main_bp.route('/stats', methods=['GET'])
