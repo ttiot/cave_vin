@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash
 
 from models import db, User
 from config import Config
-from app.database_init import initialize_database
+from app.database_init import initialize_database, apply_schema_updates
 
 
 def check_temporary_password():
@@ -32,6 +32,8 @@ def ensure_db():
     if not hasattr(current_app, "_db_initialized"):
         with current_app.app_context():
             db.create_all()
+
+            apply_schema_updates()
 
             initialize_database()
 

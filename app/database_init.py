@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 
 from models import (
     AlcoholCategory,
@@ -19,6 +19,26 @@ DEFAULT_DISPLAY_ORDERS = {
     field["name"]: int(field.get("display_order", 0))
     for field in DEFAULT_FIELD_DEFINITIONS
 }
+
+
+def apply_schema_updates() -> None:
+    """Apply idempotent schema tweaks required by recent releases."""
+
+    engine = db.engine
+    inspector = inspect(engine)
+
+    if "wine_consumption" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("wine_consumption")}
+    if "comment" in columns:
+        return
+
+    # Older installations miss the ``comment`` column that now backs optional
+    # tasting notes. Add it on the fly to avoid breaking the application at
+    # startup when the ORM issues SELECT statements.
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE wine_consumption ADD COLUMN comment TEXT"))
 
 
 ALCOHOL_CATEGORIES: list[dict[str, object]] = [
