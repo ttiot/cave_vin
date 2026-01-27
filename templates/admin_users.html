@@ -17,11 +17,21 @@
             <input type="password" class="form-control" name="password" minlength="6" required />
             <div class="form-text">Un mot de passe temporaire oblige l'utilisateur à le changer lors de sa première connexion.</div>
           </div>
+          <div class="mb-3">
+            <label class="form-label">Type de compte</label>
+            <select class="form-select" name="parent_id" id="parent_id_select">
+              <option value="">Compte indépendant</option>
+              {% for account in main_accounts %}
+              <option value="{{ account.id }}">Sous-compte de {{ account.username }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Un sous-compte accède aux ressources (caves, bouteilles) du compte principal.</div>
+          </div>
           <div class="form-check form-switch mb-2">
             <input class="form-check-input" type="checkbox" id="temporary" name="temporary" value="1" />
             <label class="form-check-label" for="temporary">Mot de passe temporaire</label>
           </div>
-          <div class="form-check form-switch mb-3">
+          <div class="form-check form-switch mb-3" id="admin_checkbox_container">
             <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin" value="1" />
             <label class="form-check-label" for="is_admin">Accorder les droits administrateur</label>
           </div>
@@ -36,42 +46,105 @@
       <div class="card-body p-0">
         <div class="list-group list-group-flush">
           {% for user in users %}
-          <div class="list-group-item d-flex justify-content-between align-items-start">
-            <div>
-              <div class="fw-semibold">{{ user.username }}{% if user.id == current_user.id %} (vous){% endif %}</div>
-              <div class="text-muted small">
-                {% if user.is_admin %}
-                  Administrateur
-                {% else %}
-                  Utilisateur standard
+          <div class="list-group-item {% if user.is_sub_account %}ps-4 bg-light{% endif %}">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold">
+                  {% if user.is_sub_account %}
+                  <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                  {% endif %}
+                  {{ user.username }}{% if user.id == current_user.id %} (vous){% endif %}
+                </div>
+                <div class="text-muted small">
+                  {% if user.is_admin %}
+                    <span class="badge bg-danger">Administrateur</span>
+                  {% elif user.is_sub_account %}
+                    <span class="badge bg-secondary">Sous-compte de {{ user.parent.username }}</span>
+                  {% else %}
+                    <span class="badge bg-primary">Compte principal</span>
+                    {% if user.sub_accounts.count() > 0 %}
+                    <span class="badge bg-info">{{ user.sub_accounts.count() }} sous-compte(s)</span>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </div>
+              <div class="d-flex gap-1 flex-wrap justify-content-end">
+                {% if not user.is_sub_account %}
+                <form method="POST" action="{{ url_for('admin.update_role', user_id=user.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <input type="hidden" name="is_admin" value="{{ 1 if not user.is_admin else 0 }}" />
+                  <button type="submit" class="btn btn-sm btn-outline-secondary" {% if user.id == current_user.id %}disabled{% endif %}>
+                    {% if user.is_admin %}Retirer admin{% else %}Promouvoir admin{% endif %}
+                  </button>
+                </form>
                 {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#parentModal{{ user.id }}" {% if user.id == current_user.id %}disabled{% endif %}>
+                  Rattachement
+                </button>
+                <form method="POST" action="{{ url_for('admin.impersonate', user_id=user.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <button type="submit" class="btn btn-sm btn-outline-primary" {% if user.id == current_user.id or is_impersonating %}disabled{% endif %}>
+                    Se connecter
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-danger"
+                    {% if user.id == current_user.id %}disabled{% endif %}
+                    onclick="return confirm('Supprimer définitivement cet utilisateur et toutes ses données ?{% if user.sub_accounts.count() > 0 %} Attention : ses {{ user.sub_accounts.count() }} sous-compte(s) seront également supprimés !{% endif %}');"
+                  >
+                    Supprimer
+                  </button>
+                </form>
               </div>
             </div>
-            <div class="d-flex gap-2">
-              <form method="POST" action="{{ url_for('admin.update_role', user_id=user.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <input type="hidden" name="is_admin" value="{{ 1 if not user.is_admin else 0 }}" />
-                <button type="submit" class="btn btn-sm btn-outline-secondary" {% if user.id == current_user.id %}disabled{% endif %}>
-                  {% if user.is_admin %}Retirer admin{% else %}Promouvoir admin{% endif %}
-                </button>
-              </form>
-              <form method="POST" action="{{ url_for('admin.impersonate', user_id=user.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <button type="submit" class="btn btn-sm btn-outline-primary" {% if user.id == current_user.id or is_impersonating %}disabled{% endif %}>
-                  Se connecter
-                </button>
-              </form>
-              <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <button
-                  type="submit"
-                  class="btn btn-sm btn-outline-danger"
-                  {% if user.id == current_user.id %}disabled{% endif %}
-                  onclick="return confirm('Supprimer définitivement cet utilisateur et toutes ses données ?');"
-                >
-                  Supprimer
-                </button>
-              </form>
+          </div>
+          
+          <!-- Modal pour modifier le rattachement -->
+          <div class="modal fade" id="parentModal{{ user.id }}" tabindex="-1" aria-labelledby="parentModalLabel{{ user.id }}" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="parentModalLabel{{ user.id }}">Modifier le rattachement de {{ user.username }}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.update_parent', user_id=user.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <div class="modal-body">
+                    {% if user.sub_accounts.count() > 0 %}
+                    <div class="alert alert-warning">
+                      <i class="bi bi-exclamation-triangle me-2"></i>
+                      Cet utilisateur a {{ user.sub_accounts.count() }} sous-compte(s) et ne peut pas devenir lui-même un sous-compte.
+                    </div>
+                    {% endif %}
+                    <div class="mb-3">
+                      <label class="form-label">Rattacher à</label>
+                      <select class="form-select" name="parent_id" {% if user.sub_accounts.count() > 0 %}disabled{% endif %}>
+                        <option value="" {% if not user.is_sub_account %}selected{% endif %}>Compte indépendant</option>
+                        {% for account in main_accounts %}
+                        {% if account.id != user.id %}
+                        <option value="{{ account.id }}" {% if user.parent_id == account.id %}selected{% endif %}>
+                          Sous-compte de {{ account.username }}
+                        </option>
+                        {% endif %}
+                        {% endfor %}
+                      </select>
+                    </div>
+                    {% if user.is_admin %}
+                    <div class="alert alert-info">
+                      <i class="bi bi-info-circle me-2"></i>
+                      Si vous rattachez cet utilisateur à un compte parent, ses droits administrateur seront automatiquement retirés.
+                    </div>
+                    {% endif %}
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary" {% if user.sub_accounts.count() > 0 %}disabled{% endif %}>Enregistrer</button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
           {% else %}
@@ -90,4 +163,27 @@
     </div>
   </div>
 </div>
+
+<script>
+// Désactiver la case admin si un compte parent est sélectionné
+document.addEventListener('DOMContentLoaded', function() {
+  const parentSelect = document.getElementById('parent_id_select');
+  const adminCheckbox = document.getElementById('is_admin');
+  const adminContainer = document.getElementById('admin_checkbox_container');
+  
+  function updateAdminCheckbox() {
+    if (parentSelect.value) {
+      adminCheckbox.checked = false;
+      adminCheckbox.disabled = true;
+      adminContainer.classList.add('text-muted');
+    } else {
+      adminCheckbox.disabled = false;
+      adminContainer.classList.remove('text-muted');
+    }
+  }
+  
+  parentSelect.addEventListener('change', updateAdminCheckbox);
+  updateAdminCheckbox();
+});
+</script>
 {% endblock %}

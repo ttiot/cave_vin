@@ -380,7 +380,11 @@ def health():
 @main_bp.route('/')
 @login_required
 def index():
-    """Page d'accueil avec vue synthétique de la cave."""
+    """Page d'accueil avec vue synthétique de la cave.
+    
+    Pour un sous-compte, affiche les ressources du compte parent.
+    """
+    owner_id = current_user.owner_id
 
     wines = (
         Wine.query.options(
@@ -388,12 +392,12 @@ def index():
             selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
             selectinload(Wine.insights),
         )
-        .filter(Wine.quantity > 0, Wine.user_id == current_user.id)
+        .filter(Wine.quantity > 0, Wine.user_id == owner_id)
         .order_by(Wine.name.asc())
         .all()
     )
     cellars = (
-        Cellar.query.filter_by(user_id=current_user.id)
+        Cellar.query.filter_by(user_id=owner_id)
         .order_by(Cellar.name.asc())
         .all()
     )
@@ -416,7 +420,7 @@ def index():
             selectinload(Wine.cellar),
             selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
         )
-        .filter(Wine.quantity > 0, Wine.user_id == current_user.id)
+        .filter(Wine.quantity > 0, Wine.user_id == owner_id)
         .order_by(Wine.id.desc())
         .limit(4)
         .all()
@@ -437,10 +441,14 @@ def index():
 @main_bp.route('/consommations', methods=['GET'])
 @login_required
 def consumption_history():
-    """Affiche l'historique des consommations."""
+    """Affiche l'historique des consommations.
+    
+    Pour un sous-compte, affiche les consommations du compte parent.
+    """
+    owner_id = current_user.owner_id
     consumptions = (
         WineConsumption.query.options(selectinload(WineConsumption.wine))
-        .filter(WineConsumption.user_id == current_user.id)
+        .filter(WineConsumption.user_id == owner_id)
         .order_by(WineConsumption.consumed_at.desc())
         .all()
     )
@@ -450,10 +458,14 @@ def consumption_history():
 @main_bp.route('/consommations/<int:consumption_id>/comment', methods=['POST'])
 @login_required
 def update_consumption_comment(consumption_id: int):
-    """Met à jour le commentaire associé à une consommation."""
+    """Met à jour le commentaire associé à une consommation.
+    
+    Pour un sous-compte, permet de modifier les consommations du compte parent.
+    """
+    owner_id = current_user.owner_id
     consumption = (
         WineConsumption.query.filter_by(
-            id=consumption_id, user_id=current_user.id
+            id=consumption_id, user_id=owner_id
         ).first_or_404()
     )
 
@@ -472,10 +484,14 @@ def update_consumption_comment(consumption_id: int):
 @main_bp.route('/consommations/<int:consumption_id>/restock', methods=['POST'])
 @login_required
 def restock_consumption(consumption_id: int):
-    """Remet une bouteille consommée en stock."""
+    """Remet une bouteille consommée en stock.
+    
+    Pour un sous-compte, permet de remettre en stock les bouteilles du compte parent.
+    """
+    owner_id = current_user.owner_id
     consumption = (
         WineConsumption.query.filter_by(
-            id=consumption_id, user_id=current_user.id
+            id=consumption_id, user_id=owner_id
         ).first_or_404()
     )
 
@@ -498,7 +514,11 @@ def restock_consumption(consumption_id: int):
 @main_bp.route('/stats', methods=['GET'])
 @login_required
 def statistics():
-    """Render a detailed analytics dashboard for the wine cellar."""
+    """Render a detailed analytics dashboard for the wine cellar.
+    
+    Pour un sous-compte, affiche les statistiques du compte parent.
+    """
+    owner_id = current_user.owner_id
 
     wines = (
         Wine.query.options(
@@ -507,7 +527,7 @@ def statistics():
             selectinload(Wine.insights),
             selectinload(Wine.consumptions),
         )
-        .filter(Wine.quantity >= 0, Wine.user_id == current_user.id)
+        .filter(Wine.quantity >= 0, Wine.user_id == owner_id)
         .all()
     )
 
@@ -604,7 +624,7 @@ def statistics():
         consumptions = (
             WineConsumption.query.filter(
                 WineConsumption.consumed_at >= first_month_start,
-                WineConsumption.user_id == current_user.id,
+                WineConsumption.user_id == owner_id,
             ).all()
         )
     else:

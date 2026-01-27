@@ -17,6 +17,15 @@ class User(UserMixin, db.Model):
     has_temporary_password = db.Column(db.Boolean, default=False, nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     default_cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id", ondelete="SET NULL"), nullable=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    # Relation vers le compte parent (si sous-compte)
+    parent = db.relationship(
+        "User",
+        remote_side=[id],
+        backref=db.backref("sub_accounts", lazy="dynamic", cascade="all, delete-orphan"),
+        foreign_keys=[parent_id],
+    )
 
     cellars = db.relationship(
         "Cellar",
@@ -39,6 +48,29 @@ class User(UserMixin, db.Model):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def is_sub_account(self) -> bool:
+        """Retourne True si ce compte est un sous-compte."""
+        return self.parent_id is not None
+
+    @property
+    def owner_id(self) -> int:
+        """Retourne l'ID du propriétaire effectif des ressources.
+        
+        Pour un sous-compte, c'est l'ID du compte parent.
+        Pour un compte principal, c'est son propre ID.
+        """
+        return self.parent_id if self.parent_id is not None else self.id
+
+    @property
+    def owner_account(self) -> "User":
+        """Retourne le compte propriétaire des ressources.
+        
+        Pour un sous-compte, c'est le compte parent.
+        Pour un compte principal, c'est lui-même.
+        """
+        return self.parent if self.parent is not None else self
 
 
 class CellarCategory(db.Model):

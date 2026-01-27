@@ -32,11 +32,15 @@ wines_bp = Blueprint('wines', __name__, url_prefix='/wines')
 @wines_bp.route('/overview')
 @login_required
 def overview():
-    """Afficher une vue moderne de l'ensemble des alcools par cave."""
+    """Afficher une vue moderne de l'ensemble des alcools par cave.
+    
+    Pour un sous-compte, affiche les ressources du compte parent.
+    """
+    owner_id = current_user.owner_id
 
     cellars = (
         Cellar.query.options(selectinload(Cellar.category))
-        .filter(Cellar.user_id == current_user.id)
+        .filter(Cellar.user_id == owner_id)
         .order_by(Cellar.name.asc())
         .all()
     )
@@ -54,7 +58,7 @@ def overview():
             selectinload(Wine.subcategory),
             selectinload(Wine.cellar),
         )
-        .filter(Wine.user_id == current_user.id)
+        .filter(Wine.user_id == owner_id)
         .order_by(Wine.cellar_id.asc(), Wine.name.asc())
         .all()
     )
@@ -301,9 +305,15 @@ def _collect_wine_field_values(wine: Wine | None, ordered_fields) -> dict[str, o
 @wines_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_wine():
-    """Ajouter une nouvelle bouteille en respectant les contraintes de catégorie."""
+    """Ajouter une nouvelle bouteille en respectant les contraintes de catégorie.
+    
+    Pour un sous-compte, la bouteille est créée pour le compte parent.
+    """
+    owner_id = current_user.owner_id
+    owner_account = current_user.owner_account
+    
     cellars = (
-        Cellar.query.filter_by(user_id=current_user.id)
+        Cellar.query.filter_by(user_id=owner_id)
         .order_by(Cellar.name.asc())
         .all()
     )
@@ -340,7 +350,7 @@ def add_wine():
             quantity = int(quantity)
 
         cellar = (
-            Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first()
+            Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first()
             if cellar_id
             else None
         )
@@ -402,7 +412,7 @@ def add_wine():
             cellar=cellar,
             subcategory=subcategory,
             extra_attributes=extra_values,
-            owner=current_user,
+            owner=owner_account,
         )
         db.session.add(wine)
         db.session.commit()
@@ -424,14 +434,18 @@ def add_wine():
 @wines_bp.route('/<int:wine_id>', methods=['GET'])
 @login_required
 def wine_detail(wine_id):
-    """Afficher les détails d'une bouteille."""
+    """Afficher les détails d'une bouteille.
+    
+    Pour un sous-compte, affiche les bouteilles du compte parent.
+    """
+    owner_id = current_user.owner_id
     wine = (
         Wine.query.options(
             selectinload(Wine.cellar),
             selectinload(Wine.insights),
             selectinload(Wine.consumptions),
         )
-        .filter(Wine.id == wine_id, Wine.user_id == current_user.id)
+        .filter(Wine.id == wine_id, Wine.user_id == owner_id)
         .first_or_404()
     )
     ordered_fields = list(iter_fields())
@@ -447,12 +461,16 @@ def wine_detail(wine_id):
 @wines_bp.route('/<int:wine_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_wine(wine_id):
-    """Modifier une bouteille existante."""
+    """Modifier une bouteille existante.
+    
+    Pour un sous-compte, permet de modifier les bouteilles du compte parent.
+    """
+    owner_id = current_user.owner_id
     wine = (
-        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+        Wine.query.filter_by(id=wine_id, user_id=owner_id).first_or_404()
     )
     cellars = (
-        Cellar.query.filter_by(user_id=current_user.id)
+        Cellar.query.filter_by(user_id=owner_id)
         .order_by(Cellar.name.asc())
         .all()
     )
@@ -485,7 +503,7 @@ def edit_wine(wine_id):
             quantity = int(quantity)
 
         cellar = (
-            Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first()
+            Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first()
             if cellar_id
             else None
         )
@@ -599,9 +617,13 @@ def edit_wine(wine_id):
 @wines_bp.route('/<int:wine_id>/refresh', methods=['POST'])
 @login_required
 def refresh_wine(wine_id):
-    """Relancer la récupération des informations d'une bouteille."""
+    """Relancer la récupération des informations d'une bouteille.
+    
+    Pour un sous-compte, permet de rafraîchir les bouteilles du compte parent.
+    """
+    owner_id = current_user.owner_id
     wine = (
-        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+        Wine.query.filter_by(id=wine_id, user_id=owner_id).first_or_404()
     )
     schedule_wine_enrichment(wine.id)
     flash("La récupération des informations a été relancée.")
@@ -611,9 +633,14 @@ def refresh_wine(wine_id):
 @wines_bp.route('/<int:wine_id>/consume', methods=['POST'])
 @login_required
 def consume_wine(wine_id):
-    """Marquer une bouteille comme consommée."""
+    """Marquer une bouteille comme consommée.
+    
+    Pour un sous-compte, permet de consommer les bouteilles du compte parent.
+    La consommation est enregistrée au nom du compte propriétaire.
+    """
+    owner_id = current_user.owner_id
     wine = (
-        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+        Wine.query.filter_by(id=wine_id, user_id=owner_id).first_or_404()
     )
     if wine.quantity <= 0:
         flash("Cette bouteille n'est plus disponible dans la cave.")
@@ -647,9 +674,13 @@ def consume_wine(wine_id):
 @wines_bp.route('/<int:wine_id>/delete', methods=['POST'])
 @login_required
 def delete_wine(wine_id):
-    """Supprimer une bouteille de la cave."""
+    """Supprimer une bouteille de la cave.
+    
+    Pour un sous-compte, permet de supprimer les bouteilles du compte parent.
+    """
+    owner_id = current_user.owner_id
     wine = (
-        Wine.query.filter_by(id=wine_id, user_id=current_user.id).first_or_404()
+        Wine.query.filter_by(id=wine_id, user_id=owner_id).first_or_404()
     )
     db.session.delete(wine)
     db.session.commit()

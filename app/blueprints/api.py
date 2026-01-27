@@ -107,6 +107,8 @@ def _consumption_to_dict(consumption: WineConsumption) -> dict[str, Any]:
 def list_wines():
     """Liste toutes les bouteilles de l'utilisateur.
     
+    Pour un sous-compte, retourne les bouteilles du compte parent.
+    
     Query params:
         - cellar_id: Filtrer par cave
         - subcategory_id: Filtrer par sous-catégorie
@@ -116,11 +118,12 @@ def list_wines():
         - offset: Décalage pour pagination (défaut: 0)
     """
     user = g.api_user
+    owner_id = user.owner_id
     
     query = Wine.query.options(
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
-    ).filter(Wine.user_id == user.id)
+    ).filter(Wine.user_id == owner_id)
     
     # Filtres
     cellar_id = request.args.get("cellar_id", type=int)
@@ -159,14 +162,18 @@ def list_wines():
 @api_bp.route("/wines/<int:wine_id>", methods=["GET"])
 @api_token_required
 def get_wine(wine_id: int):
-    """Récupère les détails d'une bouteille."""
+    """Récupère les détails d'une bouteille.
+    
+    Pour un sous-compte, accède aux bouteilles du compte parent.
+    """
     user = g.api_user
+    owner_id = user.owner_id
     
     wine = Wine.query.options(
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
         selectinload(Wine.insights),
-    ).filter(Wine.id == wine_id, Wine.user_id == user.id).first()
+    ).filter(Wine.id == wine_id, Wine.user_id == owner_id).first()
     
     if not wine:
         return jsonify({"error": "Bouteille non trouvée"}), 404
@@ -179,6 +186,8 @@ def get_wine(wine_id: int):
 def create_wine():
     """Crée une nouvelle bouteille.
     
+    Pour un sous-compte, la bouteille est créée pour le compte parent.
+    
     Body JSON:
         - name: Nom de la bouteille (requis)
         - cellar_id: ID de la cave (requis)
@@ -188,6 +197,8 @@ def create_wine():
         - extra_attributes: Attributs supplémentaires (optionnel)
     """
     user = g.api_user
+    owner_id = user.owner_id
+    owner_account = user.owner_account
     data = request.get_json() or {}
     
     # Validation
@@ -199,7 +210,7 @@ def create_wine():
     if not cellar_id:
         return jsonify({"error": "cellar_id est requis"}), 400
     
-    cellar = Cellar.query.filter_by(id=cellar_id, user_id=user.id).first()
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first()
     if not cellar:
         return jsonify({"error": "Cave non trouvée"}), 404
     
@@ -217,7 +228,7 @@ def create_wine():
         cellar=cellar,
         subcategory=subcategory,
         extra_attributes=data.get("extra_attributes", {}),
-        owner=user,
+        owner=owner_account,
     )
     
     db.session.add(wine)
@@ -229,11 +240,15 @@ def create_wine():
 @api_bp.route("/wines/<int:wine_id>", methods=["PUT", "PATCH"])
 @api_token_required
 def update_wine(wine_id: int):
-    """Met à jour une bouteille existante."""
+    """Met à jour une bouteille existante.
+    
+    Pour un sous-compte, permet de modifier les bouteilles du compte parent.
+    """
     user = g.api_user
+    owner_id = user.owner_id
     data = request.get_json() or {}
     
-    wine = Wine.query.filter_by(id=wine_id, user_id=user.id).first()
+    wine = Wine.query.filter_by(id=wine_id, user_id=owner_id).first()
     if not wine:
         return jsonify({"error": "Bouteille non trouvée"}), 404
     
@@ -247,7 +262,7 @@ def update_wine(wine_id: int):
         wine.barcode = data["barcode"]
     
     if "cellar_id" in data:
-        cellar = Cellar.query.filter_by(id=data["cellar_id"], user_id=user.id).first()
+        cellar = Cellar.query.filter_by(id=data["cellar_id"], user_id=owner_id).first()
         if not cellar:
             return jsonify({"error": "Cave non trouvée"}), 404
         wine.cellar = cellar
@@ -272,10 +287,14 @@ def update_wine(wine_id: int):
 @api_bp.route("/wines/<int:wine_id>", methods=["DELETE"])
 @api_token_required
 def delete_wine(wine_id: int):
-    """Supprime une bouteille."""
-    user = g.api_user
+    """Supprime une bouteille.
     
-    wine = Wine.query.filter_by(id=wine_id, user_id=user.id).first()
+    Pour un sous-compte, permet de supprimer les bouteilles du compte parent.
+    """
+    user = g.api_user
+    owner_id = user.owner_id
+    
+    wine = Wine.query.filter_by(id=wine_id, user_id=owner_id).first()
     if not wine:
         return jsonify({"error": "Bouteille non trouvée"}), 404
     
@@ -290,15 +309,18 @@ def delete_wine(wine_id: int):
 def consume_wine(wine_id: int):
     """Marque une bouteille comme consommée.
     
+    Pour un sous-compte, permet de consommer les bouteilles du compte parent.
+    
     Body JSON:
         - quantity: Nombre de bouteilles à consommer (défaut: 1)
         - comment: Commentaire optionnel
     """
     user = g.api_user
+    owner_id = user.owner_id
     data = request.get_json() or {}
     
     wine = Wine.query.options(selectinload(Wine.cellar)).filter_by(
-        id=wine_id, user_id=user.id
+        id=wine_id, user_id=owner_id
     ).first()
     
     if not wine:
@@ -316,7 +338,7 @@ def consume_wine(wine_id: int):
     extras = wine.extra_attributes or {}
     consumption = WineConsumption(
         wine=wine,
-        user=user,
+        user=wine.owner,
         quantity=quantity_to_consume,
         comment=data.get("comment"),
         snapshot_name=wine.name,
@@ -344,12 +366,16 @@ def consume_wine(wine_id: int):
 @api_bp.route("/cellars", methods=["GET"])
 @api_token_required
 def list_cellars():
-    """Liste toutes les caves de l'utilisateur."""
+    """Liste toutes les caves de l'utilisateur.
+    
+    Pour un sous-compte, retourne les caves du compte parent.
+    """
     user = g.api_user
+    owner_id = user.owner_id
     
     cellars = Cellar.query.options(
         selectinload(Cellar.category)
-    ).filter_by(user_id=user.id).order_by(Cellar.name.asc()).all()
+    ).filter_by(user_id=owner_id).order_by(Cellar.name.asc()).all()
     
     return jsonify({
         "cellars": [_cellar_to_dict(c) for c in cellars],
@@ -360,12 +386,16 @@ def list_cellars():
 @api_bp.route("/cellars/<int:cellar_id>", methods=["GET"])
 @api_token_required
 def get_cellar(cellar_id: int):
-    """Récupère les détails d'une cave avec ses bouteilles."""
+    """Récupère les détails d'une cave avec ses bouteilles.
+    
+    Pour un sous-compte, accède aux caves du compte parent.
+    """
     user = g.api_user
+    owner_id = user.owner_id
     
     cellar = Cellar.query.options(
         selectinload(Cellar.category),
-    ).filter_by(id=cellar_id, user_id=user.id).first()
+    ).filter_by(id=cellar_id, user_id=owner_id).first()
     
     if not cellar:
         return jsonify({"error": "Cave non trouvée"}), 404
@@ -373,7 +403,7 @@ def get_cellar(cellar_id: int):
     # Charger les vins séparément car Cellar.wines est lazy="dynamic"
     wines = Wine.query.options(
         selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
-    ).filter_by(cellar_id=cellar.id, user_id=user.id).all()
+    ).filter_by(cellar_id=cellar.id, user_id=owner_id).all()
     
     data = _cellar_to_dict(cellar)
     data["wines"] = [_wine_to_dict(w) for w in wines]
@@ -392,6 +422,8 @@ def get_cellar(cellar_id: int):
 def search_wines():
     """Recherche multi-critères dans les bouteilles.
     
+    Pour un sous-compte, recherche dans les ressources du compte parent.
+    
     Query params:
         - q: Recherche textuelle dans le nom
         - subcategory_id: Filtrer par sous-catégorie
@@ -400,12 +432,13 @@ def search_wines():
         - limit: Nombre max de résultats (défaut: 50)
     """
     user = g.api_user
+    owner_id = user.owner_id
     
     query = Wine.query.options(
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
         selectinload(Wine.insights),
-    ).filter(Wine.user_id == user.id)
+    ).filter(Wine.user_id == owner_id)
     
     # Recherche textuelle
     q = request.args.get("q", "").strip()
@@ -450,14 +483,18 @@ def search_wines():
 @api_bp.route("/statistics", methods=["GET"])
 @api_token_required
 def get_statistics():
-    """Retourne les statistiques de la cave."""
+    """Retourne les statistiques de la cave.
+    
+    Pour un sous-compte, retourne les statistiques du compte parent.
+    """
     user = g.api_user
+    owner_id = user.owner_id
     
     wines = Wine.query.options(
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
         selectinload(Wine.consumptions),
-    ).filter(Wine.user_id == user.id).all()
+    ).filter(Wine.user_id == owner_id).all()
     
     total_bottles = sum(w.quantity or 0 for w in wines if (w.quantity or 0) > 0)
     total_references = len([w for w in wines if (w.quantity or 0) > 0])
@@ -570,16 +607,19 @@ def list_cellar_categories():
 def list_consumptions():
     """Liste l'historique des consommations.
     
+    Pour un sous-compte, retourne les consommations du compte parent.
+    
     Query params:
         - limit: Nombre max de résultats (défaut: 50)
         - offset: Décalage pour pagination (défaut: 0)
     """
     user = g.api_user
+    owner_id = user.owner_id
     
     limit = min(request.args.get("limit", 50, type=int), 200)
     offset = request.args.get("offset", 0, type=int)
     
-    query = WineConsumption.query.filter_by(user_id=user.id)
+    query = WineConsumption.query.filter_by(user_id=owner_id)
     total = query.count()
     
     consumptions = query.order_by(
@@ -602,18 +642,22 @@ def list_consumptions():
 @api_bp.route("/collection", methods=["GET"])
 @api_token_required
 def get_collection():
-    """Retourne une vue d'ensemble de la collection par cave."""
+    """Retourne une vue d'ensemble de la collection par cave.
+    
+    Pour un sous-compte, retourne la collection du compte parent.
+    """
     user = g.api_user
+    owner_id = user.owner_id
     
     # Charger les caves sans eager loading sur wines (lazy="dynamic")
     cellars = Cellar.query.options(
         selectinload(Cellar.category),
-    ).filter_by(user_id=user.id).order_by(Cellar.name.asc()).all()
+    ).filter_by(user_id=owner_id).order_by(Cellar.name.asc()).all()
     
     # Charger tous les vins de l'utilisateur et les grouper par cave
     wines = Wine.query.options(
         selectinload(Wine.subcategory),
-    ).filter_by(user_id=user.id).all()
+    ).filter_by(user_id=owner_id).all()
     
     wines_by_cellar: dict[int, list[Wine]] = defaultdict(list)
     for wine in wines:

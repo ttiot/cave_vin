@@ -17,7 +17,12 @@ search_bp = Blueprint('search', __name__, url_prefix='/search')
 @search_bp.route('/', methods=['GET'])
 @login_required
 def search_wines():
-    """Recherche multi-critères dans les vins et leurs insights."""
+    """Recherche multi-critères dans les vins et leurs insights.
+    
+    Pour un sous-compte, recherche dans les ressources du compte parent.
+    """
+    owner_id = current_user.owner_id
+    
     # Récupérer les paramètres de recherche
     subcategory_id = request.args.get('subcategory_id', type=int)
     food_pairing = request.args.get('food_pairing', '').strip()
@@ -47,7 +52,7 @@ def search_wines():
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory),
         selectinload(Wine.insights)
-    ).filter(Wine.user_id == current_user.id)
+    ).filter(Wine.user_id == owner_id)
     
     # Filtrer par statut de stock
     if stock_filter == 'in_stock':
@@ -98,7 +103,12 @@ def search_wines():
 @search_bp.route('/a-consommer', methods=['GET'])
 @login_required
 def wines_to_consume():
-    """Affiche les vins à consommer prochainement selon leur potentiel de garde."""
+    """Affiche les vins à consommer prochainement selon leur potentiel de garde.
+    
+    Pour un sous-compte, affiche les vins du compte parent.
+    """
+    owner_id = current_user.owner_id
+    
     # Récupérer tous les vins avec leurs insights
     wines = (
         Wine.query.options(
@@ -106,7 +116,7 @@ def wines_to_consume():
             selectinload(Wine.subcategory),
             selectinload(Wine.insights)
         )
-        .filter(Wine.quantity > 0, Wine.user_id == current_user.id)
+        .filter(Wine.quantity > 0, Wine.user_id == owner_id)
         .all()
     )
     

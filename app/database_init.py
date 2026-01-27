@@ -46,6 +46,13 @@ def apply_schema_updates() -> None:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE user ADD COLUMN default_cellar_id INTEGER REFERENCES cellar(id) ON DELETE SET NULL"))
 
+    # Migration: Add parent_id column to user table for sub-accounts
+    if "user" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("user")}
+        if "parent_id" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user ADD COLUMN parent_id INTEGER REFERENCES user(id) ON DELETE CASCADE"))
+
 
 ALCOHOL_CATEGORIES: list[dict[str, object]] = [
     {

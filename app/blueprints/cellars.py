@@ -12,9 +12,13 @@ cellars_bp = Blueprint('cellars', __name__, url_prefix='/cellars')
 @cellars_bp.route('/', methods=['GET'])
 @login_required
 def list_cellars():
-    """Liste toutes les caves."""
+    """Liste toutes les caves.
+    
+    Pour un sous-compte, affiche les caves du compte parent.
+    """
+    owner_id = current_user.owner_id
     cellars = (
-        Cellar.query.filter_by(user_id=current_user.id)
+        Cellar.query.filter_by(user_id=owner_id)
         .order_by(Cellar.name.asc())
         .all()
     )
@@ -24,8 +28,12 @@ def list_cellars():
 @cellars_bp.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_cellar():
-    """Ajouter une nouvelle cave."""
+    """Ajouter une nouvelle cave.
+    
+    La cave est créée pour le compte propriétaire (parent si sous-compte).
+    """
     categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
+    owner_account = current_user.owner_account
     
     if request.method == 'POST':
         name = (request.form.get('name') or '').strip()
@@ -72,7 +80,7 @@ def add_cellar():
             category_id=category_id,
             floor_count=len(floor_capacities),
             bottles_per_floor=max(floor_capacities),
-            owner=current_user,
+            owner=owner_account,
         )
         for index, capacity in enumerate(floor_capacities, start=1):
             cellar.levels.append(CellarFloor(level=index, capacity=capacity))
@@ -88,8 +96,12 @@ def add_cellar():
 @cellars_bp.route('/<int:cellar_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_cellar(cellar_id):
-    """Modifier une cave existante."""
-    cellar = Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first_or_404()
+    """Modifier une cave existante.
+    
+    Pour un sous-compte, permet de modifier les caves du compte parent.
+    """
+    owner_id = current_user.owner_id
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first_or_404()
     categories = CellarCategory.query.order_by(CellarCategory.display_order, CellarCategory.name).all()
     
     if request.method == 'POST':
@@ -151,8 +163,12 @@ def edit_cellar(cellar_id):
 @cellars_bp.route('/<int:cellar_id>/set-default', methods=['POST'])
 @login_required
 def set_default_cellar(cellar_id):
-    """Définir une cave comme cave par défaut."""
-    cellar = Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first_or_404()
+    """Définir une cave comme cave par défaut.
+    
+    Pour un sous-compte, vérifie que la cave appartient au compte parent.
+    """
+    owner_id = current_user.owner_id
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first_or_404()
     
     current_user.default_cellar_id = cellar.id
     db.session.commit()
