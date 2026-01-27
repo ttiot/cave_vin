@@ -371,8 +371,22 @@ async function unsubscribeFromPush() {
 }
 
 function urlBase64ToUint8Array(base64String) {
-    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding)
+    // Nettoyer la chaîne : supprimer les guillemets et espaces
+    let cleanedString = base64String.trim();
+    if (cleanedString.startsWith('"') && cleanedString.endsWith('"')) {
+        cleanedString = cleanedString.slice(1, -1);
+    }
+    if (cleanedString.startsWith("'") && cleanedString.endsWith("'")) {
+        cleanedString = cleanedString.slice(1, -1);
+    }
+
+    console.log(
+        "[Push] Clé VAPID nettoyée:",
+        cleanedString.substring(0, 30) + "...",
+    );
+
+    const padding = "=".repeat((4 - (cleanedString.length % 4)) % 4);
+    const base64 = (cleanedString + padding)
         .replace(/-/g, "+")
         .replace(/_/g, "/");
 
