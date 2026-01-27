@@ -266,9 +266,8 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
-    // Laisser les requêtes cross-origin au navigateur
+    // Laisser les requêtes cross-origin au navigateur (ne pas intercepter)
     if (url.origin !== self.location.origin) {
-        event.respondWith(fetch(request));
         return;
     }
 
