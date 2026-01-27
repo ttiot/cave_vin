@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .report-card { min-height: 120px; }
+  .positive { color: #22c55e; }
+  .negative { color: #ef4444; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-file-earmark-bar-graph me-2"></i>Rapport annuel {{ year }}</h2>
+  <div class="d-flex gap-2">
+    <form class="d-flex" method="GET">
+      <select name="year" class="form-select form-select-sm me-2" onchange="this.form.submit()">
+        {% for y in available_years %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{{ url_for('advanced_stats.export_annual_report', year=year) }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-download me-1"></i>Exporter CSV
+    </a>
+    <a href="{{ url_for('main.statistics') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+  </div>
+</div>
+
+<!-- Résumé de l'année -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card shadow-sm report-card bg-success bg-opacity-10">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Bouteilles ajoutées</h6>
+        <h3 class="card-title mb-0 text-success">+{{ total_added_quantity }}</h3>
+        <small class="text-muted">{{ total_added }} références</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm report-card bg-danger bg-opacity-10">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Bouteilles consommées</h6>
+        <h3 class="card-title mb-0 text-danger">-{{ total_consumed }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm report-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Bilan net</h6>
+        <h3 class="card-title mb-0 {% if net_change >= 0 %}positive{% else %}negative{% endif %}">
+          {% if net_change >= 0 %}+{% endif %}{{ net_change }}
+        </h3>
+        <small class="text-muted">bouteilles</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm report-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Montant investi</h6>
+        <h3 class="card-title mb-0">{{ format_currency(total_invested) }} €</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stock actuel -->
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Stock actuel</h6>
+        <h3 class="card-title mb-0">{{ current_stock_count }} <small class="text-muted fs-6">bouteilles</small></h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Valeur estimée du stock</h6>
+        <h3 class="card-title mb-0">{{ format_currency(current_stock_value) }} €</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-bar-chart me-2"></i>Évolution mensuelle</h5>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-currency-euro me-2"></i>Investissement mensuel</h5>
+        <canvas id="investmentChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Top catégories -->
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-plus-circle me-2 text-success"></i>Top catégories ajoutées</h5>
+        {% if top_categories_added %}
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Catégorie</th>
+                <th>Quantité</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cat_name, count in top_categories_added %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ cat_name }}</td>
+                <td><strong>{{ count }}</strong></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Aucune donnée disponible.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-dash-circle me-2 text-danger"></i>Top catégories consommées</h5>
+        {% if top_categories_consumed %}
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Catégorie</th>
+                <th>Quantité</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cat_name, count in top_categories_consumed %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ cat_name }}</td>
+                <td><strong>{{ count }}</strong></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Aucune donnée disponible.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Calendrier de garde -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5 class="card-title"><i class="bi bi-calendar-event me-2"></i>Calendrier de garde</h5>
+    <p class="text-muted">Exportez un calendrier iCal avec les dates de garde optimales de vos vins.</p>
+    <a href="{{ url_for('advanced_stats.export_guard_calendar') }}" class="btn btn-outline-primary">
+      <i class="bi bi-calendar-plus me-1"></i>Télécharger le calendrier (.ics)
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+const monthLabels = {{ month_labels|tojson }};
+const addedByMonth = {{ added_by_month|tojson }};
+const consumedByMonth = {{ consumed_by_month|tojson }};
+const investedByMonth = {{ invested_by_month|tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Graphique ajouts vs consommations
+  new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels,
+      datasets: [
+        {
+          label: 'Ajoutées',
+          data: addedByMonth,
+          backgroundColor: 'rgba(34, 197, 94, 0.7)',
+          borderColor: '#22c55e',
+          borderWidth: 1
+        },
+        {
+          label: 'Consommées',
+          data: consumedByMonth,
+          backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          borderColor: '#ef4444',
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Bouteilles'
+          }
+        }
+      }
+    }
+  });
+  
+  // Graphique investissement
+  new Chart(document.getElementById('investmentChart'), {
+    type: 'line',
+    data: {
+      labels: monthLabels,
+      datasets: [{
+        label: 'Investissement (€)',
+        data: investedByMonth,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Euros'
+          }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

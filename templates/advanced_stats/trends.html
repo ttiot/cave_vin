@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .trend-card { min-height: 120px; }
+  .season-badge { font-size: 1.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-graph-up me-2"></i>Tendances de consommation</h2>
+  <a href="{{ url_for('main.statistics') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Retour aux statistiques
+  </a>
+</div>
+
+<!-- Résumé -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm trend-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Total consommé (2 ans)</h6>
+        <h3 class="card-title mb-0">{{ total_consumption }} <small class="text-muted fs-6">bouteilles</small></h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm trend-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Moyenne mensuelle</h6>
+        <h3 class="card-title mb-0">{{ avg_per_month }} <small class="text-muted fs-6">bouteilles/mois</small></h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm trend-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Tendance (6 mois)</h6>
+        <h3 class="card-title mb-0">
+          {% if trend_percent > 0 %}
+          <span class="text-success"><i class="bi bi-arrow-up"></i> +{{ trend_percent }}%</span>
+          {% elif trend_percent < 0 %}
+          <span class="text-danger"><i class="bi bi-arrow-down"></i> {{ trend_percent }}%</span>
+          {% else %}
+          <span class="text-muted"><i class="bi bi-dash"></i> Stable</span>
+          {% endif %}
+        </h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row g-4">
+  <!-- Consommation par saison -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-calendar-event me-2"></i>Consommation par saison</h5>
+        <canvas id="seasonChart"></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Consommation par mois -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-calendar3 me-2"></i>Évolution mensuelle</h5>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Consommation par jour de la semaine -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-calendar-week me-2"></i>Par jour de la semaine</h5>
+        <canvas id="weekdayChart"></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Top catégories par saison -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-trophy me-2"></i>Top catégories par saison</h5>
+        <div class="row">
+          {% for season, categories in top_categories_by_season.items() %}
+          <div class="col-6 mb-3">
+            <h6 class="text-muted">
+              {% if season == "Printemps" %}🌸{% elif season == "Été" %}☀️{% elif season == "Automne" %}🍂{% else %}❄️{% endif %}
+              {{ season }}
+            </h6>
+            <ul class="list-unstyled small">
+              {% for cat_name, count in categories %}
+              <li>{{ cat_name }}: <strong>{{ count }}</strong></li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Détails par saison -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5 class="card-title"><i class="bi bi-bar-chart me-2"></i>Détails par saison</h5>
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Saison</th>
+            <th>Bouteilles consommées</th>
+            <th>% du total</th>
+            <th>Top catégorie</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for season in season_labels %}
+          <tr>
+            <td>
+              {% if season == "Printemps" %}🌸{% elif season == "Été" %}☀️{% elif season == "Automne" %}🍂{% else %}❄️{% endif %}
+              {{ season }}
+            </td>
+            <td>{{ season_data[season].count }}</td>
+            <td>
+              {% if total_consumption > 0 %}
+              {{ ((season_data[season].count / total_consumption) * 100)|round(1) }}%
+              {% else %}
+              0%
+              {% endif %}
+            </td>
+            <td>
+              {% set cats = season_data[season].categories.items()|list|sort(attribute='1', reverse=true) %}
+              {% if cats %}
+              {{ cats[0][0] }}
+              {% else %}
+              -
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+const seasonLabels = {{ season_labels|tojson }};
+const seasonValues = {{ season_values|tojson }};
+const monthlyLabels = {{ monthly_labels|tojson }};
+const monthlyValues = {{ monthly_values|tojson }};
+const weekdayLabels = {{ weekday_labels|tojson }};
+const weekdayValues = {{ weekday_values|tojson }};
+
+const seasonColors = {
+  'Printemps': 'rgba(134, 239, 172, 0.7)',
+  'Été': 'rgba(253, 224, 71, 0.7)',
+  'Automne': 'rgba(251, 146, 60, 0.7)',
+  'Hiver': 'rgba(147, 197, 253, 0.7)'
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Graphique par saison
+  new Chart(document.getElementById('seasonChart'), {
+    type: 'doughnut',
+    data: {
+      labels: seasonLabels,
+      datasets: [{
+        data: seasonValues,
+        backgroundColor: seasonLabels.map(s => seasonColors[s] || 'rgba(99, 102, 241, 0.7)'),
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+  
+  // Graphique mensuel
+  new Chart(document.getElementById('monthlyChart'), {
+    type: 'line',
+    data: {
+      labels: monthlyLabels,
+      datasets: [{
+        label: 'Bouteilles consommées',
+        data: monthlyValues,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+  
+  // Graphique par jour de la semaine
+  new Chart(document.getElementById('weekdayChart'), {
+    type: 'bar',
+    data: {
+      labels: weekdayLabels,
+      datasets: [{
+        label: 'Bouteilles consommées',
+        data: weekdayValues,
+        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+        borderColor: '#6366f1',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

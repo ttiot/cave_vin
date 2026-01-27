@@ -7,11 +7,13 @@ Ce document décrit les conventions, procédures et bonnes pratiques à suivre l
 ## 📋 Table des matières
 
 1. [Structure du projet](#structure-du-projet)
-2. [Migrations de base de données](#migrations-de-base-de-données)
-3. [Procédure de test avec Docker](#procédure-de-test-avec-docker)
-4. [Vérification des fonctionnalités](#vérification-des-fonctionnalités)
-5. [Conventions de code](#conventions-de-code)
-6. [Checklist avant commit](#checklist-avant-commit)
+2. [Modèles de données](#modèles-de-données)
+3. [API REST](#api-rest)
+4. [Migrations de base de données](#migrations-de-base-de-données)
+5. [Procédure de test avec Docker](#procédure-de-test-avec-docker)
+6. [Vérification des fonctionnalités](#vérification-des-fonctionnalités)
+7. [Conventions de code](#conventions-de-code)
+8. [Checklist avant commit](#checklist-avant-commit)
 
 ---
 
@@ -19,15 +21,19 @@ Ce document décrit les conventions, procédures et bonnes pratiques à suivre l
 
 ```
 cave_vin/
-├── models.py              # Modèles SQLAlchemy (User, Wine, Cellar, etc.)
+├── models.py              # Modèles SQLAlchemy (User, Wine, Cellar, APIToken, etc.)
 ├── app/
 │   ├── __init__.py        # Factory Flask et configuration
 │   ├── database_init.py   # Initialisation et migrations de la BDD
+│   ├── exceptions.py      # Exceptions personnalisées
 │   ├── field_config.py    # Configuration des champs dynamiques
 │   ├── blueprints/        # Routes organisées par domaine
 │   │   ├── admin.py       # Administration utilisateurs
+│   │   ├── api.py         # API REST (authentification par token)
+│   │   ├── api_tokens.py  # Gestion des tokens API (UI)
 │   │   ├── auth.py        # Authentification
 │   │   ├── categories.py  # Gestion des catégories d'alcool
+│   │   ├── cellar_categories.py  # Gestion des catégories de caves
 │   │   ├── cellars.py     # Gestion des caves
 │   │   ├── main.py        # Routes principales (index, stats)
 │   │   ├── search.py      # Recherche de bouteilles
@@ -36,10 +42,102 @@ cave_vin/
 ├── services/
 │   └── wine_info_service.py  # Service d'enrichissement IA
 ├── templates/             # Templates Jinja2
+│   └── api_tokens/        # Templates pour la gestion des tokens API
 ├── static/                # CSS, JS, images
 ├── Dockerfile             # Image Docker de production
 ├── entrypoint.sh          # Script d'entrée Docker
 └── requirements.txt       # Dépendances Python
+```
+
+---
+
+## 📊 Modèles de données
+
+### Modèles principaux
+
+| Modèle | Description | Fichier |
+|--------|-------------|---------|
+| `User` | Utilisateur avec support des sous-comptes | [`models.py`](models.py:13) |
+| `Cellar` | Cave de stockage avec étages | [`models.py`](models.py:90) |
+| `CellarCategory` | Catégorie de cave (ex: Cave principale) | [`models.py`](models.py:76) |
+| `Wine` | Bouteille avec attributs dynamiques | [`models.py`](models.py:183) |
+| `AlcoholCategory` | Catégorie d'alcool (ex: Vins, Spiritueux) | [`models.py`](models.py:140) |
+| `AlcoholSubcategory` | Sous-catégorie (ex: Vin rouge, Rhum) | [`models.py`](models.py:160) |
+| `WineConsumption` | Historique de consommation | [`models.py`](models.py:323) |
+| `WineInsight` | Informations enrichies (IA) | [`models.py`](models.py:294) |
+| `APIToken` | Token d'authentification API | [`models.py`](models.py:348) |
+| `APITokenUsage` | Log d'utilisation des tokens | [`models.py`](models.py:413) |
+
+### Système de sous-comptes
+
+Le modèle `User` supporte les sous-comptes via la colonne `parent_id`. Un sous-compte :
+- Partage les ressources (caves, bouteilles) de son compte parent
+- Utilise `user.owner_id` pour accéder à l'ID du propriétaire effectif
+- Utilise `user.owner_account` pour accéder au compte propriétaire
+
+```python
+# Exemple d'utilisation dans un blueprint
+user = current_user
+owner_id = user.owner_id  # ID du parent si sous-compte, sinon propre ID
+wines = Wine.query.filter_by(user_id=owner_id).all()
+```
+
+---
+
+## 🔌 API REST
+
+### Authentification
+
+L'API utilise des tokens Bearer pour l'authentification. Les tokens sont générés via l'interface web dans `/api-tokens/`.
+
+```bash
+# Exemple d'appel API
+curl -H "Authorization: Bearer cv_votre_token_ici" \
+     http://localhost:8000/api/wines
+```
+
+### Endpoints disponibles
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `GET` | `/api/wines` | Liste des bouteilles (paginé) |
+| `GET` | `/api/wines/<id>` | Détails d'une bouteille |
+| `POST` | `/api/wines` | Créer une bouteille |
+| `PUT/PATCH` | `/api/wines/<id>` | Modifier une bouteille |
+| `DELETE` | `/api/wines/<id>` | Supprimer une bouteille |
+| `POST` | `/api/wines/<id>/consume` | Consommer une bouteille |
+| `GET` | `/api/cellars` | Liste des caves |
+| `GET` | `/api/cellars/<id>` | Détails d'une cave avec ses bouteilles |
+| `GET` | `/api/categories` | Catégories d'alcool |
+| `GET` | `/api/cellar-categories` | Catégories de caves |
+| `GET` | `/api/search` | Recherche multi-critères |
+| `GET` | `/api/statistics` | Statistiques de la cave |
+| `GET` | `/api/consumptions` | Historique des consommations |
+| `GET` | `/api/collection` | Vue d'ensemble par cave |
+
+### Paramètres de pagination
+
+La plupart des endpoints de liste supportent :
+- `limit` : Nombre max de résultats (défaut: 50-100, max: 200-500)
+- `offset` : Décalage pour pagination
+
+### Rate limiting
+
+Chaque token a une limite de requêtes par heure (défaut: 100). Configurable par l'admin via l'interface.
+
+### Décorateur d'authentification
+
+Pour protéger un endpoint API, utiliser le décorateur [`@api_token_required`](app/utils/decorators.py) :
+
+```python
+from app.utils.decorators import api_token_required
+
+@api_bp.route("/mon-endpoint")
+@api_token_required
+def mon_endpoint():
+    user = g.api_user  # Utilisateur authentifié via le token
+    owner_id = user.owner_id  # ID du propriétaire des ressources
+    # ...
 ```
 
 ---
@@ -217,16 +315,37 @@ Après chaque modification, vérifier les points suivants :
 - [ ] Consommation d'une bouteille
 - [ ] Affichage du détail d'une bouteille
 
-#### Modifications sur les catégories ([`app/blueprints/categories.py`](app/blueprints/categories.py))
+#### Modifications sur les catégories d'alcool ([`app/blueprints/categories.py`](app/blueprints/categories.py))
 - [ ] Création de catégorie/sous-catégorie
 - [ ] Modification des couleurs de badge
 - [ ] Suppression (vérifier les contraintes)
+
+#### Modifications sur les catégories de caves ([`app/blueprints/cellar_categories.py`](app/blueprints/cellar_categories.py))
+- [ ] Création d'une catégorie de cave
+- [ ] Modification d'une catégorie existante
+- [ ] Suppression (vérifier qu'aucune cave ne l'utilise)
 
 #### Modifications sur la recherche ([`app/blueprints/search.py`](app/blueprints/search.py))
 - [ ] Recherche par type d'alcool
 - [ ] Recherche par accords mets-vins
 - [ ] Recherche combinée
 - [ ] Affichage des résultats
+
+#### Modifications sur l'API REST ([`app/blueprints/api.py`](app/blueprints/api.py))
+- [ ] Authentification par token fonctionne
+- [ ] Endpoints CRUD bouteilles (GET, POST, PUT, DELETE)
+- [ ] Endpoint consommation
+- [ ] Endpoints caves et catégories
+- [ ] Pagination et filtres fonctionnels
+- [ ] Rate limiting respecté
+
+#### Modifications sur les tokens API ([`app/blueprints/api_tokens.py`](app/blueprints/api_tokens.py))
+- [ ] Création d'un token
+- [ ] Affichage du token une seule fois après création
+- [ ] Révocation/réactivation d'un token
+- [ ] Suppression définitive
+- [ ] Vue admin : liste de tous les tokens
+- [ ] Vue admin : détails d'utilisation d'un token
 
 ---
 

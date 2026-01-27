@@ -6,7 +6,8 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, jsonify, request, g, render_template_string
+
 from sqlalchemy.orm import selectinload
 
 from models import (
@@ -17,6 +18,7 @@ from models import (
     Wine,
     WineConsumption,
     WineInsight,
+    Webhook,
     db,
 )
 from app.utils.decorators import api_token_required
@@ -412,6 +414,125 @@ def get_cellar(cellar_id: int):
     return jsonify(data)
 
 
+@api_bp.route("/cellars", methods=["POST"])
+@api_token_required
+def create_cellar():
+    """Crée une nouvelle cave.
+    
+    Pour un sous-compte, la cave est créée pour le compte parent.
+    
+    Body JSON:
+        - name: Nom de la cave (requis)
+        - category_id: ID de la catégorie de cave (requis)
+        - floor_count: Nombre d'étages (requis)
+        - bottles_per_floor: Capacité par étage (requis)
+    """
+    user = g.api_user
+    owner_id = user.owner_id
+    owner_account = user.owner_account
+    data = request.get_json() or {}
+    
+    # Validation
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Le nom est requis"}), 400
+    
+    category_id = data.get("category_id")
+    if not category_id:
+        return jsonify({"error": "category_id est requis"}), 400
+    
+    category = CellarCategory.query.get(category_id)
+    if not category:
+        return jsonify({"error": "Catégorie de cave non trouvée"}), 404
+    
+    floor_count = data.get("floor_count")
+    if not floor_count or floor_count < 1:
+        return jsonify({"error": "floor_count doit être >= 1"}), 400
+    
+    bottles_per_floor = data.get("bottles_per_floor")
+    if not bottles_per_floor or bottles_per_floor < 1:
+        return jsonify({"error": "bottles_per_floor doit être >= 1"}), 400
+    
+    cellar = Cellar(
+        name=name,
+        category_id=category_id,
+        floor_count=floor_count,
+        bottles_per_floor=bottles_per_floor,
+        user_id=owner_id,
+    )
+    
+    db.session.add(cellar)
+    db.session.commit()
+    
+    return jsonify(_cellar_to_dict(cellar)), 201
+
+
+@api_bp.route("/cellars/<int:cellar_id>", methods=["PUT", "PATCH"])
+@api_token_required
+def update_cellar(cellar_id: int):
+    """Met à jour une cave existante.
+    
+    Pour un sous-compte, permet de modifier les caves du compte parent.
+    """
+    user = g.api_user
+    owner_id = user.owner_id
+    data = request.get_json() or {}
+    
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first()
+    if not cellar:
+        return jsonify({"error": "Cave non trouvée"}), 404
+    
+    if "name" in data:
+        cellar.name = (data["name"] or "").strip() or cellar.name
+    
+    if "category_id" in data:
+        category = CellarCategory.query.get(data["category_id"])
+        if not category:
+            return jsonify({"error": "Catégorie de cave non trouvée"}), 404
+        cellar.category_id = data["category_id"]
+    
+    if "floor_count" in data:
+        if data["floor_count"] < 1:
+            return jsonify({"error": "floor_count doit être >= 1"}), 400
+        cellar.floor_count = data["floor_count"]
+    
+    if "bottles_per_floor" in data:
+        if data["bottles_per_floor"] < 1:
+            return jsonify({"error": "bottles_per_floor doit être >= 1"}), 400
+        cellar.bottles_per_floor = data["bottles_per_floor"]
+    
+    db.session.commit()
+    
+    return jsonify(_cellar_to_dict(cellar))
+
+
+@api_bp.route("/cellars/<int:cellar_id>", methods=["DELETE"])
+@api_token_required
+def delete_cellar(cellar_id: int):
+    """Supprime une cave.
+    
+    Pour un sous-compte, permet de supprimer les caves du compte parent.
+    Attention : supprime également toutes les bouteilles de la cave.
+    """
+    user = g.api_user
+    owner_id = user.owner_id
+    
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=owner_id).first()
+    if not cellar:
+        return jsonify({"error": "Cave non trouvée"}), 404
+    
+    # Vérifier s'il y a des bouteilles
+    wine_count = Wine.query.filter_by(cellar_id=cellar_id, user_id=owner_id).count()
+    
+    db.session.delete(cellar)
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Cave supprimée",
+        "wines_deleted": wine_count,
+    }), 200
+
+
 # ============================================================================
 # Search endpoint
 # ============================================================================
@@ -699,3 +820,805 @@ def get_collection():
         "total_cellars": len(cellars),
         "total_bottles": sum(c["total_bottles"] for c in collection),
     })
+
+
+# ============================================================================
+# Webhooks endpoints
+# ============================================================================
+
+
+def _webhook_to_dict(webhook: Webhook) -> dict[str, Any]:
+    """Convertit un objet Webhook en dictionnaire JSON-serializable."""
+    return {
+        "id": webhook.id,
+        "name": webhook.name,
+        "url": webhook.url,
+        "events": webhook.events,
+        "is_active": webhook.is_active,
+        "secret": webhook.secret[:8] + "..." if webhook.secret else None,
+        "created_at": webhook.created_at.isoformat() if webhook.created_at else None,
+        "last_triggered_at": webhook.last_triggered_at.isoformat() if webhook.last_triggered_at else None,
+    }
+
+
+@api_bp.route("/webhooks", methods=["GET"])
+@api_token_required
+def list_webhooks():
+    """Liste tous les webhooks de l'utilisateur.
+    
+    Pour un sous-compte, retourne les webhooks du compte parent.
+    """
+    user = g.api_user
+    owner_id = user.owner_id
+    
+    webhooks = Webhook.query.filter_by(user_id=owner_id).order_by(Webhook.name.asc()).all()
+    
+    return jsonify({
+        "webhooks": [_webhook_to_dict(w) for w in webhooks],
+        "total": len(webhooks),
+        "available_events": Webhook.EVENTS,
+    })
+
+
+@api_bp.route("/webhooks", methods=["POST"])
+@api_token_required
+def create_webhook():
+    """Crée un nouveau webhook.
+    
+    Pour un sous-compte, le webhook est créé pour le compte parent.
+    
+    Body JSON:
+        - name: Nom du webhook (requis)
+        - url: URL de destination (requis)
+        - events: Liste des événements à écouter (requis)
+        - secret: Secret pour la signature HMAC (optionnel, généré si absent)
+    """
+    import secrets
+    
+    user = g.api_user
+    owner_id = user.owner_id
+    data = request.get_json() or {}
+    
+    # Validation
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Le nom est requis"}), 400
+    
+    url = (data.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "L'URL est requise"}), 400
+    
+    if not url.startswith(("http://", "https://")):
+        return jsonify({"error": "L'URL doit commencer par http:// ou https://"}), 400
+    
+    events = data.get("events", [])
+    if not events:
+        return jsonify({"error": "Au moins un événement est requis"}), 400
+    
+    invalid_events = [e for e in events if e not in Webhook.EVENTS]
+    if invalid_events:
+        return jsonify({
+            "error": f"Événements invalides: {', '.join(invalid_events)}",
+            "available_events": Webhook.EVENTS,
+        }), 400
+    
+    # Générer un secret si non fourni
+    secret = data.get("secret") or secrets.token_urlsafe(32)
+    
+    webhook = Webhook(
+        name=name,
+        url=url,
+        events=events,
+        secret=secret,
+        user_id=owner_id,
+    )
+    
+    db.session.add(webhook)
+    db.session.commit()
+    
+    # Retourner le secret complet à la création
+    result = _webhook_to_dict(webhook)
+    result["secret"] = webhook.secret  # Secret complet
+    
+    return jsonify(result), 201
+
+
+@api_bp.route("/webhooks/<int:webhook_id>", methods=["GET"])
+@api_token_required
+def get_webhook(webhook_id: int):
+    """Récupère les détails d'un webhook."""
+    user = g.api_user
+    owner_id = user.owner_id
+    
+    webhook = Webhook.query.filter_by(id=webhook_id, user_id=owner_id).first()
+    if not webhook:
+        return jsonify({"error": "Webhook non trouvé"}), 404
+    
+    return jsonify(_webhook_to_dict(webhook))
+
+
+@api_bp.route("/webhooks/<int:webhook_id>", methods=["PUT", "PATCH"])
+@api_token_required
+def update_webhook(webhook_id: int):
+    """Met à jour un webhook existant."""
+    user = g.api_user
+    owner_id = user.owner_id
+    data = request.get_json() or {}
+    
+    webhook = Webhook.query.filter_by(id=webhook_id, user_id=owner_id).first()
+    if not webhook:
+        return jsonify({"error": "Webhook non trouvé"}), 404
+    
+    if "name" in data:
+        webhook.name = (data["name"] or "").strip() or webhook.name
+    
+    if "url" in data:
+        url = (data["url"] or "").strip()
+        if url and not url.startswith(("http://", "https://")):
+            return jsonify({"error": "L'URL doit commencer par http:// ou https://"}), 400
+        webhook.url = url or webhook.url
+    
+    if "events" in data:
+        events = data["events"]
+        if events:
+            invalid_events = [e for e in events if e not in Webhook.EVENTS]
+            if invalid_events:
+                return jsonify({
+                    "error": f"Événements invalides: {', '.join(invalid_events)}",
+                    "available_events": Webhook.EVENTS,
+                }), 400
+            webhook.events = events
+    
+    if "is_active" in data:
+        webhook.is_active = bool(data["is_active"])
+    
+    db.session.commit()
+    
+    return jsonify(_webhook_to_dict(webhook))
+
+
+@api_bp.route("/webhooks/<int:webhook_id>", methods=["DELETE"])
+@api_token_required
+def delete_webhook(webhook_id: int):
+    """Supprime un webhook."""
+    user = g.api_user
+    owner_id = user.owner_id
+    
+    webhook = Webhook.query.filter_by(id=webhook_id, user_id=owner_id).first()
+    if not webhook:
+        return jsonify({"error": "Webhook non trouvé"}), 404
+    
+    db.session.delete(webhook)
+    db.session.commit()
+    
+    return jsonify({"message": "Webhook supprimé"}), 200
+
+
+@api_bp.route("/webhooks/<int:webhook_id>/test", methods=["POST"])
+@api_token_required
+def test_webhook(webhook_id: int):
+    """Envoie un événement de test au webhook."""
+    import hashlib
+    import hmac
+    import json
+    import requests
+    
+    user = g.api_user
+    owner_id = user.owner_id
+    
+    webhook = Webhook.query.filter_by(id=webhook_id, user_id=owner_id).first()
+    if not webhook:
+        return jsonify({"error": "Webhook non trouvé"}), 404
+    
+    # Préparer le payload de test
+    payload = {
+        "event": "test",
+        "timestamp": datetime.utcnow().isoformat(),
+        "data": {
+            "message": "Ceci est un événement de test",
+            "webhook_id": webhook.id,
+            "webhook_name": webhook.name,
+        },
+    }
+    
+    payload_json = json.dumps(payload, separators=(",", ":"))
+    
+    # Calculer la signature HMAC
+    signature = hmac.new(
+        webhook.secret.encode("utf-8"),
+        payload_json.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    
+    headers = {
+        "Content-Type": "application/json",
+        "X-Webhook-Signature": f"sha256={signature}",
+        "X-Webhook-Event": "test",
+    }
+    
+    try:
+        response = requests.post(
+            webhook.url,
+            data=payload_json,
+            headers=headers,
+            timeout=10,
+        )
+        
+        webhook.last_triggered_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            "success": response.ok,
+            "status_code": response.status_code,
+            "response_body": response.text[:500] if response.text else None,
+        })
+    except requests.RequestException as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+        }), 502
+
+
+# ============================================================================
+# OpenAPI / Swagger documentation
+# ============================================================================
+
+
+OPENAPI_SPEC = {
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Cave à Vin API",
+        "description": "API REST pour la gestion de cave à vin. Permet de gérer les bouteilles, caves, consommations et plus encore.",
+        "version": "1.0.0",
+        "contact": {
+            "name": "Support API",
+        },
+    },
+    "servers": [
+        {
+            "url": "/api",
+            "description": "Serveur principal",
+        }
+    ],
+    "security": [
+        {"ApiTokenAuth": []},
+    ],
+    "components": {
+        "securitySchemes": {
+            "ApiTokenAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "Token API au format: Bearer <token>",
+            },
+        },
+        "schemas": {
+            "Wine": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "ID unique de la bouteille"},
+                    "name": {"type": "string", "description": "Nom de la bouteille"},
+                    "barcode": {"type": "string", "nullable": True, "description": "Code-barres"},
+                    "quantity": {"type": "integer", "description": "Quantité en stock"},
+                    "image_url": {"type": "string", "nullable": True, "description": "URL de l'image"},
+                    "cellar_id": {"type": "integer", "description": "ID de la cave"},
+                    "cellar_name": {"type": "string", "nullable": True, "description": "Nom de la cave"},
+                    "subcategory_id": {"type": "integer", "nullable": True, "description": "ID de la sous-catégorie"},
+                    "subcategory_name": {"type": "string", "nullable": True, "description": "Nom de la sous-catégorie"},
+                    "category_name": {"type": "string", "nullable": True, "description": "Nom de la catégorie"},
+                    "extra_attributes": {"type": "object", "description": "Attributs supplémentaires (année, région, cépage, etc.)"},
+                    "created_at": {"type": "string", "format": "date-time", "description": "Date de création"},
+                    "updated_at": {"type": "string", "format": "date-time", "description": "Date de mise à jour"},
+                },
+            },
+            "WineCreate": {
+                "type": "object",
+                "required": ["name", "cellar_id"],
+                "properties": {
+                    "name": {"type": "string", "description": "Nom de la bouteille"},
+                    "cellar_id": {"type": "integer", "description": "ID de la cave"},
+                    "quantity": {"type": "integer", "default": 1, "description": "Quantité"},
+                    "barcode": {"type": "string", "description": "Code-barres"},
+                    "subcategory_id": {"type": "integer", "description": "ID de la sous-catégorie"},
+                    "extra_attributes": {"type": "object", "description": "Attributs supplémentaires"},
+                },
+            },
+            "Cellar": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "ID unique de la cave"},
+                    "name": {"type": "string", "description": "Nom de la cave"},
+                    "category_id": {"type": "integer", "description": "ID de la catégorie"},
+                    "category_name": {"type": "string", "nullable": True, "description": "Nom de la catégorie"},
+                    "floor_count": {"type": "integer", "description": "Nombre d'étages"},
+                    "capacity": {"type": "integer", "description": "Capacité totale"},
+                    "floor_capacities": {"type": "object", "description": "Capacités par étage"},
+                },
+            },
+            "CellarCreate": {
+                "type": "object",
+                "required": ["name", "category_id", "floor_count", "bottles_per_floor"],
+                "properties": {
+                    "name": {"type": "string", "description": "Nom de la cave"},
+                    "category_id": {"type": "integer", "description": "ID de la catégorie de cave"},
+                    "floor_count": {"type": "integer", "minimum": 1, "description": "Nombre d'étages"},
+                    "bottles_per_floor": {"type": "integer", "minimum": 1, "description": "Capacité par étage"},
+                },
+            },
+            "Consumption": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "wine_id": {"type": "integer"},
+                    "consumed_at": {"type": "string", "format": "date-time"},
+                    "quantity": {"type": "integer"},
+                    "comment": {"type": "string", "nullable": True},
+                    "snapshot_name": {"type": "string"},
+                    "snapshot_year": {"type": "string", "nullable": True},
+                    "snapshot_region": {"type": "string", "nullable": True},
+                    "snapshot_grape": {"type": "string", "nullable": True},
+                    "snapshot_cellar": {"type": "string", "nullable": True},
+                },
+            },
+            "Webhook": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "url": {"type": "string", "format": "uri"},
+                    "events": {"type": "array", "items": {"type": "string"}},
+                    "is_active": {"type": "boolean"},
+                    "secret": {"type": "string", "description": "Secret tronqué (complet à la création)"},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "last_triggered_at": {"type": "string", "format": "date-time", "nullable": True},
+                },
+            },
+            "WebhookCreate": {
+                "type": "object",
+                "required": ["name", "url", "events"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "url": {"type": "string", "format": "uri"},
+                    "events": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": Webhook.EVENTS},
+                        "description": "Événements à écouter",
+                    },
+                    "secret": {"type": "string", "description": "Secret HMAC (généré si absent)"},
+                },
+            },
+            "Category": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string", "nullable": True},
+                    "subcategories": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Subcategory"},
+                    },
+                },
+            },
+            "Subcategory": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string", "nullable": True},
+                    "badge_bg_color": {"type": "string"},
+                    "badge_text_color": {"type": "string"},
+                },
+            },
+            "Error": {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string", "description": "Message d'erreur"},
+                },
+            },
+            "Statistics": {
+                "type": "object",
+                "properties": {
+                    "total_bottles": {"type": "integer"},
+                    "total_references": {"type": "integer"},
+                    "total_consumed": {"type": "integer"},
+                    "category_distribution": {"type": "object"},
+                    "subcategory_distribution": {"type": "object"},
+                    "cellar_distribution": {"type": "object"},
+                },
+            },
+        },
+    },
+    "paths": {
+        "/wines": {
+            "get": {
+                "summary": "Liste des bouteilles",
+                "description": "Retourne la liste paginée des bouteilles de l'utilisateur.",
+                "tags": ["Bouteilles"],
+                "parameters": [
+                    {"name": "cellar_id", "in": "query", "schema": {"type": "integer"}, "description": "Filtrer par cave"},
+                    {"name": "subcategory_id", "in": "query", "schema": {"type": "integer"}, "description": "Filtrer par sous-catégorie"},
+                    {"name": "in_stock", "in": "query", "schema": {"type": "boolean"}, "description": "Uniquement en stock"},
+                    {"name": "include_insights", "in": "query", "schema": {"type": "boolean"}, "description": "Inclure les insights"},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 100, "maximum": 500}},
+                    {"name": "offset", "in": "query", "schema": {"type": "integer", "default": 0}},
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des bouteilles",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "wines": {"type": "array", "items": {"$ref": "#/components/schemas/Wine"}},
+                                        "total": {"type": "integer"},
+                                        "limit": {"type": "integer"},
+                                        "offset": {"type": "integer"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "post": {
+                "summary": "Créer une bouteille",
+                "tags": ["Bouteilles"],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/WineCreate"},
+                        },
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bouteille créée",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Wine"}}},
+                    },
+                    "400": {"description": "Données invalides", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                },
+            },
+        },
+        "/wines/{wine_id}": {
+            "get": {
+                "summary": "Détails d'une bouteille",
+                "tags": ["Bouteilles"],
+                "parameters": [{"name": "wine_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {
+                    "200": {"description": "Détails de la bouteille", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Wine"}}}},
+                    "404": {"description": "Bouteille non trouvée"},
+                },
+            },
+            "put": {
+                "summary": "Modifier une bouteille",
+                "tags": ["Bouteilles"],
+                "parameters": [{"name": "wine_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/WineCreate"}}}},
+                "responses": {
+                    "200": {"description": "Bouteille modifiée", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Wine"}}}},
+                    "404": {"description": "Bouteille non trouvée"},
+                },
+            },
+            "delete": {
+                "summary": "Supprimer une bouteille",
+                "tags": ["Bouteilles"],
+                "parameters": [{"name": "wine_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {
+                    "200": {"description": "Bouteille supprimée"},
+                    "404": {"description": "Bouteille non trouvée"},
+                },
+            },
+        },
+        "/wines/{wine_id}/consume": {
+            "post": {
+                "summary": "Consommer une bouteille",
+                "tags": ["Bouteilles"],
+                "parameters": [{"name": "wine_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "quantity": {"type": "integer", "default": 1},
+                                    "comment": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                },
+                "responses": {
+                    "200": {"description": "Consommation enregistrée"},
+                    "400": {"description": "Stock insuffisant"},
+                    "404": {"description": "Bouteille non trouvée"},
+                },
+            },
+        },
+        "/cellars": {
+            "get": {
+                "summary": "Liste des caves",
+                "tags": ["Caves"],
+                "responses": {
+                    "200": {
+                        "description": "Liste des caves",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "cellars": {"type": "array", "items": {"$ref": "#/components/schemas/Cellar"}},
+                                        "total": {"type": "integer"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "post": {
+                "summary": "Créer une cave",
+                "tags": ["Caves"],
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CellarCreate"}}},
+                },
+                "responses": {
+                    "201": {"description": "Cave créée", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Cellar"}}}},
+                    "400": {"description": "Données invalides"},
+                },
+            },
+        },
+        "/cellars/{cellar_id}": {
+            "get": {
+                "summary": "Détails d'une cave",
+                "tags": ["Caves"],
+                "parameters": [{"name": "cellar_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {
+                    "200": {"description": "Détails de la cave avec ses bouteilles"},
+                    "404": {"description": "Cave non trouvée"},
+                },
+            },
+            "put": {
+                "summary": "Modifier une cave",
+                "tags": ["Caves"],
+                "parameters": [{"name": "cellar_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/CellarCreate"}}}},
+                "responses": {
+                    "200": {"description": "Cave modifiée"},
+                    "404": {"description": "Cave non trouvée"},
+                },
+            },
+            "delete": {
+                "summary": "Supprimer une cave",
+                "description": "Supprime la cave et toutes ses bouteilles.",
+                "tags": ["Caves"],
+                "parameters": [{"name": "cellar_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {
+                    "200": {"description": "Cave supprimée"},
+                    "404": {"description": "Cave non trouvée"},
+                },
+            },
+        },
+        "/search": {
+            "get": {
+                "summary": "Recherche multi-critères",
+                "tags": ["Recherche"],
+                "parameters": [
+                    {"name": "q", "in": "query", "schema": {"type": "string"}, "description": "Recherche textuelle"},
+                    {"name": "subcategory_id", "in": "query", "schema": {"type": "integer"}},
+                    {"name": "food_pairing", "in": "query", "schema": {"type": "string"}, "description": "Recherche dans les accords mets-vins"},
+                    {"name": "in_stock", "in": "query", "schema": {"type": "boolean"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50, "maximum": 200}},
+                ],
+                "responses": {"200": {"description": "Résultats de recherche"}},
+            },
+        },
+        "/statistics": {
+            "get": {
+                "summary": "Statistiques de la cave",
+                "tags": ["Statistiques"],
+                "responses": {
+                    "200": {
+                        "description": "Statistiques",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Statistics"}}},
+                    },
+                },
+            },
+        },
+        "/categories": {
+            "get": {
+                "summary": "Liste des catégories d'alcool",
+                "tags": ["Catégories"],
+                "responses": {
+                    "200": {
+                        "description": "Liste des catégories avec sous-catégories",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "categories": {"type": "array", "items": {"$ref": "#/components/schemas/Category"}},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "/cellar-categories": {
+            "get": {
+                "summary": "Liste des catégories de caves",
+                "tags": ["Catégories"],
+                "responses": {"200": {"description": "Liste des catégories de caves"}},
+            },
+        },
+        "/consumptions": {
+            "get": {
+                "summary": "Historique des consommations",
+                "tags": ["Consommations"],
+                "parameters": [
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50, "maximum": 200}},
+                    {"name": "offset", "in": "query", "schema": {"type": "integer", "default": 0}},
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des consommations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "consumptions": {"type": "array", "items": {"$ref": "#/components/schemas/Consumption"}},
+                                        "total": {"type": "integer"},
+                                        "limit": {"type": "integer"},
+                                        "offset": {"type": "integer"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "/collection": {
+            "get": {
+                "summary": "Vue d'ensemble de la collection",
+                "tags": ["Collection"],
+                "responses": {"200": {"description": "Collection par cave"}},
+            },
+        },
+        "/webhooks": {
+            "get": {
+                "summary": "Liste des webhooks",
+                "tags": ["Webhooks"],
+                "responses": {
+                    "200": {
+                        "description": "Liste des webhooks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "webhooks": {"type": "array", "items": {"$ref": "#/components/schemas/Webhook"}},
+                                        "total": {"type": "integer"},
+                                        "available_events": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "post": {
+                "summary": "Créer un webhook",
+                "tags": ["Webhooks"],
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WebhookCreate"}}},
+                },
+                "responses": {
+                    "201": {"description": "Webhook créé (secret complet retourné)"},
+                    "400": {"description": "Données invalides"},
+                },
+            },
+        },
+        "/webhooks/{webhook_id}": {
+            "get": {
+                "summary": "Détails d'un webhook",
+                "tags": ["Webhooks"],
+                "parameters": [{"name": "webhook_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "Détails du webhook"}, "404": {"description": "Webhook non trouvé"}},
+            },
+            "put": {
+                "summary": "Modifier un webhook",
+                "tags": ["Webhooks"],
+                "parameters": [{"name": "webhook_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "Webhook modifié"}, "404": {"description": "Webhook non trouvé"}},
+            },
+            "delete": {
+                "summary": "Supprimer un webhook",
+                "tags": ["Webhooks"],
+                "parameters": [{"name": "webhook_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "Webhook supprimé"}, "404": {"description": "Webhook non trouvé"}},
+            },
+        },
+        "/webhooks/{webhook_id}/test": {
+            "post": {
+                "summary": "Tester un webhook",
+                "description": "Envoie un événement de test au webhook.",
+                "tags": ["Webhooks"],
+                "parameters": [{"name": "webhook_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {
+                    "200": {"description": "Résultat du test"},
+                    "404": {"description": "Webhook non trouvé"},
+                    "502": {"description": "Erreur de connexion au webhook"},
+                },
+            },
+        },
+    },
+    "tags": [
+        {"name": "Bouteilles", "description": "Gestion des bouteilles"},
+        {"name": "Caves", "description": "Gestion des caves"},
+        {"name": "Recherche", "description": "Recherche multi-critères"},
+        {"name": "Statistiques", "description": "Statistiques de la cave"},
+        {"name": "Catégories", "description": "Catégories d'alcool et de caves"},
+        {"name": "Consommations", "description": "Historique des consommations"},
+        {"name": "Collection", "description": "Vue d'ensemble de la collection"},
+        {"name": "Webhooks", "description": "Gestion des webhooks pour notifications externes"},
+    ],
+}
+
+
+SWAGGER_UI_HTML = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cave à Vin API - Documentation</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+    <style>
+        body { margin: 0; padding: 0; }
+        .swagger-ui .topbar { display: none; }
+        .swagger-ui .info .title { font-size: 2rem; }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script>
+        window.onload = function() {
+            SwaggerUIBundle({
+                url: "{{ spec_url }}",
+                dom_id: '#swagger-ui',
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.SwaggerUIStandalonePreset
+                ],
+                layout: "BaseLayout",
+                deepLinking: true,
+                showExtensions: true,
+                showCommonExtensions: true,
+            });
+        };
+    </script>
+</body>
+</html>
+"""
+
+
+@api_bp.route("/openapi.json", methods=["GET"])
+def openapi_spec():
+    """Retourne la spécification OpenAPI au format JSON."""
+    return jsonify(OPENAPI_SPEC)
+
+
+@api_bp.route("/docs", methods=["GET"])
+def swagger_ui():
+    """Affiche l'interface Swagger UI pour explorer l'API."""
+    from flask import url_for
+    spec_url = url_for("api.openapi_spec", _external=True)
+    return render_template_string(SWAGGER_UI_HTML, spec_url=spec_url)

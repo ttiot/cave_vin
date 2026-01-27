@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .prediction-card { min-height: 140px; }
+  .status-critical { background-color: #fee2e2; border-color: #ef4444; }
+  .status-warning { background-color: #fef3c7; border-color: #f59e0b; }
+  .status-attention { background-color: #fef9c3; border-color: #eab308; }
+  .status-stable { background-color: #dcfce7; border-color: #22c55e; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-hourglass-split me-2"></i>Prédictions de stock</h2>
+  <a href="{{ url_for('main.statistics') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Retour aux statistiques
+  </a>
+</div>
+
+<!-- Résumé global -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card shadow-sm prediction-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Stock actuel</h6>
+        <h3 class="card-title mb-0">{{ total_stock }} <small class="text-muted fs-6">bouteilles</small></h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm prediction-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Consommation moyenne</h6>
+        <h3 class="card-title mb-0">{{ avg_consumption_per_month }} <small class="text-muted fs-6">/mois</small></h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm prediction-card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Consommé cette année</h6>
+        <h3 class="card-title mb-0">{{ total_consumed_year }} <small class="text-muted fs-6">bouteilles</small></h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm prediction-card {% if months_until_empty and months_until_empty < 6 %}border-warning{% endif %}">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Épuisement estimé</h6>
+        {% if months_until_empty %}
+        <h3 class="card-title mb-0">{{ months_until_empty }} <small class="text-muted fs-6">mois</small></h3>
+        <small class="text-muted">{{ estimated_empty_date.strftime('%B %Y') }}</small>
+        {% else %}
+        <h3 class="card-title mb-0 text-muted">N/A</h3>
+        <small class="text-muted">Pas assez de données</small>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Alertes de stock bas -->
+{% if low_stock_alerts %}
+<div class="alert alert-warning mb-4">
+  <h5 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Alertes de stock bas</h5>
+  <p class="mb-2">Les catégories suivantes seront épuisées dans moins de 3 mois :</p>
+  <ul class="mb-0">
+    {% for alert in low_stock_alerts %}
+    <li>
+      <strong>{{ alert.category }}</strong> : {{ alert.stock }} bouteilles restantes 
+      (épuisement dans {{ alert.months_left }} mois)
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- Graphique de projection -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="card-title"><i class="bi bi-graph-down me-2"></i>Projection du stock sur 12 mois</h5>
+    <canvas id="projectionChart"></canvas>
+    <p class="text-muted small mt-2 mb-0">
+      Projection basée sur la consommation moyenne des 12 derniers mois.
+    </p>
+  </div>
+</div>
+
+<!-- Prédictions par catégorie -->
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title"><i class="bi bi-tags me-2"></i>Prédictions par catégorie</h5>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Catégorie</th>
+            <th>Stock</th>
+            <th>Consommé (12 mois)</th>
+            <th>Moyenne/mois</th>
+            <th>Épuisement</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat_name, pred in category_predictions.items()|sort(attribute='1.months_until_empty') %}
+          <tr class="status-{{ pred.status }}">
+            <td><strong>{{ cat_name }}</strong></td>
+            <td>{{ pred.stock }}</td>
+            <td>{{ pred.consumed_year }}</td>
+            <td>{{ pred.avg_per_month }}</td>
+            <td>
+              {% if pred.months_until_empty %}
+              {{ pred.months_until_empty }} mois
+              <br><small class="text-muted">{{ pred.estimated_empty_date.strftime('%b %Y') }}</small>
+              {% else %}
+              <span class="text-muted">N/A</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if pred.status == 'critical' %}
+              <span class="badge bg-danger">Critique</span>
+              {% elif pred.status == 'warning' %}
+              <span class="badge bg-warning text-dark">Attention</span>
+              {% elif pred.status == 'attention' %}
+              <span class="badge bg-info">À surveiller</span>
+              {% else %}
+              <span class="badge bg-success">Stable</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Conseils -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5 class="card-title"><i class="bi bi-lightbulb me-2"></i>Conseils</h5>
+    <ul class="mb-0">
+      {% if avg_consumption_per_month > 0 %}
+      <li>À votre rythme actuel de {{ avg_consumption_per_month }} bouteilles/mois, pensez à réapprovisionner régulièrement.</li>
+      {% endif %}
+      {% if low_stock_alerts %}
+      <li>Certaines catégories sont en stock critique. Consultez les alertes ci-dessus.</li>
+      {% endif %}
+      {% if months_until_empty and months_until_empty < 12 %}
+      <li>Votre cave sera épuisée dans moins d'un an. Planifiez vos achats !</li>
+      {% endif %}
+      {% if not low_stock_alerts and (not months_until_empty or months_until_empty >= 12) %}
+      <li>Votre stock est bien équilibré. Continuez ainsi !</li>
+      {% endif %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+const projectionMonths = {{ projection_months|tojson }};
+const projectionStock = {{ projection_stock|tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  new Chart(document.getElementById('projectionChart'), {
+    type: 'line',
+    data: {
+      labels: projectionMonths,
+      datasets: [{
+        label: 'Stock projeté',
+        data: projectionStock,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Bouteilles'
+          }
+        }
+      },
+      plugins: {
+        annotation: {
+          annotations: {
+            line1: {
+              type: 'line',
+              yMin: 0,
+              yMax: 0,
+              borderColor: '#ef4444',
+              borderWidth: 2,
+              borderDash: [5, 5]
+            }
+          }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

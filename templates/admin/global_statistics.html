@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-graph-up me-2"></i>Statistiques globales</h2>
+    <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+</div>
+
+<!-- Cartes de résumé -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-people fs-1 text-primary"></i>
+                <div class="display-6 fw-bold">{{ total_users }}</div>
+                <div class="text-muted">Utilisateurs</div>
+                <small class="text-muted">
+                    {{ total_main_accounts }} principaux, {{ total_sub_accounts }} sous-comptes
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-wine fs-1 text-danger"></i>
+                <div class="display-6 fw-bold">{{ total_bottles }}</div>
+                <div class="text-muted">Bouteilles</div>
+                <small class="text-muted">{{ total_wines }} références</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-box-seam fs-1 text-success"></i>
+                <div class="display-6 fw-bold">{{ total_cellars }}</div>
+                <div class="text-muted">Caves</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-cup-straw fs-1 text-warning"></i>
+                <div class="display-6 fw-bold">{{ total_consumptions }}</div>
+                <div class="text-muted">Consommations</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activité récente -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-success bg-opacity-10 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-success fw-bold">+{{ recent_wines }}</div>
+                        <div class="small text-muted">Bouteilles ajoutées (30j)</div>
+                    </div>
+                    <i class="bi bi-plus-circle fs-2 text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning bg-opacity-10 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-warning fw-bold">{{ recent_consumptions }}</div>
+                        <div class="small text-muted">Consommations (30j)</div>
+                    </div>
+                    <i class="bi bi-cup fs-2 text-warning"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info bg-opacity-10 border-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-info fw-bold">+{{ recent_users }}</div>
+                        <div class="small text-muted">Nouveaux utilisateurs (30j)</div>
+                    </div>
+                    <i class="bi bi-person-plus fs-2 text-info"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Graphique d'évolution mensuelle -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-graph-up me-2"></i>Évolution mensuelle
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Répartition par catégorie -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-pie-chart me-2"></i>Répartition par catégorie
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <!-- Top utilisateurs par bouteilles -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-trophy me-2"></i>Top utilisateurs (bouteilles)
+            </div>
+            <div class="list-group list-group-flush">
+                {% for user_id, username, total in top_users_bottles %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-secondary me-2">{{ loop.index }}</span>
+                        {{ username }}
+                    </div>
+                    <span class="badge bg-primary rounded-pill">{{ total }} bouteilles</span>
+                </div>
+                {% else %}
+                <div class="list-group-item text-center text-muted">
+                    Aucune donnée
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top utilisateurs par consommations -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-cup-hot me-2"></i>Top utilisateurs (consommations)
+            </div>
+            <div class="list-group list-group-flush">
+                {% for user_id, username, total in top_users_consumptions %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-secondary me-2">{{ loop.index }}</span>
+                        {{ username }}
+                    </div>
+                    <span class="badge bg-warning text-dark rounded-pill">{{ total }} conso.</span>
+                </div>
+                {% else %}
+                <div class="list-group-item text-center text-muted">
+                    Aucune donnée
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Données pour le graphique mensuel
+    const monthlyData = {{ monthly_stats | tojson }};
+    
+    // Graphique d'évolution mensuelle
+    const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+    new Chart(monthlyCtx, {
+        type: 'line',
+        data: {
+            labels: monthlyData.map(d => d.month_label),
+            datasets: [
+                {
+                    label: 'Bouteilles ajoutées',
+                    data: monthlyData.map(d => d.wines_added),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                },
+                {
+                    label: 'Bouteilles consommées',
+                    data: monthlyData.map(d => d.bottles_consumed),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                }
+            }
+        }
+    });
+    
+    // Données pour le graphique de catégories
+    const categoryData = {{ category_distribution | tojson }};
+    
+    // Graphique de répartition par catégorie
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: categoryData.map(d => d[0]),
+            datasets: [{
+                data: categoryData.map(d => d[1]),
+                backgroundColor: [
+                    '#722f37', '#dc3545', '#fd7e14', '#ffc107', '#28a745',
+                    '#20c997', '#17a2b8', '#6f42c1', '#e83e8c', '#6c757d'
+                ],
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 8,
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

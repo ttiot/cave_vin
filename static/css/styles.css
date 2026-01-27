@@ -1,9 +1,280 @@
-body { -webkit-font-smoothing: antialiased; }
+/* ============================================================================
+   Variables CSS pour le thème
+   ============================================================================ */
+
+:root {
+  /* Couleurs de base - Mode clair */
+  --bg-body: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #f1f3f5;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-muted: #adb5bd;
+  --border-color: #dee2e6;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-hover: rgba(0, 0, 0, 0.15);
+  
+  /* Couleurs d'accent */
+  --accent-primary: #722f37;
+  --accent-success: #10b981;
+  --accent-info: #0dcaf0;
+  --accent-warning: #ffc107;
+  --accent-danger: #dc3545;
+  
+  /* Navbar */
+  --navbar-bg: #343a40;
+  --navbar-text: rgba(255, 255, 255, 0.85);
+  --navbar-hover: rgba(255, 255, 255, 0.1);
+  
+  /* Transitions */
+  --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Mode sombre */
+[data-theme="dark"] {
+  --bg-body: #1a1d21;
+  --bg-card: #212529;
+  --bg-input: #2d3238;
+  --bg-hover: #343a40;
+  --text-primary: #e9ecef;
+  --text-secondary: #adb5bd;
+  --text-muted: #6c757d;
+  --border-color: #495057;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-hover: rgba(0, 0, 0, 0.4);
+  
+  --navbar-bg: #0d1117;
+  --navbar-text: rgba(255, 255, 255, 0.9);
+  --navbar-hover: rgba(255, 255, 255, 0.15);
+}
+
+/* ============================================================================
+   Styles de base avec variables
+   ============================================================================ */
+
+body {
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg-body) !important;
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
+/* Cards */
+.card {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
 .card img { object-fit: cover; height: 200px; }
-.wine-card { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.wine-card:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15); }
+
+.card-header {
+  background-color: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+.card-footer {
+  background-color: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+.wine-card { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease, var(--transition-theme); }
+.wine-card:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem var(--shadow-hover); }
 .wine-card .card-actions { cursor: default; }
 .wine-card .card-actions .btn { white-space: nowrap; }
+
+/* Tables */
+.table {
+  color: var(--text-primary);
+}
+
+.table > :not(caption) > * > * {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: var(--bg-hover);
+}
+
+.table-hover > tbody > tr:hover > * {
+  background-color: var(--bg-hover);
+}
+
+/* Forms */
+.form-control, .form-select {
+  background-color: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
+.form-control:focus, .form-select:focus {
+  background-color: var(--bg-input);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+}
+
+.form-label {
+  color: var(--text-primary);
+}
+
+.form-text {
+  color: var(--text-secondary);
+}
+
+.input-group-text {
+  background-color: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Lists */
+.list-group-item {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.list-group-item:hover {
+  background-color: var(--bg-hover);
+}
+
+/* Modals */
+.modal-content {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.modal-header, .modal-footer {
+  border-color: var(--border-color);
+}
+
+/* Dropdowns */
+.dropdown-menu {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.dropdown-item {
+  color: var(--text-primary);
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dropdown-divider {
+  border-color: var(--border-color);
+}
+
+/* Alerts */
+[data-theme="dark"] .alert-info {
+  background-color: rgba(13, 202, 240, 0.15);
+  border-color: rgba(13, 202, 240, 0.3);
+  color: #6edff6;
+}
+
+[data-theme="dark"] .alert-success {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+[data-theme="dark"] .alert-warning {
+  background-color: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+[data-theme="dark"] .alert-danger {
+  background-color: rgba(220, 53, 69, 0.15);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #f87171;
+}
+
+/* Breadcrumbs */
+.breadcrumb {
+  background-color: var(--bg-hover);
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  color: var(--text-muted);
+}
+
+.breadcrumb-item.active {
+  color: var(--text-secondary);
+}
+
+/* Pagination */
+.page-link {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.page-link:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.page-item.active .page-link {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.page-item.disabled .page-link {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
+
+/* Text utilities */
+.text-muted {
+  color: var(--text-secondary) !important;
+}
+
+/* Background utilities override for dark mode */
+[data-theme="dark"] .bg-light {
+  background-color: var(--bg-body) !important;
+}
+
+[data-theme="dark"] .bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+/* Border utilities */
+.border {
+  border-color: var(--border-color) !important;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  color: var(--navbar-text);
+  transition: color 0.2s ease;
+}
+
+.theme-toggle:hover {
+  color: #fff;
+}
+
+.theme-toggle i {
+  font-size: 1.1rem;
+}
 
 /* Les couleurs des badges de sous-catégories sont désormais gérées depuis la base de données. */
 
@@ -175,4 +446,304 @@ body { -webkit-font-smoothing: antialiased; }
   border-color: rgba(255, 255, 255, 0.4);
   color: #fff;
   box-shadow: none;
+}
+
+/* ============================================================================
+   Tutoriel interactif
+   ============================================================================ */
+
+.tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.tutorial-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  pointer-events: auto;
+}
+
+.tutorial-spotlight {
+  position: absolute;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+  background-color: transparent;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.tutorial-tooltip {
+  position: absolute;
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  padding: 1.25rem;
+  max-width: 350px;
+  min-width: 280px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+  animation: tutorialFadeIn 0.3s ease;
+}
+
+@keyframes tutorialFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tutorial-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.tutorial-step-indicator {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background-color: var(--bg-hover);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.tutorial-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.tutorial-close:hover {
+  color: var(--text-primary);
+}
+
+.tutorial-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.tutorial-content {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.tutorial-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tutorial-actions .btn {
+  font-size: 0.85rem;
+}
+
+.tutorial-skip {
+  margin-left: auto;
+  font-size: 0.8rem !important;
+  color: var(--text-muted) !important;
+}
+
+.tutorial-skip:hover {
+  color: var(--text-secondary) !important;
+}
+
+/* ============================================================================
+   PWA Install Banner
+   ============================================================================ */
+
+.pwa-install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  z-index: 1050;
+  box-shadow: 0 -4px 20px var(--shadow-color);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.pwa-install-banner .pwa-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pwa-install-banner .pwa-icon {
+  font-size: 2rem;
+}
+
+.pwa-install-banner .pwa-text h6 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.pwa-install-banner .pwa-text p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.pwa-install-banner .pwa-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ============================================================================
+   Notifications
+   ============================================================================ */
+
+.notification-settings {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.notification-settings h6 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.notification-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.notification-option:last-child {
+  border-bottom: none;
+}
+
+.notification-option .option-info {
+  flex: 1;
+}
+
+.notification-option .option-info label {
+  display: block;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.notification-option .option-info small {
+  color: var(--text-secondary);
+}
+
+/* ============================================================================
+   Gallery view
+   ============================================================================ */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.gallery-item {
+  position: relative;
+  aspect-ratio: 3/4;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gallery-item:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px var(--shadow-hover);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-item .gallery-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  padding: 1rem;
+  color: #fff;
+}
+
+.gallery-item .gallery-overlay h6 {
+  margin: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-item .gallery-overlay small {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ============================================================================
+   Responsive adjustments
+   ============================================================================ */
+
+@media (max-width: 576px) {
+  .tutorial-tooltip {
+    max-width: calc(100vw - 20px);
+    min-width: auto;
+  }
+  
+  .pwa-install-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .pwa-install-banner .pwa-info {
+    flex-direction: column;
+  }
+  
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
 }

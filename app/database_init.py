@@ -6,6 +6,7 @@ from typing import Iterable
 from sqlalchemy import func, inspect, text
 
 from models import (
+    ActivityLog,
     AlcoholCategory,
     AlcoholFieldRequirement,
     AlcoholSubcategory,
@@ -13,6 +14,8 @@ from models import (
     APITokenUsage,
     BottleFieldDefinition,
     CellarCategory,
+    UserSettings,
+    Webhook,
     db,
 )
 from app.field_config import DEFAULT_FIELD_DEFINITIONS
@@ -52,6 +55,13 @@ def apply_schema_updates() -> None:
         if "parent_id" not in columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE user ADD COLUMN parent_id INTEGER REFERENCES user(id) ON DELETE CASCADE"))
+
+    # Migration: Add created_at column to user table for tracking user registration
+    if "user" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("user")}
+        if "created_at" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user ADD COLUMN created_at DATETIME"))
 
 
 ALCOHOL_CATEGORIES: list[dict[str, object]] = [

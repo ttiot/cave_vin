@@ -36,12 +36,23 @@ def create_app(config_class=Config):
     csrf.exempt("api.consume_wine")
     csrf.exempt("api.list_cellars")
     csrf.exempt("api.get_cellar")
+    csrf.exempt("api.create_cellar")
+    csrf.exempt("api.update_cellar")
+    csrf.exempt("api.delete_cellar")
     csrf.exempt("api.search_wines")
     csrf.exempt("api.get_statistics")
     csrf.exempt("api.list_categories")
     csrf.exempt("api.list_cellar_categories")
     csrf.exempt("api.list_consumptions")
     csrf.exempt("api.get_collection")
+    csrf.exempt("api.list_webhooks")
+    csrf.exempt("api.create_webhook")
+    csrf.exempt("api.get_webhook")
+    csrf.exempt("api.update_webhook")
+    csrf.exempt("api.delete_webhook")
+    csrf.exempt("api.test_webhook")
+    csrf.exempt("api.openapi_spec")
+    csrf.exempt("api.swagger_ui")
 
     @flask_app.after_request
     def set_security_headers(response):
@@ -97,6 +108,7 @@ def create_app(config_class=Config):
     from app.blueprints.admin import admin_bp
     from app.blueprints.api_tokens import api_tokens_bp
     from app.blueprints.api import api_bp
+    from app.blueprints.advanced_stats import advanced_stats_bp
 
     flask_app.register_blueprint(auth_bp)
     flask_app.register_blueprint(wines_bp)
@@ -108,5 +120,6 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(admin_bp)
     flask_app.register_blueprint(api_tokens_bp)
     flask_app.register_blueprint(api_bp)
+    flask_app.register_blueprint(advanced_stats_bp)
 
     return flask_app

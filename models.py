@@ -18,6 +18,7 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     default_cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id", ondelete="SET NULL"), nullable=True)
     parent_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
 
     # Relation vers le compte parent (si sous-compte)
     parent = db.relationship(
@@ -424,3 +425,79 @@ class APITokenUsage(db.Model):
     response_time_ms = db.Column(db.Integer, nullable=True)
 
     token = db.relationship("APIToken", back_populates="usage_logs")
+
+
+class ActivityLog(db.Model):
+    """Log d'activité utilisateur pour l'audit."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    action = db.Column(db.String(50), nullable=False, index=True)
+    entity_type = db.Column(db.String(50), nullable=True)
+    entity_id = db.Column(db.Integer, nullable=True)
+    details = db.Column(db.JSON, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    user = db.relationship("User", backref=db.backref("activity_logs", cascade="all, delete-orphan"))
+
+    @staticmethod
+    def log(user_id: int, action: str, entity_type: str = None, entity_id: int = None,
+            details: dict = None, ip_address: str = None, user_agent: str = None) -> "ActivityLog":
+        """Crée un log d'activité."""
+        log_entry = ActivityLog(
+            user_id=user_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            details=details,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        db.session.add(log_entry)
+        return log_entry
+
+
+class Webhook(db.Model):
+    """Configuration de webhook pour notifications externes."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    secret = db.Column(db.String(64), nullable=True)
+    events = db.Column(db.JSON, nullable=False, default=list)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_triggered_at = db.Column(db.DateTime, nullable=True)
+    failure_count = db.Column(db.Integer, default=0, nullable=False)
+
+    user = db.relationship("User", backref=db.backref("webhooks", cascade="all, delete-orphan"))
+
+    EVENTS = [
+        "wine.created",
+        "wine.updated",
+        "wine.deleted",
+        "wine.consumed",
+        "cellar.created",
+        "cellar.updated",
+        "cellar.deleted",
+        "stock.low",
+    ]
+
+
+class UserSettings(db.Model):
+    """Paramètres utilisateur (thème, quotas, préférences)."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
+    theme = db.Column(db.String(20), default="light", nullable=False)
+    max_bottles = db.Column(db.Integer, nullable=True)
+    push_notifications_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    push_subscription = db.Column(db.JSON, nullable=True)
+    tutorial_completed = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", backref=db.backref("settings", uselist=False, cascade="all, delete-orphan"))

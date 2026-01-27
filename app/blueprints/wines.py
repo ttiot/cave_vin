@@ -372,6 +372,7 @@ def add_wine():
         errors.extend(field_errors)
 
         image_url = None
+        openfoodfacts_data = {}
         if barcode and not name:
             try:
                 response = requests.get(
@@ -379,15 +380,64 @@ def add_wine():
                     timeout=6,
                 )
                 if response.status_code == 200:
-                    data = response.json().get('product', {}) or {}
+                    openfoodfacts_data = response.json().get('product', {}) or {}
                     name = (
-                        data.get('product_name')
-                        or data.get('brands')
+                        openfoodfacts_data.get('product_name')
+                        or openfoodfacts_data.get('brands')
                         or 'Bouteille sans nom'
                     )
-                    image_url = data.get('image_url')
+                    image_url = openfoodfacts_data.get('image_url')
+                    
+                    # Enrichir avec les données OpenFoodFacts
+                    if not field_values.get('region') and openfoodfacts_data.get('origins'):
+                        field_values['region'] = openfoodfacts_data.get('origins')
+                    if not field_values.get('volume_ml') and openfoodfacts_data.get('quantity'):
+                        # Essayer d'extraire le volume en ml
+                        qty_str = openfoodfacts_data.get('quantity', '')
+                        import re
+                        ml_match = re.search(r'(\d+)\s*ml', qty_str, re.IGNORECASE)
+                        cl_match = re.search(r'(\d+)\s*cl', qty_str, re.IGNORECASE)
+                        l_match = re.search(r'(\d+(?:[.,]\d+)?)\s*l(?:itre)?', qty_str, re.IGNORECASE)
+                        if ml_match:
+                            field_values['volume_ml'] = int(ml_match.group(1))
+                        elif cl_match:
+                            field_values['volume_ml'] = int(cl_match.group(1)) * 10
+                        elif l_match:
+                            field_values['volume_ml'] = int(float(l_match.group(1).replace(',', '.')) * 1000)
             except Exception:  # pragma: no cover - appels réseau best effort
                 image_url = None
+
+        # Traitement de l'image uploadée
+        label_image_data = None
+        if 'label_image' in request.files:
+            file = request.files['label_image']
+            if file and file.filename:
+                try:
+                    image = Image.open(file.stream)
+                    
+                    # Convertir en RGB si nécessaire
+                    if image.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', image.size, (255, 255, 255))
+                        if image.mode == 'P':
+                            image = image.convert('RGBA')
+                        background.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
+                        image = background
+                    elif image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    
+                    # Redimensionner l'image
+                    max_width = 800
+                    if image.width > max_width:
+                        ratio = max_width / image.width
+                        new_height = int(image.height * ratio)
+                        image = image.resize((max_width, new_height), Image.Resampling.LANCZOS)
+                    
+                    # Convertir en base64
+                    buffer = BytesIO()
+                    image.save(buffer, format='JPEG', quality=85, optimize=True)
+                    label_image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                except Exception as e:
+                    errors.append(f"Erreur lors du traitement de l'image : {str(e)}")
 
         if errors:
             for error in errors:
@@ -408,6 +458,7 @@ def add_wine():
             name=name or 'Bouteille sans nom',
             barcode=barcode,
             image_url=image_url,
+            label_image_data=label_image_data,
             quantity=quantity or 1,
             cellar=cellar,
             subcategory=subcategory,
@@ -429,6 +480,33 @@ def add_wine():
         field_settings=field_settings,
         ordered_fields=ordered_fields,
     )
+
+
+@wines_bp.route('/gallery')
+@login_required
+def gallery():
+    """Affiche une galerie des étiquettes de bouteilles.
+    
+    Pour un sous-compte, affiche les ressources du compte parent.
+    """
+    owner_id = current_user.owner_id
+    
+    wines = (
+        Wine.query
+        .options(
+            selectinload(Wine.cellar),
+            selectinload(Wine.subcategory).selectinload(AlcoholSubcategory.category),
+        )
+        .filter(
+            Wine.user_id == owner_id,
+            Wine.quantity > 0,
+            (Wine.label_image_data.isnot(None)) | (Wine.image_url.isnot(None))
+        )
+        .order_by(Wine.name.asc())
+        .all()
+    )
+    
+    return render_template('gallery.html', wines=wines)
 
 
 @wines_bp.route('/<int:wine_id>', methods=['GET'])

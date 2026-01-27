@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-speedometer2 me-2"></i>Gestion du quota - {{ user.username }}</h2>
+    <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-sliders me-2"></i>Configuration du quota
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Quota maximum de bouteilles</label>
+                        <input type="number" name="max_bottles" class="form-control" 
+                               value="{{ settings.max_bottles or '' }}" min="0"
+                               placeholder="Laisser vide pour illimité">
+                        <div class="form-text">
+                            Définissez le nombre maximum de bouteilles que cet utilisateur peut stocker.
+                            Laissez vide ou mettez 0 pour un quota illimité.
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Enregistrer
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-bar-chart me-2"></i>Utilisation actuelle
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <div class="display-4 fw-bold text-primary">{{ current_bottles }}</div>
+                    <div class="text-muted">bouteilles en stock</div>
+                </div>
+                
+                {% if settings.max_bottles %}
+                {% set usage_percent = (current_bottles / settings.max_bottles * 100) | round(1) %}
+                <div class="progress mb-3" style="height: 25px;">
+                    <div class="progress-bar {% if usage_percent >= 90 %}bg-danger{% elif usage_percent >= 70 %}bg-warning{% else %}bg-success{% endif %}" 
+                         role="progressbar" 
+                         style="width: {{ [usage_percent, 100] | min }}%"
+                         aria-valuenow="{{ current_bottles }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="{{ settings.max_bottles }}">
+                        {{ usage_percent }}%
+                    </div>
+                </div>
+                <div class="text-center text-muted">
+                    {{ current_bottles }} / {{ settings.max_bottles }} bouteilles
+                    {% if usage_percent >= 100 %}
+                    <span class="badge bg-danger ms-2">Quota atteint</span>
+                    {% elif usage_percent >= 90 %}
+                    <span class="badge bg-warning text-dark ms-2">Presque plein</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-infinity me-2"></i>
+                    Quota illimité
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if user.is_sub_account %}
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle me-2"></i>
+            Cet utilisateur est un sous-compte de <strong>{{ user.parent.username }}</strong>.
+            Le quota s'applique au compte principal.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

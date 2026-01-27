@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-activity me-2"></i>Logs d'activité</h2>
+    <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+</div>
+
+<!-- Filtres -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Utilisateur</label>
+                <select name="user_id" class="form-select">
+                    <option value="">Tous les utilisateurs</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {% if current_user_id == user.id %}selected{% endif %}>
+                        {{ user.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Action</label>
+                <select name="action" class="form-select">
+                    <option value="">Toutes</option>
+                    {% for a in actions %}
+                    <option value="{{ a }}" {% if current_action == a %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Type d'entité</label>
+                <select name="entity_type" class="form-select">
+                    <option value="">Tous</option>
+                    {% for e in entity_types %}
+                    <option value="{{ e }}" {% if current_entity_type == e %}selected{% endif %}>{{ e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Période</label>
+                <select name="days" class="form-select">
+                    <option value="1" {% if current_days == 1 %}selected{% endif %}>Dernières 24h</option>
+                    <option value="7" {% if current_days == 7 %}selected{% endif %}>7 derniers jours</option>
+                    <option value="30" {% if current_days == 30 %}selected{% endif %}>30 derniers jours</option>
+                    <option value="90" {% if current_days == 90 %}selected{% endif %}>90 derniers jours</option>
+                    <option value="0" {% if current_days == 0 %}selected{% endif %}>Tout</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel me-1"></i>Filtrer
+                </button>
+                <a href="{{ url_for('admin.activity_logs') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Liste des logs -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ul me-2"></i>{{ logs.total }} entrées</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Utilisateur</th>
+                    <th>Action</th>
+                    <th>Entité</th>
+                    <th>Détails</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs.items %}
+                <tr>
+                    <td class="text-nowrap">
+                        <small class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                    </td>
+                    <td>
+                        {% if log.user %}
+                        <a href="{{ url_for('admin.user_activity_logs', user_id=log.user_id) }}">
+                            {{ log.user.username }}
+                        </a>
+                        {% else %}
+                        <span class="text-muted">Utilisateur supprimé</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.action == 'create' %}
+                        <span class="badge bg-success">{{ log.action }}</span>
+                        {% elif log.action == 'update' %}
+                        <span class="badge bg-info">{{ log.action }}</span>
+                        {% elif log.action == 'delete' %}
+                        <span class="badge bg-danger">{{ log.action }}</span>
+                        {% elif log.action == 'consume' %}
+                        <span class="badge bg-warning text-dark">{{ log.action }}</span>
+                        {% elif log.action == 'login' %}
+                        <span class="badge bg-secondary">{{ log.action }}</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ log.action }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.entity_type %}
+                        <span class="text-muted">{{ log.entity_type }}</span>
+                        {% if log.entity_id %}
+                        <small class="text-muted">#{{ log.entity_id }}</small>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.details %}
+                        <button class="btn btn-sm btn-outline-secondary" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#details-{{ log.id }}">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if log.details %}
+                <tr class="collapse" id="details-{{ log.id }}">
+                    <td colspan="5" class="bg-light">
+                        <pre class="mb-0 small"><code>{{ log.details | tojson(indent=2) }}</code></pre>
+                    </td>
+                </tr>
+                {% endif %}
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        Aucun log d'activité trouvé
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if logs.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if logs.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin.activity_logs', page=logs.prev_num, user_id=current_user_id, action=current_action, entity_type=current_entity_type, days=current_days) }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        
+        {% for p in logs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+        <li class="page-item {% if p == logs.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('admin.activity_logs', page=p, user_id=current_user_id, action=current_action, entity_type=current_entity_type, days=current_days) }}">{{ p }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+        {% endfor %}
+        
+        {% if logs.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin.activity_logs', page=logs.next_num, user_id=current_user_id, action=current_action, entity_type=current_entity_type, days=current_days) }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

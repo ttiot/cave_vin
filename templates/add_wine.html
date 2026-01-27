@@ -15,7 +15,7 @@
 {% endif %}
 
 <h3>Ajouter une bouteille</h3>
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <div class="mb-3">
     <label class="form-label">Cave</label>
@@ -65,6 +65,27 @@
     </div>
     {% endfor %}
   </div>
+  
+  <!-- Section image -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-image me-2"></i>Photo de l'étiquette
+    </div>
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <input type="file" class="form-control" name="label_image" id="label_image" accept="image/*">
+          <div class="form-text">Formats acceptés : JPG, PNG, WebP. Taille max recommandée : 5 Mo.</div>
+        </div>
+        <div class="col-md-4">
+          <div id="image-preview" class="text-center" style="display: none;">
+            <img id="preview-img" src="" alt="Aperçu" class="img-thumbnail" style="max-height: 150px;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <div class="row">
     <div class="col-md-3 mb-3">
       <label class="form-label">Quantité</label>
@@ -106,12 +127,36 @@
     });
   }
 
+  function setupImagePreview() {
+    const imageInput = document.getElementById('label_image');
+    const previewContainer = document.getElementById('image-preview');
+    const previewImg = document.getElementById('preview-img');
+    
+    if (imageInput && previewContainer && previewImg) {
+      imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            previewContainer.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        } else {
+          previewContainer.style.display = 'none';
+          previewImg.src = '';
+        }
+      });
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const select = document.getElementById('subcategory_id');
     if (select) {
       select.addEventListener('change', updateFieldVisibility);
     }
     updateFieldVisibility();
+    setupImagePreview();
   });
 })();
 </script>

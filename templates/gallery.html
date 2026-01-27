@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+  .gallery-item {
+    position: relative;
+    aspect-ratio: 3/4;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .gallery-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  .gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gallery-item .overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    color: white;
+    padding: 1rem 0.75rem 0.75rem;
+  }
+  .gallery-item .overlay h6 {
+    margin: 0;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gallery-item .overlay small {
+    opacity: 0.8;
+  }
+  .no-image-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 3rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-images me-2"></i>Galerie des étiquettes</h2>
+  <a href="{{ url_for('wines.overview') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Retour à la collection
+  </a>
+</div>
+
+{% if wines %}
+<p class="text-muted mb-4">{{ wines|length }} bouteille(s) avec image</p>
+
+<div class="gallery-grid">
+  {% for wine in wines %}
+  <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="gallery-item text-decoration-none">
+    {% if wine.label_image_data %}
+    <img src="data:image/jpeg;base64,{{ wine.label_image_data }}" alt="{{ wine.name }}">
+    {% elif wine.image_url %}
+    <img src="{{ wine.image_url }}" alt="{{ wine.name }}" onerror="this.parentElement.innerHTML='<div class=\'no-image-placeholder h-100\'><i class=\'bi bi-image\'></i></div>'">
+    {% else %}
+    <div class="no-image-placeholder h-100">
+      <i class="bi bi-image"></i>
+    </div>
+    {% endif %}
+    <div class="overlay">
+      <h6>{{ wine.name }}</h6>
+      {% if wine.subcategory %}
+      <small>{{ wine.subcategory.name }}</small>
+      {% endif %}
+      {% if wine.extra_attributes and wine.extra_attributes.year %}
+      <small class="ms-2">{{ wine.extra_attributes.year }}</small>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-images text-muted" style="font-size: 4rem;"></i>
+  <h4 class="mt-3 text-muted">Aucune image disponible</h4>
+  <p class="text-muted">Ajoutez des photos d'étiquettes à vos bouteilles pour les voir ici.</p>
+  <a href="{{ url_for('wines.add_wine') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Ajouter une bouteille
+  </a>
+</div>
+{% endif %}
+{% endblock %}
