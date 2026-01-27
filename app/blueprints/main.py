@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Iterable
 
-from flask import Blueprint, flash, redirect, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request, send_from_directory, current_app
 from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 
@@ -375,6 +375,23 @@ def _build_month_series(month_count: int = 12) -> list[datetime]:
 def health():
     """Endpoint de santé pour vérifier que l'application fonctionne."""
     return {"status": "OK"}, 200
+
+
+@main_bp.route('/sw.js')
+def service_worker():
+    """Sert le Service Worker depuis la racine avec le bon scope.
+    
+    Le header Service-Worker-Allowed permet au SW d'avoir un scope
+    plus large que son emplacement physique.
+    """
+    response = send_from_directory(
+        current_app.static_folder,
+        'sw.js',
+        mimetype='application/javascript'
+    )
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 
 @main_bp.route('/')

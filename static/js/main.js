@@ -16,9 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
  */
 function initServiceWorker() {
     if ("serviceWorker" in navigator) {
-        // Enregistrer immédiatement, pas besoin d'attendre 'load'
+        // Enregistrer immédiatement avec scope racine
+        // Note: Le serveur doit envoyer le header Service-Worker-Allowed: /
         navigator.serviceWorker
-            .register("/static/sw.js")
+            .register("/sw.js", { scope: "/" })
             .then((registration) => {
                 console.log(
                     "[PWA] Service Worker enregistré:",
