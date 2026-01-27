@@ -1,6 +1,8 @@
 """Factory pattern pour l'application Flask Cave à Vin."""
 
 import os
+
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -22,6 +24,15 @@ def create_app(config_class=Config):
                      template_folder=template_dir,
                      static_folder=static_dir)
     flask_app.config.from_object(config_class)
+
+    # Support proxy (Traefik, etc.) pour scheme/host corrects
+    flask_app.wsgi_app = ProxyFix(
+        flask_app.wsgi_app,
+        x_for=1,
+        x_proto=1,
+        x_host=1,
+        x_port=1,
+    )
 
     # Initialiser les extensions
     db.init_app(flask_app)

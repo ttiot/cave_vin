@@ -39,14 +39,10 @@ const STATIC_ASSETS = [
     "/static/icons/icon-192x192.png",
     "/static/icons/icon-384x384.png",
     "/static/icons/icon-512x512.png",
-    "/static/vendor/bootstrap/css/bootstrap.min.css",
-    "/static/vendor/bootstrap-icons/bootstrap-icons.css",
-    "/static/vendor/bootstrap/js/bootstrap.bundle.min.js",
-    "/static/vendor/quagga/quagga.min.js",
 ];
 
 // Pages à pré-cacher pour le mode hors-ligne
-const OFFLINE_PAGES = ["/wines/overview", "/cellars", "/statistics", "/search"];
+const OFFLINE_PAGES = ["/wines/overview", "/cellars/", "/stats", "/search/"];
 
 // Limites de cache
 const CACHE_LIMITS = {
