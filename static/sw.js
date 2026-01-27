@@ -266,6 +266,12 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
+    // Laisser les requêtes cross-origin au navigateur
+    if (url.origin !== self.location.origin) {
+        event.respondWith(fetch(request));
+        return;
+    }
+
     // Ignorer les requêtes API (toujours réseau avec fallback)
     if (url.pathname.startsWith("/api/")) {
         event.respondWith(networkOnly(request));
@@ -277,6 +283,12 @@ self.addEventListener("fetch", (event) => {
         url.pathname.startsWith("/login") ||
         url.pathname.startsWith("/logout")
     ) {
+        event.respondWith(networkOnly(request));
+        return;
+    }
+
+    // Éviter le cache SW pour les vendors locaux (facilite le debugging)
+    if (url.pathname.startsWith("/static/vendor/")) {
         event.respondWith(networkOnly(request));
         return;
     }
@@ -329,12 +341,12 @@ function isImageRequest(url) {
 
 // Cache First - pour les ressources statiques
 async function cacheFirst(request, cacheName) {
-    const cached = await caches.match(request);
-    if (cached) {
-        return cached;
-    }
-
     try {
+        const cached = await caches.match(request);
+        if (cached) {
+            return cached;
+        }
+
         const response = await fetch(request);
         if (response.ok) {
             const cache = await caches.open(cacheName);
@@ -343,18 +355,22 @@ async function cacheFirst(request, cacheName) {
         return response;
     } catch (error) {
         console.error("[SW] Erreur Cache First:", error);
-        return new Response("Ressource non disponible", { status: 503 });
+        try {
+            return await fetch(request);
+        } catch (fallbackError) {
+            return new Response("Ressource non disponible", { status: 503 });
+        }
     }
 }
 
 // Cache First avec expiration - pour les images
 async function cacheFirstWithExpiry(request, cacheName) {
-    const cached = await caches.match(request);
-    if (cached) {
-        return cached;
-    }
-
     try {
+        const cached = await caches.match(request);
+        if (cached) {
+            return cached;
+        }
+
         const response = await fetch(request);
         if (response.ok) {
             const cache = await caches.open(cacheName);
