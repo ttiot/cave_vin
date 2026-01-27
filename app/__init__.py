@@ -25,7 +25,23 @@ def create_app(config_class=Config):
 
     # Initialiser les extensions
     db.init_app(flask_app)
-    CSRFProtect(flask_app)
+    csrf = CSRFProtect(flask_app)
+    
+    # Exempter les routes API de la protection CSRF (elles utilisent l'auth par token)
+    csrf.exempt("api.list_wines")
+    csrf.exempt("api.get_wine")
+    csrf.exempt("api.create_wine")
+    csrf.exempt("api.update_wine")
+    csrf.exempt("api.delete_wine")
+    csrf.exempt("api.consume_wine")
+    csrf.exempt("api.list_cellars")
+    csrf.exempt("api.get_cellar")
+    csrf.exempt("api.search_wines")
+    csrf.exempt("api.get_statistics")
+    csrf.exempt("api.list_categories")
+    csrf.exempt("api.list_cellar_categories")
+    csrf.exempt("api.list_consumptions")
+    csrf.exempt("api.get_collection")
 
     @flask_app.after_request
     def set_security_headers(response):
@@ -79,6 +95,8 @@ def create_app(config_class=Config):
     from app.blueprints.search import search_bp
     from app.blueprints.main import main_bp
     from app.blueprints.admin import admin_bp
+    from app.blueprints.api_tokens import api_tokens_bp
+    from app.blueprints.api import api_bp
 
     flask_app.register_blueprint(auth_bp)
     flask_app.register_blueprint(wines_bp)
@@ -88,5 +106,7 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(search_bp)
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp)
+    flask_app.register_blueprint(api_tokens_bp)
+    flask_app.register_blueprint(api_bp)
 
     return flask_app

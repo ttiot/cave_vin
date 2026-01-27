@@ -78,6 +78,13 @@
           </a>
         </li>
         
+        <!-- Tokens API (utilisateur) -->
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('api_tokens.list_tokens') }}">
+            <i class="bi bi-key me-1"></i>API
+          </a>
+        </li>
+        
         {% if current_user.is_admin %}
         <!-- Administration (dropdown) -->
         <li class="nav-item dropdown">
@@ -87,6 +94,8 @@
           <ul class="dropdown-menu dropdown-menu-dark">
             <li><a class="dropdown-item" href="{{ url_for('categories.list_categories') }}"><i class="bi bi-tags me-2"></i>Catégories</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.manage_users') }}"><i class="bi bi-people me-2"></i>Utilisateurs</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('api_tokens.admin_list') }}"><i class="bi bi-key me-2"></i>Tokens API</a></li>
           </ul>
         </li>
         {% endif %}

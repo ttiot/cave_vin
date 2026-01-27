@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-key me-2"></i>Gestion des tokens API</h1>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-list-ul me-1"></i>Tous les tokens
+  </div>
+  <div class="card-body">
+    {% if tokens %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Utilisateur</th>
+            <th>Nom</th>
+            <th>Préfixe</th>
+            <th>Statut</th>
+            <th>Limite</th>
+            <th>Créé le</th>
+            <th>Dernière utilisation</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for token in tokens %}
+          <tr>
+            <td>
+              <i class="bi bi-person me-1"></i>{{ token.owner.username }}
+            </td>
+            <td>
+              <strong>{{ token.name }}</strong>
+            </td>
+            <td>
+              <code>{{ token.token_prefix }}...</code>
+            </td>
+            <td>
+              {% if not token.is_active %}
+              <span class="badge bg-danger">Révoqué</span>
+              {% elif token.is_expired %}
+              <span class="badge bg-warning text-dark">Expiré</span>
+              {% else %}
+              <span class="badge bg-success">Actif</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-secondary">{{ token.rate_limit }} req/h</span>
+            </td>
+            <td>{{ token.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>
+              {% if token.last_used_at %}
+              {{ token.last_used_at.strftime('%d/%m/%Y %H:%M') }}
+              {% else %}
+              <span class="text-muted">Jamais</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{{ url_for('api_tokens.admin_token_detail', token_id=token.id) }}" 
+                 class="btn btn-info btn-sm" title="Détails">
+                <i class="bi bi-graph-up"></i>
+              </a>
+              {% if token.is_active %}
+              <form method="POST" action="{{ url_for('api_tokens.revoke_token', token_id=token.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn btn-warning btn-sm" title="Révoquer" 
+                        onclick="return confirm('Êtes-vous sûr de vouloir révoquer ce token ?')">
+                  <i class="bi bi-slash-circle"></i>
+                </button>
+              </form>
+              {% else %}
+              <form method="POST" action="{{ url_for('api_tokens.activate_token', token_id=token.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn btn-success btn-sm" title="Réactiver">
+                  <i class="bi bi-check-circle"></i>
+                </button>
+              </form>
+              {% endif %}
+              <form method="POST" action="{{ url_for('api_tokens.delete_token', token_id=token.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn btn-danger btn-sm" title="Supprimer" 
+                        onclick="return confirm('Êtes-vous sûr de vouloir supprimer définitivement ce token ?')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+      <i class="bi bi-key display-1 text-muted"></i>
+      <p class="mt-3 text-muted">Aucun token API n'a été créé.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

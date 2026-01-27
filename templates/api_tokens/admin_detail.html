@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-graph-up me-2"></i>Détails du token</h1>
+  <a href="{{ url_for('api_tokens.admin_list') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Retour
+  </a>
+</div>
+
+<div class="row">
+  <!-- Informations du token -->
+  <div class="col-lg-4 mb-4">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-info-circle me-1"></i>Informations
+      </div>
+      <div class="card-body">
+        <dl class="mb-0">
+          <dt>Nom</dt>
+          <dd>{{ token.name }}</dd>
+          
+          <dt>Utilisateur</dt>
+          <dd><i class="bi bi-person me-1"></i>{{ token.owner.username }}</dd>
+          
+          <dt>Préfixe</dt>
+          <dd><code>{{ token.token_prefix }}...</code></dd>
+          
+          <dt>Statut</dt>
+          <dd>
+            {% if not token.is_active %}
+            <span class="badge bg-danger">Révoqué</span>
+            {% elif token.is_expired %}
+            <span class="badge bg-warning text-dark">Expiré</span>
+            {% else %}
+            <span class="badge bg-success">Actif</span>
+            {% endif %}
+          </dd>
+          
+          <dt>Créé le</dt>
+          <dd>{{ token.created_at.strftime('%d/%m/%Y à %H:%M') }}</dd>
+          
+          <dt>Dernière utilisation</dt>
+          <dd>
+            {% if token.last_used_at %}
+            {{ token.last_used_at.strftime('%d/%m/%Y à %H:%M') }}
+            {% else %}
+            <span class="text-muted">Jamais</span>
+            {% endif %}
+          </dd>
+          
+          <dt>Expire le</dt>
+          <dd>
+            {% if token.expires_at %}
+            {{ token.expires_at.strftime('%d/%m/%Y à %H:%M') }}
+            {% else %}
+            <span class="text-muted">Jamais</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+    </div>
+    
+    <!-- Rate Limiting -->
+    <div class="card mt-4">
+      <div class="card-header">
+        <i class="bi bi-speedometer2 me-1"></i>Rate Limiting
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('api_tokens.update_rate_limit', token_id=token.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          
+          <div class="mb-3">
+            <label for="rate_limit" class="form-label">Limite de requêtes par heure</label>
+            <div class="input-group">
+              <input type="number" class="form-control" id="rate_limit" name="rate_limit" 
+                     value="{{ token.rate_limit }}" min="1" required>
+              <span class="input-group-text">req/h</span>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Utilisation actuelle (dernière heure)</label>
+            <div class="progress" style="height: 25px;">
+              {% set usage_count = token.get_usage_count(hours=1) %}
+              {% set usage_percent = (usage_count / token.rate_limit * 100) | int %}
+              {% if usage_percent > 90 %}
+              {% set bar_class = 'bg-danger' %}
+              {% elif usage_percent > 70 %}
+              {% set bar_class = 'bg-warning' %}
+              {% else %}
+              {% set bar_class = 'bg-success' %}
+              {% endif %}
+              <div class="progress-bar {{ bar_class }}" role="progressbar" 
+                   style="width: {{ [usage_percent, 100] | min }}%">
+                {{ usage_count }} / {{ token.rate_limit }}
+              </div>
+            </div>
+          </div>
+          
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check me-1"></i>Mettre à jour
+          </button>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Actions -->
+    <div class="card mt-4">
+      <div class="card-header">
+        <i class="bi bi-gear me-1"></i>Actions
+      </div>
+      <div class="card-body">
+        {% if token.is_active %}
+        <form method="POST" action="{{ url_for('api_tokens.revoke_token', token_id=token.id) }}" class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn btn-warning w-100" 
+                  onclick="return confirm('Êtes-vous sûr de vouloir révoquer ce token ?')">
+            <i class="bi bi-slash-circle me-1"></i>Révoquer le token
+          </button>
+        </form>
+        {% else %}
+        <form method="POST" action="{{ url_for('api_tokens.activate_token', token_id=token.id) }}" class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Réactiver le token
+          </button>
+        </form>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('api_tokens.delete_token', token_id=token.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn btn-danger w-100" 
+                  onclick="return confirm('Êtes-vous sûr de vouloir supprimer définitivement ce token ? Cette action est irréversible.')">
+            <i class="bi bi-trash me-1"></i>Supprimer définitivement
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Statistiques -->
+  <div class="col-lg-8">
+    <!-- Codes de statut -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <i class="bi bi-pie-chart me-1"></i>Codes de statut
+          </div>
+          <div class="card-body">
+            {% if status_codes %}
+            <div class="row">
+              {% for status_code, count in status_codes %}
+              <div class="col-6 mb-2">
+                {% if status_code >= 200 and status_code < 300 %}
+                <span class="badge bg-success">{{ status_code }}</span>
+                {% elif status_code >= 400 and status_code < 500 %}
+                <span class="badge bg-warning text-dark">{{ status_code }}</span>
+                {% elif status_code >= 500 %}
+                <span class="badge bg-danger">{{ status_code }}</span>
+                {% else %}
+                <span class="badge bg-secondary">{{ status_code }}</span>
+                {% endif %}
+                <span class="ms-1">{{ count }} requêtes</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucune donnée disponible</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <i class="bi bi-clock-history me-1"></i>Utilisation (24h)
+          </div>
+          <div class="card-body">
+            {% if hourly_usage %}
+            <div class="small">
+              {% for hour, count in hourly_usage[-12:] %}
+              <div class="d-flex justify-content-between">
+                <span>{{ hour.split(' ')[1] }}</span>
+                <span class="badge bg-primary">{{ count }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aucune utilisation dans les dernières 24h</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Endpoints les plus utilisés -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-link-45deg me-1"></i>Endpoints les plus utilisés
+      </div>
+      <div class="card-body">
+        {% if endpoint_usage %}
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Méthode</th>
+                <th>Endpoint</th>
+                <th>Requêtes</th>
+                <th>Temps moyen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for endpoint, method, count, avg_time in endpoint_usage %}
+              <tr>
+                <td>
+                  {% if method == 'GET' %}
+                  <span class="badge bg-success">{{ method }}</span>
+                  {% elif method == 'POST' %}
+                  <span class="badge bg-primary">{{ method }}</span>
+                  {% elif method == 'PUT' or method == 'PATCH' %}
+                  <span class="badge bg-warning text-dark">{{ method }}</span>
+                  {% elif method == 'DELETE' %}
+                  <span class="badge bg-danger">{{ method }}</span>
+                  {% else %}
+                  <span class="badge bg-secondary">{{ method }}</span>
+                  {% endif %}
+                </td>
+                <td><code>{{ endpoint }}</code></td>
+                <td>{{ count }}</td>
+                <td>
+                  {% if avg_time %}
+                  {{ avg_time | int }} ms
+                  {% else %}
+                  -
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Aucune donnée disponible</p>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Historique des requêtes -->
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-list-ul me-1"></i>Historique des requêtes
+      </div>
+      <div class="card-body">
+        {% if usage_pagination.items %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Méthode</th>
+                <th>Endpoint</th>
+                <th>Statut</th>
+                <th>Temps</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for usage in usage_pagination.items %}
+              <tr>
+                <td class="small">{{ usage.timestamp.strftime('%d/%m %H:%M:%S') }}</td>
+                <td>
+                  {% if usage.method == 'GET' %}
+                  <span class="badge bg-success">{{ usage.method }}</span>
+                  {% elif usage.method == 'POST' %}
+                  <span class="badge bg-primary">{{ usage.method }}</span>
+                  {% elif usage.method == 'PUT' or usage.method == 'PATCH' %}
+                  <span class="badge bg-warning text-dark">{{ usage.method }}</span>
+                  {% elif usage.method == 'DELETE' %}
+                  <span class="badge bg-danger">{{ usage.method }}</span>
+                  {% else %}
+                  <span class="badge bg-secondary">{{ usage.method }}</span>
+                  {% endif %}
+                </td>
+                <td><code class="small">{{ usage.endpoint }}</code></td>
+                <td>
+                  {% if usage.status_code >= 200 and usage.status_code < 300 %}
+                  <span class="badge bg-success">{{ usage.status_code }}</span>
+                  {% elif usage.status_code >= 400 and usage.status_code < 500 %}
+                  <span class="badge bg-warning text-dark">{{ usage.status_code }}</span>
+                  {% elif usage.status_code >= 500 %}
+                  <span class="badge bg-danger">{{ usage.status_code }}</span>
+                  {% else %}
+                  <span class="badge bg-secondary">{{ usage.status_code }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if usage.response_time_ms %}
+                  {{ usage.response_time_ms }} ms
+                  {% else %}
+                  -
+                  {% endif %}
+                </td>
+                <td class="small text-muted">{{ usage.ip_address or '-' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if usage_pagination.pages > 1 %}
+        <nav aria-label="Pagination">
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            {% if usage_pagination.has_prev %}
+            <li class="page-item">
+              <a class="page-link" href="{{ url_for('api_tokens.admin_token_detail', token_id=token.id, page=usage_pagination.prev_num) }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+            {% endif %}
+            
+            {% for page_num in usage_pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if page_num %}
+            <li class="page-item {% if page_num == usage_pagination.page %}active{% endif %}">
+              <a class="page-link" href="{{ url_for('api_tokens.admin_token_detail', token_id=token.id, page=page_num) }}">
+                {{ page_num }}
+              </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+            {% endfor %}
+            
+            {% if usage_pagination.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="{{ url_for('api_tokens.admin_token_detail', token_id=token.id, page=usage_pagination.next_num) }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+        {% else %}
+        <p class="text-muted mb-0">Aucune requête enregistrée</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

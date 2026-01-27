@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-check-circle text-success me-2"></i>Token créé</h1>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card border-success">
+      <div class="card-header bg-success text-white">
+        <i class="bi bi-key me-1"></i>Votre nouveau token API
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <strong>Attention !</strong> Ce token ne sera affiché qu'une seule fois.
+          Copiez-le maintenant et conservez-le en lieu sûr.
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label fw-bold">Nom du token</label>
+          <p class="mb-0">{{ token.name }}</p>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label fw-bold">Token</label>
+          <div class="input-group">
+            <input type="text" class="form-control font-monospace" id="token-value" 
+                   value="{{ full_token }}" readonly>
+            <button class="btn btn-outline-primary" type="button" id="copy-token" title="Copier">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+        </div>
+        
+        {% if token.expires_at %}
+        <div class="mb-3">
+          <label class="form-label fw-bold">Expire le</label>
+          <p class="mb-0">{{ token.expires_at.strftime('%d/%m/%Y à %H:%M') }}</p>
+        </div>
+        {% endif %}
+        
+        <hr>
+        
+        <h6>Utilisation</h6>
+        <p>Incluez ce token dans vos requêtes API :</p>
+        
+        <div class="mb-3">
+          <label class="form-label">En-tête HTTP</label>
+          <pre class="bg-light p-2 rounded small"><code>Authorization: Bearer {{ full_token }}</code></pre>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Exemple avec curl</label>
+          <pre class="bg-light p-2 rounded small"><code>curl -H "Authorization: Bearer {{ full_token }}" \
+     https://votre-domaine.com/api/endpoint</code></pre>
+        </div>
+        
+        <div class="d-grid gap-2 mt-4">
+          <a href="{{ url_for('api_tokens.list_tokens') }}" class="btn btn-primary">
+            <i class="bi bi-arrow-left me-1"></i>Retour à la liste des tokens
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('copy-token').addEventListener('click', function() {
+    const tokenInput = document.getElementById('token-value');
+    tokenInput.select();
+    tokenInput.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(tokenInput.value).then(function() {
+        const btn = document.getElementById('copy-token');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i>';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-success');
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+});
+</script>
+{% endblock %}

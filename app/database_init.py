@@ -9,6 +9,8 @@ from models import (
     AlcoholCategory,
     AlcoholFieldRequirement,
     AlcoholSubcategory,
+    APIToken,
+    APITokenUsage,
     BottleFieldDefinition,
     CellarCategory,
     db,
