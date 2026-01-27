@@ -1080,8 +1080,6 @@ def get_vapid_key():
     if vapid_public_key.startswith("'") and vapid_public_key.endswith("'"):
         vapid_public_key = vapid_public_key[1:-1]
     
-    current_app.logger.info(f"[Push] Clé VAPID envoyée: {vapid_public_key[:30]}...")
-    
     return jsonify({"publicKey": vapid_public_key})
 
 
@@ -1101,27 +1099,35 @@ def subscribe_push():
     
     try:
         if not current_user.is_authenticated:
+            current_app.logger.warning("[Push] Utilisateur non authentifié")
             return jsonify({"error": "Authentification requise"}), 401
         
-        data = request.get_json()
+        # Récupérer les données JSON
+        data = request.get_json(force=True, silent=True)
         
         if not data:
-            return jsonify({"error": "Corps de requête JSON requis"}), 400
+            current_app.logger.error("[Push] Corps de requête invalide ou vide")
+            return jsonify({"error": "Corps de requête JSON requis ou invalide"}), 400
         
         endpoint = data.get("endpoint")
-        keys = data.get("keys", {})
-        
-        # Log pour debug
-        current_app.logger.info(f"[Push] Subscription reçue pour user {current_user.id}: endpoint={endpoint[:50] if endpoint else 'None'}...")
-        current_app.logger.info(f"[Push] Keys reçues: p256dh={bool(keys.get('p256dh'))}, auth={bool(keys.get('auth'))}")
+        keys = data.get("keys") or {}
+        if not isinstance(keys, dict):
+            keys = {}
+        if not keys.get("p256dh") and data.get("p256dh"):
+            keys["p256dh"] = data.get("p256dh")
+        if not keys.get("auth") and data.get("auth"):
+            keys["auth"] = data.get("auth")
         
         if not endpoint:
+            current_app.logger.error("[Push] Endpoint manquant")
             return jsonify({"error": "Endpoint manquant dans la subscription"}), 400
         
         if not keys.get("p256dh"):
+            current_app.logger.error("[Push] Clé p256dh manquante")
             return jsonify({"error": "Clé p256dh manquante dans la subscription"}), 400
             
         if not keys.get("auth"):
+            current_app.logger.error("[Push] Clé auth manquante")
             return jsonify({"error": "Clé auth manquante dans la subscription"}), 400
         
         # Vérifier si l'abonnement existe déjà
@@ -1139,7 +1145,7 @@ def subscribe_push():
                 return jsonify({"message": "Abonnement mis à jour", "id": existing.id})
             else:
                 # Endpoint déjà utilisé par un autre utilisateur - le réassigner
-                current_app.logger.warning(f"[Push] Endpoint réassigné de user {existing.user_id} à user {current_user.owner_id}")
+                current_app.logger.warning("[Push] Endpoint réassigné à un autre utilisateur")
                 existing.user_id = current_user.owner_id
                 existing.p256dh_key = keys["p256dh"]
                 existing.auth_key = keys["auth"]
@@ -1160,7 +1166,7 @@ def subscribe_push():
         db.session.add(subscription)
         db.session.commit()
         
-        current_app.logger.info(f"[Push] Nouvel abonnement créé: id={subscription.id} pour user {current_user.owner_id}")
+        current_app.logger.info(f"[Push] Nouvel abonnement créé: id={subscription.id}")
         
         return jsonify({"message": "Abonnement créé", "id": subscription.id}), 201
         

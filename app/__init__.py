@@ -115,6 +115,9 @@ def create_app(config_class=Config):
     from app.blueprints.api import api_bp
     from app.blueprints.advanced_stats import advanced_stats_bp
 
+    # Exempter tout le blueprint API du CSRF (appelé via fetch/js)
+    csrf.exempt(api_bp)
+
     flask_app.register_blueprint(auth_bp)
     flask_app.register_blueprint(wines_bp)
     flask_app.register_blueprint(cellars_bp)

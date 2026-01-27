@@ -1,3 +1,17 @@
+const APP_DEBUG = window.APP_DEBUG === true;
+
+function logDebug(...args) {
+    if (APP_DEBUG) {
+        console.log(...args);
+    }
+}
+
+function warnDebug(...args) {
+    if (APP_DEBUG) {
+        console.warn(...args);
+    }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     initServiceWorker();
     initThemeToggle();
@@ -18,10 +32,11 @@ function initServiceWorker() {
     if ("serviceWorker" in navigator) {
         // Enregistrer immédiatement avec scope racine
         // Note: Le serveur doit envoyer le header Service-Worker-Allowed: /
+        const swUrl = APP_DEBUG ? "/sw.js?debug=1" : "/sw.js";
         navigator.serviceWorker
-            .register("/sw.js", { scope: "/" })
+            .register(swUrl, { scope: "/" })
             .then((registration) => {
-                console.log(
+                logDebug(
                     "[PWA] Service Worker enregistré:",
                     registration.scope,
                 );
@@ -80,7 +95,7 @@ function showUpdateNotification() {
  */
 function initPushNotifications() {
     const enableBtn = document.getElementById("enableNotifications");
-    console.log("[Push] Initialisation, bouton trouvé:", !!enableBtn);
+    logDebug("[Push] Initialisation");
 
     // Vérifier si les notifications sont supportées
     if (
@@ -88,11 +103,7 @@ function initPushNotifications() {
         !("serviceWorker" in navigator) ||
         !("PushManager" in window)
     ) {
-        console.log("[Push] Notifications non supportées:", {
-            Notification: "Notification" in window,
-            serviceWorker: "serviceWorker" in navigator,
-            PushManager: "PushManager" in window,
-        });
+        logDebug("[Push] Notifications non supportées");
         if (enableBtn) {
             enableBtn.disabled = true;
             enableBtn.textContent = "Notifications non supportées";
@@ -100,20 +111,14 @@ function initPushNotifications() {
         return;
     }
 
-    console.log(
-        "[Push] Notifications supportées, permission actuelle:",
-        Notification.permission,
-    );
+    logDebug("[Push] Notifications supportées");
 
     // Mettre à jour l'état du bouton si présent
     if (enableBtn) {
         updateNotificationButton(enableBtn);
 
         enableBtn.addEventListener("click", async () => {
-            console.log(
-                "[Push] Clic sur le bouton, permission:",
-                Notification.permission,
-            );
+            logDebug("[Push] Clic sur le bouton notifications");
             const isCompact = enableBtn.classList.contains("theme-toggle");
             const originalContent = enableBtn.innerHTML;
 
@@ -130,18 +135,13 @@ function initPushNotifications() {
 
             try {
                 if (Notification.permission === "granted") {
-                    console.log(
-                        "[Push] Permission déjà accordée, vérification abonnement...",
-                    );
+                    logDebug("[Push] Permission déjà accordée");
                     // Vérifier si déjà abonné
                     const registration = await navigator.serviceWorker.ready;
-                    console.log(
-                        "[Push] Service Worker prêt:",
-                        registration.scope,
-                    );
+                    logDebug("[Push] Service Worker prêt");
                     const subscription =
                         await registration.pushManager.getSubscription();
-                    console.log("[Push] Abonnement existant:", !!subscription);
+                    logDebug("[Push] Abonnement existant:", !!subscription);
 
                     if (subscription) {
                         await unsubscribeFromPush();
@@ -149,19 +149,16 @@ function initPushNotifications() {
                         await subscribeToPush();
                     }
                 } else if (Notification.permission === "default") {
-                    console.log("[Push] Demande de permission...");
+                    logDebug("[Push] Demande de permission...");
                     // Demander la permission
                     const permission = await Notification.requestPermission();
-                    console.log("[Push] Permission obtenue:", permission);
+                    logDebug("[Push] Permission obtenue");
                     if (permission === "granted") {
                         await subscribeToPush();
                         showNotificationSuccess();
                     }
                 } else {
-                    console.log(
-                        "[Push] Permission refusée:",
-                        Notification.permission,
-                    );
+                    logDebug("[Push] Permission refusée");
                 }
             } catch (error) {
                 console.error("[Push] Erreur:", error);
@@ -183,14 +180,12 @@ async function checkPushSubscription() {
         const subscription = await registration.pushManager.getSubscription();
 
         if (subscription) {
-            console.log("[Push] Abonnement actif:", subscription.endpoint);
-            // Mettre à jour l'UI si nécessaire
             document.body.classList.add("push-subscribed");
         } else {
             document.body.classList.remove("push-subscribed");
         }
     } catch (error) {
-        console.log("[Push] Erreur vérification abonnement:", error);
+        console.error("[Push] Erreur vérification abonnement:", error);
     }
 }
 
@@ -251,10 +246,10 @@ function updateNotificationButton(btn) {
 
 async function subscribeToPush() {
     try {
-        console.log("[Push] Début subscribeToPush...");
+        logDebug("[Push] Début subscribeToPush");
 
         // Attendre que le service worker soit prêt avec un timeout
-        console.log("[Push] Attente du Service Worker...");
+        logDebug("[Push] Attente du Service Worker");
         const registration = await Promise.race([
             navigator.serviceWorker.ready,
             new Promise((_, reject) =>
@@ -265,16 +260,13 @@ async function subscribeToPush() {
                 ),
             ),
         ]);
-        console.log("[Push] Service Worker prêt:", registration.scope);
+        logDebug("[Push] Service Worker prêt");
 
         // Récupérer la clé VAPID depuis le serveur si non définie
         let vapidKey = window.VAPID_PUBLIC_KEY;
-        console.log("[Push] Clé VAPID en cache:", !!vapidKey);
-
         if (!vapidKey) {
-            console.log("[Push] Récupération de la clé VAPID...");
+            logDebug("[Push] Récupération de la clé VAPID");
             const response = await fetch("/api/push/vapid-key");
-            console.log("[Push] Réponse VAPID:", response.status);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -284,10 +276,6 @@ async function subscribeToPush() {
             }
             const data = await response.json();
             vapidKey = data.publicKey;
-            console.log(
-                "[Push] Clé VAPID reçue:",
-                vapidKey ? vapidKey.substring(0, 20) + "..." : "null",
-            );
         }
 
         if (!vapidKey) {
@@ -297,42 +285,44 @@ async function subscribeToPush() {
         }
 
         // S'abonner aux notifications push
-        console.log("[Push] Création de l'abonnement pushManager...");
+        logDebug("[Push] Création de l'abonnement pushManager");
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey),
         });
-        console.log(
-            "[Push] Abonnement créé:",
-            subscription.endpoint.substring(0, 50) + "...",
-        );
+        logDebug("[Push] Abonnement créé");
 
         // Envoyer la subscription au serveur
-        const subscriptionData = subscription.toJSON();
-        console.log(
-            "[Push] Données à envoyer:",
-            JSON.stringify(subscriptionData).substring(0, 100) + "...",
-        );
-
+        const subscriptionData = normalizePushSubscription(subscription);
         const response = await fetch("/api/push/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(subscriptionData),
+            credentials: "same-origin",
         });
-        console.log("[Push] Réponse serveur:", response.status);
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error("[Push] Erreur serveur:", errorData);
+            const errorText = await response.text();
+            let errorData = {};
+            if (errorText) {
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch (parseError) {
+                    errorData = {};
+                }
+            }
+            console.error("[Push] Erreur serveur:", errorData || errorText);
             // Si erreur serveur, désabonner localement pour éviter l'incohérence
             await subscription.unsubscribe().catch(() => {});
             throw new Error(
-                errorData.error || "Erreur serveur lors de l'abonnement",
+                errorData.error ||
+                    errorText ||
+                    "Erreur serveur lors de l'abonnement",
             );
         }
 
-        const result = await response.json();
-        console.log("[Push] Abonnement réussi, ID:", result.id);
+        const result = await response.json().catch(() => ({}));
+        logDebug("[Push] Abonnement réussi");
         document.body.classList.add("push-subscribed");
 
         // Envoyer une notification de test
@@ -362,7 +352,7 @@ async function unsubscribeFromPush() {
             await subscription.unsubscribe();
         }
 
-        console.log("[Push] Désabonnement réussi");
+        logDebug("[Push] Désabonnement réussi");
         document.body.classList.remove("push-subscribed");
     } catch (error) {
         console.error("[Push] Erreur de désabonnement:", error);
@@ -380,11 +370,6 @@ function urlBase64ToUint8Array(base64String) {
         cleanedString = cleanedString.slice(1, -1);
     }
 
-    console.log(
-        "[Push] Clé VAPID nettoyée:",
-        cleanedString.substring(0, 30) + "...",
-    );
-
     const padding = "=".repeat((4 - (cleanedString.length % 4)) % 4);
     const base64 = (cleanedString + padding)
         .replace(/-/g, "+")
@@ -397,6 +382,46 @@ function urlBase64ToUint8Array(base64String) {
         outputArray[i] = rawData.charCodeAt(i);
     }
     return outputArray;
+}
+
+function normalizePushSubscription(subscription) {
+    const subscriptionData =
+        typeof subscription.toJSON === "function"
+            ? subscription.toJSON()
+            : {};
+
+    if (!subscriptionData.endpoint && subscription.endpoint) {
+        subscriptionData.endpoint = subscription.endpoint;
+    }
+
+    if (!subscriptionData.keys || typeof subscriptionData.keys !== "object") {
+        subscriptionData.keys = {};
+    }
+
+    if (!subscriptionData.keys.p256dh && subscription.getKey) {
+        const p256dh = subscription.getKey("p256dh");
+        if (p256dh) {
+            subscriptionData.keys.p256dh = arrayBufferToBase64(p256dh);
+        }
+    }
+
+    if (!subscriptionData.keys.auth && subscription.getKey) {
+        const auth = subscription.getKey("auth");
+        if (auth) {
+            subscriptionData.keys.auth = arrayBufferToBase64(auth);
+        }
+    }
+
+    return subscriptionData;
+}
+
+function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
 }
 
 function showNotificationSuccess() {
@@ -443,7 +468,7 @@ async function sendTestNotification() {
     try {
         await fetch("/api/push/test", { method: "POST" });
     } catch (e) {
-        console.log("[Push] Notification de test non envoyée");
+        console.error("[Push] Notification de test non envoyée");
     }
 }
 
@@ -779,7 +804,7 @@ function initWineCards() {
                 }
             }
         } catch (err) {
-            console.warn(
+            warnDebug(
                 "Impossible de parser les informations enrichies",
                 err,
             );
@@ -1057,7 +1082,7 @@ async function updateCacheStats(element) {
 }
 
 function displayCacheStatus(status) {
-    console.log("[Cache] Statut:", status);
+    logDebug("[Cache] Statut:", status);
     // Peut être utilisé pour afficher les détails dans l'UI
 }
 

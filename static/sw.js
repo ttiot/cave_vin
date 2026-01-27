@@ -9,6 +9,20 @@ const STATIC_CACHE = `cave-vin-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `cave-vin-dynamic-${CACHE_VERSION}`;
 const IMAGES_CACHE = `cave-vin-images-${CACHE_VERSION}`;
 const OFFLINE_QUEUE_KEY = "cave-vin-offline-queue";
+const DEBUG =
+    new URL(self.location.href).searchParams.get("debug") === "1";
+
+function logDebug(...args) {
+    if (DEBUG) {
+        console.log(...args);
+    }
+}
+
+function warnDebug(...args) {
+    if (DEBUG) {
+        console.warn(...args);
+    }
+}
 
 // Ressources statiques à mettre en cache immédiatement
 const STATIC_ASSETS = [
@@ -25,9 +39,10 @@ const STATIC_ASSETS = [
     "/static/icons/icon-192x192.png",
     "/static/icons/icon-384x384.png",
     "/static/icons/icon-512x512.png",
-    "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
-    "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css",
-    "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
+    "/static/vendor/bootstrap/css/bootstrap.min.css",
+    "/static/vendor/bootstrap-icons/bootstrap-icons.css",
+    "/static/vendor/bootstrap/js/bootstrap.bundle.min.js",
+    "/static/vendor/quagga/quagga.min.js",
 ];
 
 // Pages à pré-cacher pour le mode hors-ligne
@@ -168,18 +183,25 @@ const OFFLINE_PAGE = `<!DOCTYPE html>
 // INSTALLATION
 // ============================================
 self.addEventListener("install", (event) => {
-    console.log("[SW] Installation v2...");
-
     event.waitUntil(
         Promise.all([
             // Cache des ressources statiques
             caches.open(STATIC_CACHE).then((cache) => {
-                console.log("[SW] Mise en cache des ressources statiques");
-                return cache.addAll(STATIC_ASSETS);
+                return Promise.allSettled(
+                    STATIC_ASSETS.map((asset) => cache.add(asset)),
+                ).then((results) => {
+                    results.forEach((result, index) => {
+                        if (result.status === "rejected") {
+                            warnDebug(
+                                "[SW] Ressource statique ignorée:",
+                                STATIC_ASSETS[index],
+                            );
+                        }
+                    });
+                });
             }),
             // Pré-cache des pages importantes
             caches.open(DYNAMIC_CACHE).then(async (cache) => {
-                console.log("[SW] Pré-cache des pages hors-ligne");
                 for (const page of OFFLINE_PAGES) {
                     try {
                         const response = await fetch(page, {
@@ -189,7 +211,10 @@ self.addEventListener("install", (event) => {
                             await cache.put(page, response);
                         }
                     } catch (e) {
-                        console.log(`[SW] Impossible de pré-cacher ${page}`);
+                        console.error(
+                            "[SW] Impossible de pré-cacher une page hors-ligne",
+                            e,
+                        );
                     }
                 }
             }),
@@ -203,8 +228,6 @@ self.addEventListener("install", (event) => {
 // ACTIVATION
 // ============================================
 self.addEventListener("activate", (event) => {
-    console.log("[SW] Activation v2...");
-
     event.waitUntil(
         caches
             .keys()
@@ -220,13 +243,7 @@ self.addEventListener("activate", (event) => {
                                 name !== IMAGES_CACHE
                             );
                         })
-                        .map((name) => {
-                            console.log(
-                                "[SW] Suppression cache obsolète:",
-                                name,
-                            );
-                            return caches.delete(name);
-                        }),
+                        .map((name) => caches.delete(name)),
                 );
             })
             .then(() => self.clients.claim()),
@@ -370,8 +387,6 @@ async function networkFirstWithOffline(request) {
         }
         return response;
     } catch (error) {
-        console.log("[SW] Réseau indisponible, recherche dans le cache...");
-
         // Chercher dans le cache
         const cached = await caches.match(request);
         if (cached) {
@@ -451,7 +466,7 @@ async function handleOfflineRequest(request) {
         });
         localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
     } catch (e) {
-        console.log("[SW] Impossible de mettre en file d'attente:", e);
+        console.error("[SW] Impossible de mettre en file d'attente:", e);
     }
 }
 
@@ -460,8 +475,6 @@ async function handleOfflineRequest(request) {
 // ============================================
 
 self.addEventListener("push", (event) => {
-    console.log("[SW] Notification push reçue");
-
     let data = {
         title: "Cave à Vin",
         body: "Nouvelle notification",
@@ -513,8 +526,6 @@ self.addEventListener("push", (event) => {
 
 // Clic sur une notification
 self.addEventListener("notificationclick", (event) => {
-    console.log("[SW] Clic sur notification:", event.action);
-
     event.notification.close();
 
     if (event.action === "close") {
@@ -549,7 +560,6 @@ self.addEventListener("notificationclick", (event) => {
 
 // Fermeture d'une notification
 self.addEventListener("notificationclose", (event) => {
-    console.log("[SW] Notification fermée:", event.notification.tag);
     // Possibilité de tracker les notifications fermées
 });
 
@@ -558,8 +568,6 @@ self.addEventListener("notificationclose", (event) => {
 // ============================================
 
 self.addEventListener("sync", (event) => {
-    console.log("[SW] Synchronisation:", event.tag);
-
     switch (event.tag) {
         case "sync-consumptions":
             event.waitUntil(syncConsumptions());
@@ -568,21 +576,18 @@ self.addEventListener("sync", (event) => {
             event.waitUntil(syncOfflineQueue());
             break;
         default:
-            console.log("[SW] Tag de sync inconnu:", event.tag);
+            warnDebug("[SW] Tag de sync inconnu:", event.tag);
     }
 });
 
 // Synchroniser les consommations en attente
 async function syncConsumptions() {
-    console.log("[SW] Synchronisation des consommations...");
     // Implémentation de la synchronisation des consommations
     // Cette fonction serait appelée quand la connexion est rétablie
 }
 
 // Synchroniser la file d'attente hors-ligne
 async function syncOfflineQueue() {
-    console.log("[SW] Synchronisation de la file d'attente hors-ligne...");
-
     try {
         const queue = JSON.parse(
             localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]",
@@ -591,9 +596,8 @@ async function syncOfflineQueue() {
         for (const item of queue) {
             try {
                 await fetch(item.url, { method: item.method });
-                console.log("[SW] Requête synchronisée:", item.url);
             } catch (e) {
-                console.log("[SW] Échec sync:", item.url);
+                console.error("[SW] Échec sync:", item.url, e);
             }
         }
 
@@ -609,8 +613,6 @@ async function syncOfflineQueue() {
 // ============================================
 
 self.addEventListener("periodicsync", (event) => {
-    console.log("[SW] Periodic sync:", event.tag);
-
     if (event.tag === "update-cache") {
         event.waitUntil(updateCache());
     }
@@ -618,8 +620,6 @@ self.addEventListener("periodicsync", (event) => {
 
 // Mettre à jour le cache périodiquement
 async function updateCache() {
-    console.log("[SW] Mise à jour périodique du cache...");
-
     const cache = await caches.open(DYNAMIC_CACHE);
 
     for (const page of OFFLINE_PAGES) {
@@ -627,10 +627,9 @@ async function updateCache() {
             const response = await fetch(page, { credentials: "same-origin" });
             if (response.ok) {
                 await cache.put(page, response);
-                console.log("[SW] Cache mis à jour:", page);
             }
         } catch (e) {
-            console.log("[SW] Impossible de mettre à jour:", page);
+            console.error("[SW] Impossible de mettre à jour:", page, e);
         }
     }
 }
@@ -640,8 +639,6 @@ async function updateCache() {
 // ============================================
 
 self.addEventListener("message", (event) => {
-    console.log("[SW] Message reçu:", event.data);
-
     switch (event.data.type) {
         case "SKIP_WAITING":
             self.skipWaiting();
@@ -656,7 +653,7 @@ self.addEventListener("message", (event) => {
             event.waitUntil(getCacheStatus(event));
             break;
         default:
-            console.log("[SW] Type de message inconnu:", event.data.type);
+            warnDebug("[SW] Type de message inconnu:", event.data.type);
     }
 });
 
@@ -664,7 +661,6 @@ self.addEventListener("message", (event) => {
 async function clearAllCaches() {
     const cacheNames = await caches.keys();
     await Promise.all(cacheNames.map((name) => caches.delete(name)));
-    console.log("[SW] Tous les caches vidés");
 }
 
 // Mettre une page en cache
@@ -674,7 +670,6 @@ async function cachePage(url) {
         const response = await fetch(url, { credentials: "same-origin" });
         if (response.ok) {
             await cache.put(url, response);
-            console.log("[SW] Page mise en cache:", url);
         }
     } catch (e) {
         console.error("[SW] Erreur cache page:", e);
@@ -697,5 +692,3 @@ async function getCacheStatus(event) {
         status: status,
     });
 }
-
-console.log("[SW] Service Worker v2 chargé");
