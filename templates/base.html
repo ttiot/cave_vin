@@ -19,10 +19,33 @@
       <span class="ms-2 fw-semibold">Ma Cave</span>
     </a>
     
+    <!-- Bouton recherche mobile (visible uniquement sur mobile) -->
+    <button class="btn btn-link text-light d-lg-none me-2 navbar-search-toggle" type="button" aria-label="Rechercher">
+      <i class="bi bi-search fs-5"></i>
+    </button>
+    
     <!-- Bouton hamburger pour mobile -->
     <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Menu">
       <span class="navbar-toggler-icon"></span>
     </button>
+    
+    <!-- Barre de recherche mobile (cachée par défaut) -->
+    <div class="navbar-search-mobile w-100 d-lg-none" style="display: none;">
+      <form class="d-flex" action="{{ url_for('search.search_wines') }}" method="GET">
+        <div class="input-group">
+          <input type="text" class="form-control form-control-sm" name="wine_name" placeholder="Rechercher un vin..." aria-label="Rechercher">
+          <button class="btn btn-outline-light btn-sm" type="submit" title="Rechercher">
+            <i class="bi bi-search"></i>
+          </button>
+          <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-info btn-sm" title="Recherche avancée">
+            <i class="bi bi-sliders"></i>
+          </a>
+          <button class="btn btn-outline-secondary btn-sm navbar-search-close" type="button" aria-label="Fermer">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </form>
+    </div>
     
     <!-- Menu principal -->
     <div class="collapse navbar-collapse" id="navbarMain">
@@ -48,13 +71,6 @@
           </ul>
         </li>
         
-        <!-- Recherche -->
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('search.search_wines') }}">
-            <i class="bi bi-search me-1"></i>Recherche
-          </a>
-        </li>
-        
         <!-- À consommer -->
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('search.wines_to_consume') }}">
@@ -78,6 +94,19 @@
       
       <!-- Actions rapides (droite) -->
       <div class="d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center gap-2">
+        <!-- Barre de recherche desktop (visible uniquement sur desktop) -->
+        <form class="d-none d-lg-flex me-2" action="{{ url_for('search.search_wines') }}" method="GET">
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control navbar-search-input" name="wine_name" placeholder="Rechercher..." aria-label="Rechercher">
+            <button class="btn btn-outline-light" type="submit" title="Rechercher">
+              <i class="bi bi-search"></i>
+            </button>
+            <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-info" title="Recherche avancée">
+              <i class="bi bi-sliders"></i>
+            </a>
+          </div>
+        </form>
+        
         <a href="{{ url_for('wines.add_wine') }}" class="btn btn-success btn-sm">
           <i class="bi bi-plus-lg me-1"></i>Ajouter
         </a>
