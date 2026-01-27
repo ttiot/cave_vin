@@ -10,6 +10,7 @@ class Config:
     # Protection CSRF
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = 3600  # Limite la durée de vie des tokens CSRF à 1h
+    WTF_CSRF_EXEMPT_LOGIN = os.environ.get('CSRF_EXEMPT_LOGIN', '0').lower() in {'1', 'true', 'yes', 'on'}
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', 'https://api.openai.com/v1')
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL')
