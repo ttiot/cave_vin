@@ -33,7 +33,24 @@ def login():
     """Page de connexion."""
     next_url = request.args.get('next')
 
+    def _log_csrf_state(stage: str) -> None:
+        """Log des infos utiles pour debug CSRF sans exposer de secrets."""
+        current_app.logger.info(
+            "[Auth][%s] secure=%s proto=%s ua=%s referer=%s cookie_session=%s form_csrf=%s",
+            stage,
+            request.is_secure,
+            request.headers.get('X-Forwarded-Proto'),
+            request.headers.get('User-Agent'),
+            request.headers.get('Referer'),
+            "present" if request.cookies.get("session") else "missing",
+            "present" if request.form.get("csrf_token") else "missing",
+        )
+
+    if request.method == 'GET':
+        _log_csrf_state("login_get")
+
     if request.method == 'POST':
+        _log_csrf_state("login_post")
         client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown').split(',')[0].strip()
         now = time()
         attempts = _login_attempts[client_ip]
