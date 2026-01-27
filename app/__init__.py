@@ -3,9 +3,9 @@
 import os
 
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask import Flask, request
+from flask import Flask
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_wtf.csrf import CSRFProtect
 import logging
 
 from models import db, User
@@ -38,19 +38,6 @@ def create_app(config_class=Config):
     db.init_app(flask_app)
     csrf = CSRFProtect(flask_app)
     
-    @flask_app.errorhandler(CSRFError)
-    def handle_csrf_error(error):
-        """Journalise les erreurs CSRF pour faciliter le diagnostic."""
-        flask_app.logger.warning(
-            "[CSRF] %s path=%s ua=%s referer=%s session_cookie=%s",
-            error.description,
-            request.path,
-            request.headers.get("User-Agent"),
-            request.headers.get("Referer"),
-            "present" if request.cookies.get("session") else "missing",
-        )
-        return error.description, 400
-
     # Exempter les routes API de la protection CSRF (elles utilisent l'auth par token)
     csrf.exempt("api.list_wines")
     csrf.exempt("api.get_wine")
@@ -142,8 +129,6 @@ def create_app(config_class=Config):
     # Exempter tout le blueprint API du CSRF (appelé via fetch/js)
     csrf.exempt(api_bp)
 
-    if flask_app.config.get("WTF_CSRF_EXEMPT_LOGIN"):
-        csrf.exempt("auth.login")
 
     flask_app.register_blueprint(auth_bp)
     flask_app.register_blueprint(wines_bp)
