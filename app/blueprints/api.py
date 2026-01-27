@@ -2194,5 +2194,8 @@ def openapi_spec():
 def swagger_ui():
     """Affiche l'interface Swagger UI pour explorer l'API."""
     from flask import url_for
-    spec_url = url_for("api.openapi_spec", _external=True)
+    # Utiliser le même schéma que la requête pour éviter les erreurs de mixed-content
+    # Vérifier X-Forwarded-Proto pour les proxies (nginx, etc.)
+    scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+    spec_url = url_for("api.openapi_spec", _external=True, _scheme=scheme)
     return render_template_string(SWAGGER_UI_HTML, spec_url=spec_url)
