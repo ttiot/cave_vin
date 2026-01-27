@@ -100,6 +100,24 @@
   </div>
 </div>
 
+<!-- Lien vers la documentation API -->
+<div class="card mt-4 border-primary">
+  <div class="card-header bg-primary text-white">
+    <i class="bi bi-book me-1"></i>Documentation API interactive
+  </div>
+  <div class="card-body">
+    <p>Explorez et testez tous les endpoints de l'API directement depuis votre navigateur avec notre interface Swagger UI.</p>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('api.swagger_ui') }}" class="btn btn-primary">
+        <i class="bi bi-play-circle me-1"></i>Ouvrir la documentation
+      </a>
+      <a href="{{ url_for('api.openapi_spec') }}" class="btn btn-outline-secondary" target="_blank">
+        <i class="bi bi-filetype-json me-1"></i>Télécharger OpenAPI Spec
+      </a>
+    </div>
+  </div>
+</div>
+
 <div class="card mt-4">
   <div class="card-header">
     <i class="bi bi-info-circle me-1"></i>Comment utiliser les tokens API
@@ -109,13 +127,16 @@
     
     <h6>Authentification</h6>
     <p>Incluez votre token dans l'en-tête <code>Authorization</code> de vos requêtes :</p>
-    <pre class="bg-light p-3 rounded"><code>Authorization: Bearer cv_votre_token_ici</code></pre>
+    <pre class="bg-light p-3 rounded"><code>Authorization: Bearer cvt_votre_token_ici</code></pre>
     
     <p>Ou utilisez le paramètre <code>api_key</code> :</p>
-    <pre class="bg-light p-3 rounded"><code>GET /api/endpoint?api_key=cv_votre_token_ici</code></pre>
+    <pre class="bg-light p-3 rounded"><code>GET /api/endpoint?api_key=cvt_votre_token_ici</code></pre>
     
     <h6 class="mt-4">Limites</h6>
     <p>Chaque token a une limite de requêtes par heure. En cas de dépassement, vous recevrez une erreur HTTP 429.</p>
+    
+    <h6 class="mt-4">Tester l'API</h6>
+    <p>Utilisez la <a href="{{ url_for('api.swagger_ui') }}">documentation interactive</a> pour tester vos requêtes. Collez simplement votre token dans le champ d'authentification et explorez les endpoints disponibles.</p>
   </div>
 </div>
 {% endblock %}

@@ -501,3 +501,41 @@ class UserSettings(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     user = db.relationship("User", backref=db.backref("settings", uselist=False, cascade="all, delete-orphan"))
+
+
+class PushSubscription(db.Model):
+    """Abonnement aux notifications push pour un utilisateur."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    endpoint = db.Column(db.String(500), nullable=False, unique=True)
+    p256dh_key = db.Column(db.String(200), nullable=False)
+    auth_key = db.Column(db.String(100), nullable=False)
+    user_agent = db.Column(db.String(255), nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", backref=db.backref("push_subscriptions", cascade="all, delete-orphan"))
+
+    def to_dict(self) -> dict:
+        """Retourne la subscription au format Web Push."""
+        return {
+            "endpoint": self.endpoint,
+            "keys": {
+                "p256dh": self.p256dh_key,
+                "auth": self.auth_key,
+            }
+        }
+
+    @staticmethod
+    def from_subscription_info(user_id: int, subscription: dict, user_agent: str = None) -> "PushSubscription":
+        """Crée une instance depuis les données de subscription du navigateur."""
+        keys = subscription.get("keys", {})
+        return PushSubscription(
+            user_id=user_id,
+            endpoint=subscription.get("endpoint"),
+            p256dh_key=keys.get("p256dh"),
+            auth_key=keys.get("auth"),
+            user_agent=user_agent,
+        )

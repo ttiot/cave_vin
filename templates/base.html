@@ -101,11 +101,18 @@
           </a>
         </li>
         
-        <!-- Tokens API (utilisateur) -->
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('api_tokens.list_tokens') }}">
-            <i class="bi bi-key me-1"></i>API
+        <!-- API (dropdown) -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-code-slash me-1"></i>API
           </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="{{ url_for('api_tokens.list_tokens') }}"><i class="bi bi-key me-2"></i>Mes tokens</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('api_tokens.create_token') }}"><i class="bi bi-plus-circle me-2"></i>Créer un token</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('api.swagger_ui') }}"><i class="bi bi-book me-2"></i>Documentation</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('api.openapi_spec') }}" target="_blank"><i class="bi bi-filetype-json me-2"></i>OpenAPI Spec</a></li>
+          </ul>
         </li>
         
         {% if current_user.is_admin %}

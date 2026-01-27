@@ -7,6 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initMobileSearch();
     initPushNotifications();
     initTutorial();
+    initOfflineIndicator();
+    initCacheManagement();
 });
 
 /**
@@ -78,72 +80,154 @@ function showUpdateNotification() {
  */
 function initPushNotifications() {
     const enableBtn = document.getElementById("enableNotifications");
-    if (!enableBtn) return;
 
     // Vérifier si les notifications sont supportées
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-        enableBtn.disabled = true;
-        enableBtn.textContent = "Notifications non supportées";
+    if (
+        !("Notification" in window) ||
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window)
+    ) {
+        if (enableBtn) {
+            enableBtn.disabled = true;
+            enableBtn.textContent = "Notifications non supportées";
+        }
         return;
     }
 
-    // Mettre à jour l'état du bouton
-    updateNotificationButton(enableBtn);
+    // Mettre à jour l'état du bouton si présent
+    if (enableBtn) {
+        updateNotificationButton(enableBtn);
 
-    enableBtn.addEventListener("click", async () => {
-        if (Notification.permission === "granted") {
-            // Désactiver les notifications
-            await unsubscribeFromPush();
-            updateNotificationButton(enableBtn);
-        } else {
-            // Demander la permission
-            const permission = await Notification.requestPermission();
-            if (permission === "granted") {
-                await subscribeToPush();
+        enableBtn.addEventListener("click", async () => {
+            enableBtn.disabled = true;
+            enableBtn.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-1"></span>Chargement...';
+
+            try {
+                if (Notification.permission === "granted") {
+                    // Vérifier si déjà abonné
+                    const registration = await navigator.serviceWorker.ready;
+                    const subscription =
+                        await registration.pushManager.getSubscription();
+
+                    if (subscription) {
+                        await unsubscribeFromPush();
+                    } else {
+                        await subscribeToPush();
+                    }
+                } else if (Notification.permission === "default") {
+                    // Demander la permission
+                    const permission = await Notification.requestPermission();
+                    if (permission === "granted") {
+                        await subscribeToPush();
+                        showNotificationSuccess();
+                    }
+                }
+            } catch (error) {
+                console.error("[Push] Erreur:", error);
+                showNotificationError(error.message);
             }
+
+            enableBtn.disabled = false;
             updateNotificationButton(enableBtn);
+        });
+    }
+
+    // Vérifier l'état de l'abonnement au chargement
+    checkPushSubscription();
+}
+
+async function checkPushSubscription() {
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (subscription) {
+            console.log("[Push] Abonnement actif:", subscription.endpoint);
+            // Mettre à jour l'UI si nécessaire
+            document.body.classList.add("push-subscribed");
+        } else {
+            document.body.classList.remove("push-subscribed");
         }
-    });
+    } catch (error) {
+        console.log("[Push] Erreur vérification abonnement:", error);
+    }
 }
 
 function updateNotificationButton(btn) {
-    if (Notification.permission === "granted") {
-        btn.innerHTML =
-            '<i class="bi bi-bell-slash me-1"></i>Désactiver les notifications';
-        btn.classList.remove("btn-primary");
-        btn.classList.add("btn-outline-secondary");
-    } else if (Notification.permission === "denied") {
-        btn.innerHTML =
-            '<i class="bi bi-bell-slash me-1"></i>Notifications bloquées';
-        btn.disabled = true;
-    } else {
-        btn.innerHTML =
-            '<i class="bi bi-bell me-1"></i>Activer les notifications';
-        btn.classList.remove("btn-outline-secondary");
-        btn.classList.add("btn-primary");
-    }
+    navigator.serviceWorker.ready.then(async (registration) => {
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (Notification.permission === "denied") {
+            btn.innerHTML =
+                '<i class="bi bi-bell-slash me-1"></i>Notifications bloquées';
+            btn.disabled = true;
+            btn.classList.remove("btn-primary", "btn-outline-secondary");
+            btn.classList.add("btn-secondary");
+        } else if (subscription) {
+            btn.innerHTML =
+                '<i class="bi bi-bell-fill me-1"></i>Notifications activées';
+            btn.classList.remove("btn-primary", "btn-secondary");
+            btn.classList.add("btn-outline-success");
+            btn.disabled = false;
+        } else {
+            btn.innerHTML =
+                '<i class="bi bi-bell me-1"></i>Activer les notifications';
+            btn.classList.remove(
+                "btn-outline-secondary",
+                "btn-outline-success",
+                "btn-secondary",
+            );
+            btn.classList.add("btn-primary");
+            btn.disabled = false;
+        }
+    });
 }
 
 async function subscribeToPush() {
     try {
         const registration = await navigator.serviceWorker.ready;
+
+        // Récupérer la clé VAPID depuis le serveur si non définie
+        let vapidKey = window.VAPID_PUBLIC_KEY;
+        if (!vapidKey) {
+            const response = await fetch("/api/push/vapid-key");
+            if (response.ok) {
+                const data = await response.json();
+                vapidKey = data.publicKey;
+            }
+        }
+
+        if (!vapidKey) {
+            throw new Error("Clé VAPID non disponible");
+        }
+
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(
-                window.VAPID_PUBLIC_KEY || "",
-            ),
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
         });
 
         // Envoyer la subscription au serveur
-        await fetch("/api/push/subscribe", {
+        const response = await fetch("/api/push/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(subscription),
         });
 
+        if (!response.ok) {
+            throw new Error("Erreur serveur lors de l'abonnement");
+        }
+
         console.log("[Push] Abonnement réussi");
+        document.body.classList.add("push-subscribed");
+
+        // Envoyer une notification de test
+        sendTestNotification();
+
+        return subscription;
     } catch (error) {
         console.error("[Push] Erreur d'abonnement:", error);
+        throw error;
     }
 }
 
@@ -153,19 +237,22 @@ async function unsubscribeFromPush() {
         const subscription = await registration.pushManager.getSubscription();
 
         if (subscription) {
-            await subscription.unsubscribe();
-
-            // Informer le serveur
+            // Informer le serveur d'abord
             await fetch("/api/push/unsubscribe", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ endpoint: subscription.endpoint }),
             });
+
+            // Puis se désabonner localement
+            await subscription.unsubscribe();
         }
 
         console.log("[Push] Désabonnement réussi");
+        document.body.classList.remove("push-subscribed");
     } catch (error) {
         console.error("[Push] Erreur de désabonnement:", error);
+        throw error;
     }
 }
 
@@ -182,6 +269,54 @@ function urlBase64ToUint8Array(base64String) {
         outputArray[i] = rawData.charCodeAt(i);
     }
     return outputArray;
+}
+
+function showNotificationSuccess() {
+    const toast = document.createElement("div");
+    toast.className = "position-fixed bottom-0 end-0 p-3";
+    toast.style.zIndex = "1100";
+    toast.innerHTML = `
+        <div class="toast show bg-success text-white" role="alert">
+            <div class="toast-header bg-success text-white">
+                <i class="bi bi-bell-fill me-2"></i>
+                <strong class="me-auto">Notifications activées</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                Vous recevrez des notifications pour les rappels de consommation et les mises à jour importantes.
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+function showNotificationError(message) {
+    const toast = document.createElement("div");
+    toast.className = "position-fixed bottom-0 end-0 p-3";
+    toast.style.zIndex = "1100";
+    toast.innerHTML = `
+        <div class="toast show bg-danger text-white" role="alert">
+            <div class="toast-header bg-danger text-white">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong class="me-auto">Erreur</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${message || "Impossible d'activer les notifications"}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+async function sendTestNotification() {
+    try {
+        await fetch("/api/push/test", { method: "POST" });
+    } catch (e) {
+        console.log("[Push] Notification de test non envoyée");
+    }
 }
 
 /**
@@ -606,3 +741,253 @@ function initMobileSearch() {
         }
     });
 }
+
+/**
+ * Indicateur de connexion hors-ligne
+ */
+function initOfflineIndicator() {
+    // Créer l'indicateur hors-ligne
+    const indicator = document.createElement("div");
+    indicator.id = "offline-indicator";
+    indicator.className = "offline-indicator";
+    indicator.innerHTML = `
+        <div class="offline-indicator-content">
+            <i class="bi bi-wifi-off me-2"></i>
+            <span>Mode hors-ligne</span>
+        </div>
+    `;
+    indicator.style.cssText = `
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        text-align: center;
+        padding: 0;
+        font-size: 0.875rem;
+        font-weight: 500;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.3s ease, padding 0.3s ease;
+    `;
+
+    // Insérer le bandeau au tout début du body (avant la navbar)
+    document.body.insertBefore(indicator, document.body.firstChild);
+
+    // Fonction pour mettre à jour l'état
+    function updateOnlineStatus() {
+        if (navigator.onLine) {
+            indicator.style.maxHeight = "0";
+            indicator.style.padding = "0";
+            document.body.classList.remove("is-offline");
+            document.body.classList.add("is-online");
+
+            // Synchroniser les données en attente
+            if (
+                "serviceWorker" in navigator &&
+                "sync" in window.ServiceWorkerRegistration.prototype
+            ) {
+                navigator.serviceWorker.ready.then((registration) => {
+                    registration.sync
+                        .register("sync-offline-queue")
+                        .catch(() => {});
+                });
+            }
+        } else {
+            indicator.style.maxHeight = "50px";
+            indicator.style.padding = "8px 15px";
+            document.body.classList.remove("is-online");
+            document.body.classList.add("is-offline");
+        }
+    }
+
+    // Écouter les changements de connexion
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+
+    // Vérifier l'état initial
+    updateOnlineStatus();
+
+    // Vérifier périodiquement la connexion réelle (pas juste l'état du navigateur)
+    setInterval(async () => {
+        try {
+            const response = await fetch("/api/ping", {
+                method: "HEAD",
+                cache: "no-store",
+                timeout: 5000,
+            });
+            if (!response.ok && !navigator.onLine) {
+                updateOnlineStatus();
+            }
+        } catch (e) {
+            if (navigator.onLine) {
+                // Le navigateur pense être en ligne mais pas de connexion réelle
+                indicator.style.maxHeight = "50px";
+                indicator.style.padding = "8px 15px";
+                document.body.classList.add("is-offline");
+            }
+        }
+    }, 30000); // Vérifier toutes les 30 secondes
+}
+
+/**
+ * Gestion du cache pour le mode hors-ligne
+ */
+function initCacheManagement() {
+    // Bouton pour vider le cache (si présent dans les paramètres)
+    const clearCacheBtn = document.getElementById("clearCacheBtn");
+    if (clearCacheBtn) {
+        clearCacheBtn.addEventListener("click", async () => {
+            clearCacheBtn.disabled = true;
+            clearCacheBtn.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-1"></span>Nettoyage...';
+
+            try {
+                // Envoyer un message au service worker
+                if ("serviceWorker" in navigator) {
+                    const registration = await navigator.serviceWorker.ready;
+                    registration.active.postMessage({ type: "CLEAR_CACHE" });
+                }
+
+                // Vider aussi le localStorage des données temporaires
+                const keysToKeep = ["theme", "tutorialCompleted"];
+                Object.keys(localStorage).forEach((key) => {
+                    if (!keysToKeep.includes(key)) {
+                        localStorage.removeItem(key);
+                    }
+                });
+
+                showToast("Cache vidé avec succès", "success");
+            } catch (error) {
+                console.error("[Cache] Erreur:", error);
+                showToast("Erreur lors du nettoyage du cache", "danger");
+            }
+
+            clearCacheBtn.disabled = false;
+            clearCacheBtn.innerHTML =
+                '<i class="bi bi-trash me-1"></i>Vider le cache';
+        });
+    }
+
+    // Afficher les statistiques du cache (si élément présent)
+    const cacheStatsEl = document.getElementById("cacheStats");
+    if (cacheStatsEl) {
+        updateCacheStats(cacheStatsEl);
+    }
+
+    // Pré-cacher la page actuelle pour le mode hors-ligne
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+            // Mettre en cache la page actuelle
+            registration.active?.postMessage({
+                type: "CACHE_PAGE",
+                url: window.location.pathname,
+            });
+        });
+    }
+
+    // Écouter les messages du service worker
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.addEventListener("message", (event) => {
+            if (event.data.type === "CACHE_STATUS") {
+                displayCacheStatus(event.data.status);
+            }
+        });
+    }
+}
+
+async function updateCacheStats(element) {
+    if (!("caches" in window)) {
+        element.innerHTML =
+            "<small class='text-muted'>Cache non disponible</small>";
+        return;
+    }
+
+    try {
+        const cacheNames = await caches.keys();
+        let totalSize = 0;
+        let totalItems = 0;
+
+        for (const name of cacheNames) {
+            const cache = await caches.open(name);
+            const keys = await cache.keys();
+            totalItems += keys.length;
+        }
+
+        element.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-database me-1"></i>Éléments en cache:</span>
+                <span class="badge bg-secondary">${totalItems}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-1">
+                <span><i class="bi bi-folder me-1"></i>Caches actifs:</span>
+                <span class="badge bg-secondary">${cacheNames.length}</span>
+            </div>
+        `;
+    } catch (error) {
+        element.innerHTML =
+            "<small class='text-muted'>Impossible de lire les statistiques</small>";
+    }
+}
+
+function displayCacheStatus(status) {
+    console.log("[Cache] Statut:", status);
+    // Peut être utilisé pour afficher les détails dans l'UI
+}
+
+/**
+ * Afficher un toast de notification
+ */
+function showToast(message, type = "info") {
+    const toast = document.createElement("div");
+    toast.className = "position-fixed bottom-0 end-0 p-3";
+    toast.style.zIndex = "1100";
+
+    const bgClass =
+        {
+            success: "bg-success",
+            danger: "bg-danger",
+            warning: "bg-warning",
+            info: "bg-info",
+        }[type] || "bg-secondary";
+
+    const icon =
+        {
+            success: "bi-check-circle",
+            danger: "bi-exclamation-triangle",
+            warning: "bi-exclamation-circle",
+            info: "bi-info-circle",
+        }[type] || "bi-info-circle";
+
+    toast.innerHTML = `
+        <div class="toast show ${bgClass} text-white" role="alert">
+            <div class="toast-body d-flex align-items-center">
+                <i class="bi ${icon} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+/**
+ * Demander la mise en cache d'une page spécifique
+ */
+function cachePageForOffline(url) {
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+            registration.active?.postMessage({
+                type: "CACHE_PAGE",
+                url: url,
+            });
+        });
+    }
+}
+
+// Exposer certaines fonctions globalement pour utilisation dans les templates
+window.CaveVin = {
+    showToast,
+    cachePageForOffline,
+    subscribeToPush,
+    unsubscribeFromPush,
+};

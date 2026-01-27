@@ -7,3 +7,4 @@ requests>=2.31.0
 openai>=1.50.0
 Pillow>=10.0.0
 bleach>=6.1.0
+pywebpush>=2.0.0

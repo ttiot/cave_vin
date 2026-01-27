@@ -14,6 +14,7 @@ from models import (
     APITokenUsage,
     BottleFieldDefinition,
     CellarCategory,
+    PushSubscription,
     UserSettings,
     Webhook,
     db,

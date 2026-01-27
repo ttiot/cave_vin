@@ -1060,6 +1060,192 @@ def test_webhook(webhook_id: int):
 
 
 # ============================================================================
+# Push Notifications endpoints
+# ============================================================================
+
+
+@api_bp.route("/push/vapid-key", methods=["GET"])
+def get_vapid_key():
+    """Retourne la clé publique VAPID pour les notifications push."""
+    import os
+    vapid_public_key = os.environ.get("VAPID_PUBLIC_KEY", "")
+    
+    if not vapid_public_key:
+        return jsonify({"error": "Notifications push non configurées"}), 503
+    
+    return jsonify({"publicKey": vapid_public_key})
+
+
+@api_bp.route("/push/subscribe", methods=["POST"])
+def subscribe_push():
+    """Enregistre un abonnement aux notifications push.
+    
+    Body JSON (format Web Push standard):
+        - endpoint: URL de l'endpoint push
+        - keys:
+            - p256dh: Clé publique
+            - auth: Secret d'authentification
+    """
+    from flask_login import current_user
+    from models import PushSubscription
+    
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Authentification requise"}), 401
+    
+    data = request.get_json() or {}
+    
+    endpoint = data.get("endpoint")
+    keys = data.get("keys", {})
+    
+    if not endpoint or not keys.get("p256dh") or not keys.get("auth"):
+        return jsonify({"error": "Données de subscription invalides"}), 400
+    
+    # Vérifier si l'abonnement existe déjà
+    existing = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    
+    if existing:
+        # Mettre à jour si c'est le même utilisateur
+        if existing.user_id == current_user.owner_id:
+            existing.p256dh_key = keys["p256dh"]
+            existing.auth_key = keys["auth"]
+            existing.is_active = True
+            existing.user_agent = request.headers.get("User-Agent")
+            db.session.commit()
+            return jsonify({"message": "Abonnement mis à jour", "id": existing.id})
+        else:
+            # Endpoint déjà utilisé par un autre utilisateur
+            return jsonify({"error": "Endpoint déjà enregistré"}), 409
+    
+    # Créer un nouvel abonnement
+    subscription = PushSubscription(
+        user_id=current_user.owner_id,
+        endpoint=endpoint,
+        p256dh_key=keys["p256dh"],
+        auth_key=keys["auth"],
+        user_agent=request.headers.get("User-Agent"),
+    )
+    
+    db.session.add(subscription)
+    db.session.commit()
+    
+    return jsonify({"message": "Abonnement créé", "id": subscription.id}), 201
+
+
+@api_bp.route("/push/unsubscribe", methods=["POST"])
+def unsubscribe_push():
+    """Supprime un abonnement aux notifications push.
+    
+    Body JSON:
+        - endpoint: URL de l'endpoint à désabonner
+    """
+    from flask_login import current_user
+    from models import PushSubscription
+    
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Authentification requise"}), 401
+    
+    data = request.get_json() or {}
+    endpoint = data.get("endpoint")
+    
+    if not endpoint:
+        return jsonify({"error": "Endpoint requis"}), 400
+    
+    subscription = PushSubscription.query.filter_by(
+        endpoint=endpoint,
+        user_id=current_user.owner_id
+    ).first()
+    
+    if subscription:
+        db.session.delete(subscription)
+        db.session.commit()
+        return jsonify({"message": "Désabonnement réussi"})
+    
+    return jsonify({"message": "Abonnement non trouvé"}), 404
+
+
+@api_bp.route("/push/test", methods=["POST"])
+def test_push():
+    """Envoie une notification push de test à l'utilisateur connecté."""
+    from flask_login import current_user
+    from models import PushSubscription
+    import os
+    
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Authentification requise"}), 401
+    
+    # Récupérer les abonnements de l'utilisateur
+    subscriptions = PushSubscription.query.filter_by(
+        user_id=current_user.owner_id,
+        is_active=True
+    ).all()
+    
+    if not subscriptions:
+        return jsonify({"error": "Aucun abonnement actif"}), 404
+    
+    # Vérifier la configuration VAPID
+    vapid_private_key = os.environ.get("VAPID_PRIVATE_KEY")
+    vapid_claims = {
+        "sub": os.environ.get("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
+    }
+    
+    if not vapid_private_key:
+        return jsonify({"error": "Notifications push non configurées sur le serveur"}), 503
+    
+    # Préparer le payload
+    payload = {
+        "title": "🍷 Cave à Vin",
+        "body": "Les notifications sont activées ! Vous recevrez des alertes pour vos bouteilles.",
+        "icon": "/static/icons/icon-192x192.png",
+        "badge": "/static/icons/icon-72x72.png",
+        "url": "/",
+        "tag": "test-notification",
+    }
+    
+    # Envoyer les notifications
+    sent = 0
+    errors = []
+    
+    try:
+        from pywebpush import webpush, WebPushException
+        
+        for sub in subscriptions:
+            try:
+                webpush(
+                    subscription_info=sub.to_dict(),
+                    data=__import__("json").dumps(payload),
+                    vapid_private_key=vapid_private_key,
+                    vapid_claims=vapid_claims,
+                )
+                sub.last_used_at = datetime.utcnow()
+                sent += 1
+            except WebPushException as e:
+                errors.append(str(e))
+                # Si l'abonnement est invalide, le désactiver
+                if e.response and e.response.status_code in (404, 410):
+                    sub.is_active = False
+        
+        db.session.commit()
+        
+    except ImportError:
+        return jsonify({
+            "error": "Module pywebpush non installé",
+            "message": "Installez pywebpush pour activer les notifications push"
+        }), 503
+    
+    return jsonify({
+        "message": f"Notification envoyée à {sent} appareil(s)",
+        "sent": sent,
+        "errors": errors if errors else None,
+    })
+
+
+@api_bp.route("/ping", methods=["GET", "HEAD"])
+def ping():
+    """Endpoint de vérification de connectivité."""
+    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
+
+
+# ============================================================================
 # OpenAPI / Swagger documentation
 # ============================================================================
 
@@ -1580,18 +1766,324 @@ SWAGGER_UI_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cave à Vin API - Documentation</title>
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        body { margin: 0; padding: 0; }
+        :root {
+            --primary-color: #722f37;
+            --primary-hover: #5a252c;
+            --bg-light: #f8f9fa;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        
         .swagger-ui .topbar { display: none; }
         .swagger-ui .info .title { font-size: 2rem; }
+        
+        /* Header personnalisé */
+        .api-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #4a1f24 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .api-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .api-header h1 i {
+            font-size: 1.8rem;
+        }
+        
+        .header-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .header-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .header-links a:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        /* Panneau d'authentification */
+        .auth-panel {
+            background: var(--bg-light);
+            border-bottom: 1px solid #dee2e6;
+            padding: 1rem 2rem;
+        }
+        
+        .auth-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .auth-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .auth-form {
+            display: flex;
+            gap: 0.75rem;
+            align-items: stretch;
+        }
+        
+        .auth-input-group {
+            flex: 1;
+            position: relative;
+        }
+        
+        .auth-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.1);
+        }
+        
+        .auth-input::placeholder {
+            color: #adb5bd;
+        }
+        
+        .auth-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+        
+        .auth-btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .auth-btn-primary:hover {
+            background: var(--primary-hover);
+        }
+        
+        .auth-btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .auth-btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .auth-btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .auth-status {
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        
+        .auth-status.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .auth-status.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .auth-status.info {
+            display: block;
+            background: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        
+        .auth-help {
+            margin-top: 0.75rem;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .auth-help a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        .auth-help a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Swagger UI customizations */
+        .swagger-ui .info {
+            margin: 30px 0;
+        }
+        
+        .swagger-ui .scheme-container {
+            background: var(--bg-light);
+            padding: 15px;
+        }
+        
+        .swagger-ui .btn.authorize {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .swagger-ui .btn.authorize:hover {
+            background: var(--primary-hover);
+        }
+        
+        .swagger-ui .btn.authorize svg {
+            fill: white;
+        }
+        
+        .swagger-ui .opblock.opblock-get .opblock-summary-method {
+            background: #61affe;
+        }
+        
+        .swagger-ui .opblock.opblock-post .opblock-summary-method {
+            background: #49cc90;
+        }
+        
+        .swagger-ui .opblock.opblock-put .opblock-summary-method {
+            background: #fca130;
+        }
+        
+        .swagger-ui .opblock.opblock-delete .opblock-summary-method {
+            background: #f93e3e;
+        }
+        
+        .swagger-ui .opblock.opblock-patch .opblock-summary-method {
+            background: #50e3c2;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .api-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .auth-form {
+                flex-direction: column;
+            }
+            
+            .auth-btn {
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Header -->
+    <div class="api-header">
+        <h1><i class="bi bi-code-slash"></i> Cave à Vin API</h1>
+        <div class="header-links">
+            <a href="/"><i class="bi bi-house"></i> Accueil</a>
+            <a href="/api-tokens"><i class="bi bi-key"></i> Mes tokens</a>
+        </div>
+    </div>
+    
+    <!-- Panneau d'authentification -->
+    <div class="auth-panel">
+        <div class="auth-container">
+            <div class="auth-title">
+                <i class="bi bi-shield-lock"></i> Authentification API
+            </div>
+            <div class="auth-form">
+                <div class="auth-input-group">
+                    <input type="text"
+                           id="api-token"
+                           class="auth-input"
+                           placeholder="Collez votre token API ici (ex: cvt_abc123...)"
+                           autocomplete="off">
+                </div>
+                <button type="button" class="auth-btn auth-btn-primary" onclick="applyToken()">
+                    <i class="bi bi-unlock"></i> Authentifier
+                </button>
+                <button type="button" class="auth-btn auth-btn-secondary" onclick="clearToken()">
+                    <i class="bi bi-x-circle"></i> Effacer
+                </button>
+            </div>
+            <div id="auth-status" class="auth-status"></div>
+            <div class="auth-help">
+                <i class="bi bi-info-circle"></i>
+                Vous n'avez pas de token ? <a href="/api-tokens/create">Créez-en un ici</a>.
+                Le token sera automatiquement ajouté à toutes vos requêtes.
+            </div>
+        </div>
+    </div>
+    
+    <!-- Swagger UI -->
     <div id="swagger-ui"></div>
+    
     <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
     <script>
+        let swaggerUI = null;
+        let currentToken = localStorage.getItem('api_token') || '';
+        
+        // Initialiser Swagger UI
         window.onload = function() {
-            SwaggerUIBundle({
+            initSwaggerUI();
+            
+            // Restaurer le token sauvegardé
+            if (currentToken) {
+                document.getElementById('api-token').value = currentToken;
+                showStatus('Token restauré depuis la session précédente', 'info');
+            }
+        };
+        
+        function initSwaggerUI() {
+            swaggerUI = SwaggerUIBundle({
                 url: "{{ spec_url }}",
                 dom_id: '#swagger-ui',
                 presets: [
@@ -1602,8 +2094,90 @@ SWAGGER_UI_HTML = """
                 deepLinking: true,
                 showExtensions: true,
                 showCommonExtensions: true,
+                persistAuthorization: true,
+                requestInterceptor: function(request) {
+                    // Ajouter le token à chaque requête si présent
+                    if (currentToken) {
+                        request.headers['Authorization'] = 'Bearer ' + currentToken;
+                    }
+                    return request;
+                },
+                onComplete: function() {
+                    // Si un token est présent, l'appliquer à Swagger UI
+                    if (currentToken) {
+                        applyTokenToSwagger(currentToken);
+                    }
+                }
             });
-        };
+        }
+        
+        function applyToken() {
+            const tokenInput = document.getElementById('api-token');
+            const token = tokenInput.value.trim();
+            
+            if (!token) {
+                showStatus('Veuillez entrer un token API', 'error');
+                return;
+            }
+            
+            // Valider le format du token (optionnel)
+            if (!token.startsWith('cvt_')) {
+                showStatus('Le token doit commencer par "cvt_"', 'error');
+                return;
+            }
+            
+            currentToken = token;
+            localStorage.setItem('api_token', token);
+            
+            // Appliquer à Swagger UI
+            applyTokenToSwagger(token);
+            
+            showStatus('Token appliqué avec succès ! Vous pouvez maintenant tester les endpoints.', 'success');
+        }
+        
+        function applyTokenToSwagger(token) {
+            if (swaggerUI) {
+                swaggerUI.preauthorizeApiKey('ApiTokenAuth', 'Bearer ' + token);
+            }
+        }
+        
+        function clearToken() {
+            currentToken = '';
+            localStorage.removeItem('api_token');
+            document.getElementById('api-token').value = '';
+            
+            // Réinitialiser Swagger UI
+            if (swaggerUI) {
+                swaggerUI.preauthorizeApiKey('ApiTokenAuth', '');
+            }
+            
+            showStatus('Token effacé', 'info');
+        }
+        
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('auth-status');
+            statusEl.textContent = message;
+            statusEl.className = 'auth-status ' + type;
+            
+            // Masquer après 5 secondes pour les messages de succès/info
+            if (type !== 'error') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Permettre l'authentification avec Entrée
+        document.addEventListener('DOMContentLoaded', function() {
+            const tokenInput = document.getElementById('api-token');
+            if (tokenInput) {
+                tokenInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyToken();
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>

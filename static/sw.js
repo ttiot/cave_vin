@@ -1,11 +1,14 @@
 /**
  * Service Worker pour Cave à Vin PWA
- * Gère le cache et le mode hors-ligne
+ * Gère le cache, le mode hors-ligne et les notifications push
+ * Version: 2.0
  */
 
-const CACHE_NAME = "cave-vin-v1";
-const STATIC_CACHE = "cave-vin-static-v1";
-const DYNAMIC_CACHE = "cave-vin-dynamic-v1";
+const CACHE_VERSION = "v2";
+const STATIC_CACHE = `cave-vin-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `cave-vin-dynamic-${CACHE_VERSION}`;
+const IMAGES_CACHE = `cave-vin-images-${CACHE_VERSION}`;
+const OFFLINE_QUEUE_KEY = "cave-vin-offline-queue";
 
 // Ressources statiques à mettre en cache immédiatement
 const STATIC_ASSETS = [
@@ -14,35 +17,193 @@ const STATIC_ASSETS = [
     "/static/js/main.js",
     "/static/favico.png",
     "/static/manifest.json",
+    "/static/icons/icon-72x72.png",
+    "/static/icons/icon-96x96.png",
+    "/static/icons/icon-128x128.png",
+    "/static/icons/icon-144x144.png",
+    "/static/icons/icon-152x152.png",
+    "/static/icons/icon-192x192.png",
+    "/static/icons/icon-384x384.png",
+    "/static/icons/icon-512x512.png",
     "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
     "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css",
     "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
 ];
 
-// Pages à mettre en cache pour le mode hors-ligne
-const OFFLINE_PAGES = ["/wines/overview", "/cellars", "/statistics"];
+// Pages à pré-cacher pour le mode hors-ligne
+const OFFLINE_PAGES = ["/wines/overview", "/cellars", "/statistics", "/search"];
 
-// Installation du service worker
+// Limites de cache
+const CACHE_LIMITS = {
+    dynamic: 50,
+    images: 100,
+};
+
+// Page hors-ligne de secours
+const OFFLINE_PAGE = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hors-ligne - Cave à Vin</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            text-align: center; 
+            padding: 50px 20px; 
+            background: linear-gradient(135deg, #1a1d21 0%, #2d1f24 100%);
+            color: #e9ecef;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .container { max-width: 400px; }
+        .icon { font-size: 5rem; margin-bottom: 1.5rem; animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        h1 { font-size: 1.75rem; margin-bottom: 1rem; color: #fff; }
+        p { color: #adb5bd; margin-bottom: 0.5rem; line-height: 1.6; }
+        .status { 
+            margin-top: 2rem; 
+            padding: 1rem; 
+            background: rgba(255,255,255,0.05); 
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+            margin-right: 8px;
+            animation: blink 1.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .retry { 
+            margin-top: 2rem; 
+            padding: 12px 30px; 
+            background: linear-gradient(135deg, #722f37 0%, #8b3a44 100%);
+            color: white; 
+            border: none; 
+            border-radius: 25px; 
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(114, 47, 55, 0.3);
+        }
+        .retry:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(114, 47, 55, 0.4);
+        }
+        .retry:active { transform: translateY(0); }
+        .cached-pages {
+            margin-top: 2rem;
+            text-align: left;
+        }
+        .cached-pages h3 {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            color: #adb5bd;
+        }
+        .cached-pages a {
+            display: block;
+            padding: 0.5rem 1rem;
+            margin: 0.25rem 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            color: #e9ecef;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .cached-pages a:hover {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🍷</div>
+        <h1>Vous êtes hors-ligne</h1>
+        <p>Impossible de charger cette page pour le moment.</p>
+        <p>Vérifiez votre connexion internet et réessayez.</p>
+        
+        <div class="status">
+            <span class="status-indicator"></span>
+            Connexion indisponible
+        </div>
+        
+        <button class="retry" onclick="location.reload()">
+            🔄 Réessayer
+        </button>
+        
+        <div class="cached-pages">
+            <h3>📱 Pages disponibles hors-ligne :</h3>
+            <a href="/">🏠 Accueil</a>
+            <a href="/wines/overview">🍾 Ma collection</a>
+            <a href="/cellars">📦 Mes caves</a>
+            <a href="/statistics">📊 Statistiques</a>
+        </div>
+    </div>
+    
+    <script>
+        // Vérifier la connexion périodiquement
+        setInterval(() => {
+            fetch('/').then(() => location.reload()).catch(() => {});
+        }, 5000);
+    </script>
+</body>
+</html>`;
+
+// ============================================
+// INSTALLATION
+// ============================================
 self.addEventListener("install", (event) => {
-    console.log("[SW] Installation...");
+    console.log("[SW] Installation v2...");
 
     event.waitUntil(
-        caches
-            .open(STATIC_CACHE)
-            .then((cache) => {
+        Promise.all([
+            // Cache des ressources statiques
+            caches.open(STATIC_CACHE).then((cache) => {
                 console.log("[SW] Mise en cache des ressources statiques");
                 return cache.addAll(STATIC_ASSETS);
-            })
+            }),
+            // Pré-cache des pages importantes
+            caches.open(DYNAMIC_CACHE).then(async (cache) => {
+                console.log("[SW] Pré-cache des pages hors-ligne");
+                for (const page of OFFLINE_PAGES) {
+                    try {
+                        const response = await fetch(page, {
+                            credentials: "same-origin",
+                        });
+                        if (response.ok) {
+                            await cache.put(page, response);
+                        }
+                    } catch (e) {
+                        console.log(`[SW] Impossible de pré-cacher ${page}`);
+                    }
+                }
+            }),
+        ])
             .then(() => self.skipWaiting())
-            .catch((err) =>
-                console.error("[SW] Erreur lors de l'installation:", err),
-            ),
+            .catch((err) => console.error("[SW] Erreur installation:", err)),
     );
 });
 
-// Activation du service worker
+// ============================================
+// ACTIVATION
+// ============================================
 self.addEventListener("activate", (event) => {
-    console.log("[SW] Activation...");
+    console.log("[SW] Activation v2...");
 
     event.waitUntil(
         caches
@@ -50,13 +211,18 @@ self.addEventListener("activate", (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames
-                        .filter(
-                            (name) =>
-                                name !== STATIC_CACHE && name !== DYNAMIC_CACHE,
-                        )
+                        .filter((name) => {
+                            // Supprimer les anciens caches
+                            return (
+                                name.startsWith("cave-vin-") &&
+                                name !== STATIC_CACHE &&
+                                name !== DYNAMIC_CACHE &&
+                                name !== IMAGES_CACHE
+                            );
+                        })
                         .map((name) => {
                             console.log(
-                                "[SW] Suppression du cache obsolète:",
+                                "[SW] Suppression cache obsolète:",
                                 name,
                             );
                             return caches.delete(name);
@@ -67,30 +233,52 @@ self.addEventListener("activate", (event) => {
     );
 });
 
-// Interception des requêtes
+// ============================================
+// INTERCEPTION DES REQUÊTES
+// ============================================
 self.addEventListener("fetch", (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
     // Ignorer les requêtes non-GET
     if (request.method !== "GET") {
+        // Mettre en file d'attente les requêtes POST/PUT/DELETE pour sync
+        if (["POST", "PUT", "DELETE"].includes(request.method)) {
+            handleOfflineRequest(request);
+        }
         return;
     }
 
-    // Ignorer les requêtes API (toujours réseau)
+    // Ignorer les requêtes API (toujours réseau avec fallback)
     if (url.pathname.startsWith("/api/")) {
+        event.respondWith(networkOnly(request));
+        return;
+    }
+
+    // Ignorer les requêtes d'authentification
+    if (
+        url.pathname.startsWith("/login") ||
+        url.pathname.startsWith("/logout")
+    ) {
+        event.respondWith(networkOnly(request));
+        return;
+    }
+
+    // Stratégie pour les images
+    if (isImageRequest(url)) {
+        event.respondWith(cacheFirstWithExpiry(request, IMAGES_CACHE));
         return;
     }
 
     // Stratégie: Cache First pour les ressources statiques
     if (isStaticAsset(url)) {
-        event.respondWith(cacheFirst(request));
+        event.respondWith(cacheFirst(request, STATIC_CACHE));
         return;
     }
 
     // Stratégie: Network First pour les pages HTML
     if (request.headers.get("accept")?.includes("text/html")) {
-        event.respondWith(networkFirst(request));
+        event.respondWith(networkFirstWithOffline(request));
         return;
     }
 
@@ -98,24 +286,32 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(staleWhileRevalidate(request));
 });
 
+// ============================================
+// STRATÉGIES DE CACHE
+// ============================================
+
 // Vérifier si c'est une ressource statique
 function isStaticAsset(url) {
-    const staticExtensions = [
-        ".css",
-        ".js",
+    const staticExtensions = [".css", ".js", ".woff", ".woff2", ".ttf", ".eot"];
+    return staticExtensions.some((ext) => url.pathname.endsWith(ext));
+}
+
+// Vérifier si c'est une image
+function isImageRequest(url) {
+    const imageExtensions = [
         ".png",
         ".jpg",
         ".jpeg",
         ".gif",
         ".svg",
-        ".woff",
-        ".woff2",
+        ".webp",
+        ".ico",
     ];
-    return staticExtensions.some((ext) => url.pathname.endsWith(ext));
+    return imageExtensions.some((ext) => url.pathname.endsWith(ext));
 }
 
-// Stratégie Cache First
-async function cacheFirst(request) {
+// Cache First - pour les ressources statiques
+async function cacheFirst(request, cacheName) {
     const cached = await caches.match(request);
     if (cached) {
         return cached;
@@ -124,74 +320,101 @@ async function cacheFirst(request) {
     try {
         const response = await fetch(request);
         if (response.ok) {
-            const cache = await caches.open(STATIC_CACHE);
+            const cache = await caches.open(cacheName);
             cache.put(request, response.clone());
         }
         return response;
     } catch (error) {
         console.error("[SW] Erreur Cache First:", error);
-        return new Response("Ressource non disponible hors-ligne", {
-            status: 503,
-        });
+        return new Response("Ressource non disponible", { status: 503 });
     }
 }
 
-// Stratégie Network First
-async function networkFirst(request) {
+// Cache First avec expiration - pour les images
+async function cacheFirstWithExpiry(request, cacheName) {
+    const cached = await caches.match(request);
+    if (cached) {
+        return cached;
+    }
+
+    try {
+        const response = await fetch(request);
+        if (response.ok) {
+            const cache = await caches.open(cacheName);
+            cache.put(request, response.clone());
+            // Nettoyer le cache si trop grand
+            limitCacheSize(cacheName, CACHE_LIMITS.images);
+        }
+        return response;
+    } catch (error) {
+        // Retourner une image placeholder si hors-ligne
+        return new Response(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                <rect fill="#2d1f24" width="200" height="200"/>
+                <text fill="#722f37" font-family="sans-serif" font-size="60" x="50%" y="50%" text-anchor="middle" dy=".3em">🍷</text>
+            </svg>`,
+            { headers: { "Content-Type": "image/svg+xml" } },
+        );
+    }
+}
+
+// Network First avec page hors-ligne - pour les pages HTML
+async function networkFirstWithOffline(request) {
     try {
         const response = await fetch(request);
         if (response.ok) {
             const cache = await caches.open(DYNAMIC_CACHE);
             cache.put(request, response.clone());
+            // Nettoyer le cache dynamique
+            limitCacheSize(DYNAMIC_CACHE, CACHE_LIMITS.dynamic);
         }
         return response;
     } catch (error) {
-        console.log("[SW] Réseau indisponible, utilisation du cache");
+        console.log("[SW] Réseau indisponible, recherche dans le cache...");
+
+        // Chercher dans le cache
         const cached = await caches.match(request);
         if (cached) {
             return cached;
         }
 
-        // Page hors-ligne de secours
-        return (
-            caches.match("/") ||
-            new Response(
-                `<!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Hors-ligne - Cave à Vin</title>
-        <style>
-          body { font-family: system-ui, sans-serif; text-align: center; padding: 50px 20px; background: #1a1d21; color: #e9ecef; }
-          h1 { font-size: 2rem; margin-bottom: 1rem; }
-          p { color: #adb5bd; }
-          .icon { font-size: 4rem; margin-bottom: 1rem; }
-          .retry { margin-top: 2rem; padding: 10px 20px; background: #722f37; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        </style>
-      </head>
-      <body>
-        <div class="icon">🍷</div>
-        <h1>Vous êtes hors-ligne</h1>
-        <p>Impossible de charger cette page. Vérifiez votre connexion internet.</p>
-        <button class="retry" onclick="location.reload()">Réessayer</button>
-      </body>
-      </html>`,
-                { headers: { "Content-Type": "text/html" } },
-            )
+        // Chercher la page d'accueil en cache
+        const homeCached = await caches.match("/");
+        if (homeCached && request.url.endsWith("/")) {
+            return homeCached;
+        }
+
+        // Retourner la page hors-ligne
+        return new Response(OFFLINE_PAGE, {
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+    }
+}
+
+// Network Only - pour les API et auth
+async function networkOnly(request) {
+    try {
+        return await fetch(request);
+    } catch (error) {
+        return new Response(
+            JSON.stringify({
+                error: "Hors-ligne",
+                message: "Cette action nécessite une connexion internet",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
         );
     }
 }
 
-// Stratégie Stale While Revalidate
+// Stale While Revalidate
 async function staleWhileRevalidate(request) {
     const cached = await caches.match(request);
 
     const fetchPromise = fetch(request)
-        .then((response) => {
+        .then(async (response) => {
             if (response.ok) {
-                const cache = caches.open(DYNAMIC_CACHE);
-                cache.then((c) => c.put(request, response.clone()));
+                const cache = await caches.open(DYNAMIC_CACHE);
+                cache.put(request, response.clone());
             }
             return response;
         })
@@ -200,15 +423,58 @@ async function staleWhileRevalidate(request) {
     return cached || fetchPromise;
 }
 
-// Gestion des notifications push
+// Limiter la taille du cache
+async function limitCacheSize(cacheName, maxItems) {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    if (keys.length > maxItems) {
+        // Supprimer les plus anciens
+        const toDelete = keys.slice(0, keys.length - maxItems);
+        await Promise.all(toDelete.map((key) => cache.delete(key)));
+    }
+}
+
+// ============================================
+// GESTION DES REQUÊTES HORS-LIGNE
+// ============================================
+
+async function handleOfflineRequest(request) {
+    // Stocker les requêtes pour synchronisation ultérieure
+    try {
+        const queue = JSON.parse(
+            localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]",
+        );
+        queue.push({
+            url: request.url,
+            method: request.method,
+            timestamp: Date.now(),
+        });
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    } catch (e) {
+        console.log("[SW] Impossible de mettre en file d'attente:", e);
+    }
+}
+
+// ============================================
+// NOTIFICATIONS PUSH
+// ============================================
+
 self.addEventListener("push", (event) => {
     console.log("[SW] Notification push reçue");
 
-    let data = { title: "Cave à Vin", body: "Nouvelle notification" };
+    let data = {
+        title: "Cave à Vin",
+        body: "Nouvelle notification",
+        icon: "/static/icons/icon-192x192.png",
+        badge: "/static/icons/icon-72x72.png",
+        tag: "cave-vin-notification",
+        url: "/",
+    };
 
     if (event.data) {
         try {
-            data = event.data.json();
+            const payload = event.data.json();
+            data = { ...data, ...payload };
         } catch (e) {
             data.body = event.data.text();
         }
@@ -216,25 +482,38 @@ self.addEventListener("push", (event) => {
 
     const options = {
         body: data.body,
-        icon: "/static/icons/icon-192x192.png",
-        badge: "/static/icons/icon-72x72.png",
-        vibrate: [100, 50, 100],
+        icon: data.icon,
+        badge: data.badge,
+        tag: data.tag,
+        vibrate: [100, 50, 100, 50, 100],
+        renotify: true,
+        requireInteraction: data.requireInteraction || false,
         data: {
-            url: data.url || "/",
+            url: data.url,
             dateOfArrival: Date.now(),
+            primaryKey: data.primaryKey || Date.now(),
         },
         actions: data.actions || [
-            { action: "open", title: "Ouvrir" },
+            {
+                action: "open",
+                title: "Ouvrir",
+                icon: "/static/icons/icon-72x72.png",
+            },
             { action: "close", title: "Fermer" },
         ],
     };
+
+    // Ajouter une image si fournie
+    if (data.image) {
+        options.image = data.image;
+    }
 
     event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 // Clic sur une notification
 self.addEventListener("notificationclick", (event) => {
-    console.log("[SW] Clic sur notification");
+    console.log("[SW] Clic sur notification:", event.action);
 
     event.notification.close();
 
@@ -248,10 +527,16 @@ self.addEventListener("notificationclick", (event) => {
         clients
             .matchAll({ type: "window", includeUncontrolled: true })
             .then((clientList) => {
-                // Chercher une fenêtre existante
+                // Chercher une fenêtre existante avec la même URL
                 for (const client of clientList) {
-                    if (client.url === url && "focus" in client) {
+                    if (client.url.includes(url) && "focus" in client) {
                         return client.focus();
+                    }
+                }
+                // Chercher n'importe quelle fenêtre de l'app
+                for (const client of clientList) {
+                    if ("focus" in client && "navigate" in client) {
+                        return client.focus().then(() => client.navigate(url));
                     }
                 }
                 // Ouvrir une nouvelle fenêtre
@@ -262,18 +547,155 @@ self.addEventListener("notificationclick", (event) => {
     );
 });
 
-// Synchronisation en arrière-plan (pour les actions hors-ligne)
+// Fermeture d'une notification
+self.addEventListener("notificationclose", (event) => {
+    console.log("[SW] Notification fermée:", event.notification.tag);
+    // Possibilité de tracker les notifications fermées
+});
+
+// ============================================
+// SYNCHRONISATION EN ARRIÈRE-PLAN
+// ============================================
+
 self.addEventListener("sync", (event) => {
     console.log("[SW] Synchronisation:", event.tag);
 
-    if (event.tag === "sync-consumptions") {
-        event.waitUntil(syncConsumptions());
+    switch (event.tag) {
+        case "sync-consumptions":
+            event.waitUntil(syncConsumptions());
+            break;
+        case "sync-offline-queue":
+            event.waitUntil(syncOfflineQueue());
+            break;
+        default:
+            console.log("[SW] Tag de sync inconnu:", event.tag);
     }
 });
 
 // Synchroniser les consommations en attente
 async function syncConsumptions() {
-    // Cette fonction serait utilisée pour synchroniser les actions
-    // effectuées hors-ligne une fois la connexion rétablie
     console.log("[SW] Synchronisation des consommations...");
+    // Implémentation de la synchronisation des consommations
+    // Cette fonction serait appelée quand la connexion est rétablie
 }
+
+// Synchroniser la file d'attente hors-ligne
+async function syncOfflineQueue() {
+    console.log("[SW] Synchronisation de la file d'attente hors-ligne...");
+
+    try {
+        const queue = JSON.parse(
+            localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]",
+        );
+
+        for (const item of queue) {
+            try {
+                await fetch(item.url, { method: item.method });
+                console.log("[SW] Requête synchronisée:", item.url);
+            } catch (e) {
+                console.log("[SW] Échec sync:", item.url);
+            }
+        }
+
+        // Vider la file d'attente
+        localStorage.removeItem(OFFLINE_QUEUE_KEY);
+    } catch (e) {
+        console.error("[SW] Erreur sync queue:", e);
+    }
+}
+
+// ============================================
+// PERIODIC BACKGROUND SYNC (si supporté)
+// ============================================
+
+self.addEventListener("periodicsync", (event) => {
+    console.log("[SW] Periodic sync:", event.tag);
+
+    if (event.tag === "update-cache") {
+        event.waitUntil(updateCache());
+    }
+});
+
+// Mettre à jour le cache périodiquement
+async function updateCache() {
+    console.log("[SW] Mise à jour périodique du cache...");
+
+    const cache = await caches.open(DYNAMIC_CACHE);
+
+    for (const page of OFFLINE_PAGES) {
+        try {
+            const response = await fetch(page, { credentials: "same-origin" });
+            if (response.ok) {
+                await cache.put(page, response);
+                console.log("[SW] Cache mis à jour:", page);
+            }
+        } catch (e) {
+            console.log("[SW] Impossible de mettre à jour:", page);
+        }
+    }
+}
+
+// ============================================
+// MESSAGES DEPUIS L'APPLICATION
+// ============================================
+
+self.addEventListener("message", (event) => {
+    console.log("[SW] Message reçu:", event.data);
+
+    switch (event.data.type) {
+        case "SKIP_WAITING":
+            self.skipWaiting();
+            break;
+        case "CLEAR_CACHE":
+            event.waitUntil(clearAllCaches());
+            break;
+        case "CACHE_PAGE":
+            event.waitUntil(cachePage(event.data.url));
+            break;
+        case "GET_CACHE_STATUS":
+            event.waitUntil(getCacheStatus(event));
+            break;
+        default:
+            console.log("[SW] Type de message inconnu:", event.data.type);
+    }
+});
+
+// Vider tous les caches
+async function clearAllCaches() {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((name) => caches.delete(name)));
+    console.log("[SW] Tous les caches vidés");
+}
+
+// Mettre une page en cache
+async function cachePage(url) {
+    try {
+        const cache = await caches.open(DYNAMIC_CACHE);
+        const response = await fetch(url, { credentials: "same-origin" });
+        if (response.ok) {
+            await cache.put(url, response);
+            console.log("[SW] Page mise en cache:", url);
+        }
+    } catch (e) {
+        console.error("[SW] Erreur cache page:", e);
+    }
+}
+
+// Obtenir le statut du cache
+async function getCacheStatus(event) {
+    const cacheNames = await caches.keys();
+    const status = {};
+
+    for (const name of cacheNames) {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        status[name] = keys.length;
+    }
+
+    event.source.postMessage({
+        type: "CACHE_STATUS",
+        status: status,
+    });
+}
+
+console.log("[SW] Service Worker v2 chargé");
