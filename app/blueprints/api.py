@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-from flask import Blueprint, jsonify, request, g, render_template_string
+from flask import Blueprint, jsonify, request, g, render_template_string, current_app
 
 from sqlalchemy.orm import selectinload
 
@@ -1085,6 +1085,7 @@ def subscribe_push():
         - keys:
             - p256dh: Clé publique
             - auth: Secret d'authentification
+        - expirationTime: (optionnel) Temps d'expiration
     """
     from flask_login import current_user
     from models import PushSubscription
@@ -1092,13 +1093,25 @@ def subscribe_push():
     if not current_user.is_authenticated:
         return jsonify({"error": "Authentification requise"}), 401
     
-    data = request.get_json() or {}
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"error": "Corps de requête JSON requis"}), 400
     
     endpoint = data.get("endpoint")
     keys = data.get("keys", {})
     
-    if not endpoint or not keys.get("p256dh") or not keys.get("auth"):
-        return jsonify({"error": "Données de subscription invalides"}), 400
+    # Log pour debug
+    current_app.logger.info(f"[Push] Subscription reçue pour user {current_user.id}: endpoint={endpoint[:50] if endpoint else 'None'}...")
+    
+    if not endpoint:
+        return jsonify({"error": "Endpoint manquant dans la subscription"}), 400
+    
+    if not keys.get("p256dh"):
+        return jsonify({"error": "Clé p256dh manquante dans la subscription"}), 400
+        
+    if not keys.get("auth"):
+        return jsonify({"error": "Clé auth manquante dans la subscription"}), 400
     
     # Vérifier si l'abonnement existe déjà
     existing = PushSubscription.query.filter_by(endpoint=endpoint).first()
@@ -1111,10 +1124,18 @@ def subscribe_push():
             existing.is_active = True
             existing.user_agent = request.headers.get("User-Agent")
             db.session.commit()
+            current_app.logger.info(f"[Push] Abonnement mis à jour: id={existing.id}")
             return jsonify({"message": "Abonnement mis à jour", "id": existing.id})
         else:
-            # Endpoint déjà utilisé par un autre utilisateur
-            return jsonify({"error": "Endpoint déjà enregistré"}), 409
+            # Endpoint déjà utilisé par un autre utilisateur - le réassigner
+            current_app.logger.warning(f"[Push] Endpoint réassigné de user {existing.user_id} à user {current_user.owner_id}")
+            existing.user_id = current_user.owner_id
+            existing.p256dh_key = keys["p256dh"]
+            existing.auth_key = keys["auth"]
+            existing.is_active = True
+            existing.user_agent = request.headers.get("User-Agent")
+            db.session.commit()
+            return jsonify({"message": "Abonnement réassigné", "id": existing.id})
     
     # Créer un nouvel abonnement
     subscription = PushSubscription(
@@ -1127,6 +1148,8 @@ def subscribe_push():
     
     db.session.add(subscription)
     db.session.commit()
+    
+    current_app.logger.info(f"[Push] Nouvel abonnement créé: id={subscription.id} pour user {current_user.owner_id}")
     
     return jsonify({"message": "Abonnement créé", "id": subscription.id}), 201
 

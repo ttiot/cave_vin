@@ -221,22 +221,39 @@ function updateNotificationButton(btn) {
 
 async function subscribeToPush() {
     try {
-        const registration = await navigator.serviceWorker.ready;
+        // Attendre que le service worker soit prêt avec un timeout
+        const registration = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((_, reject) =>
+                setTimeout(
+                    () =>
+                        reject(new Error("Service Worker non prêt (timeout)")),
+                    10000,
+                ),
+            ),
+        ]);
 
         // Récupérer la clé VAPID depuis le serveur si non définie
         let vapidKey = window.VAPID_PUBLIC_KEY;
         if (!vapidKey) {
             const response = await fetch("/api/push/vapid-key");
-            if (response.ok) {
-                const data = await response.json();
-                vapidKey = data.publicKey;
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(
+                    errorData.error || "Impossible de récupérer la clé VAPID",
+                );
             }
+            const data = await response.json();
+            vapidKey = data.publicKey;
         }
 
         if (!vapidKey) {
-            throw new Error("Clé VAPID non disponible");
+            throw new Error(
+                "Clé VAPID non disponible - notifications push non configurées sur le serveur",
+            );
         }
 
+        // S'abonner aux notifications push
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey),
@@ -246,14 +263,20 @@ async function subscribeToPush() {
         const response = await fetch("/api/push/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(subscription),
+            body: JSON.stringify(subscription.toJSON()),
         });
 
         if (!response.ok) {
-            throw new Error("Erreur serveur lors de l'abonnement");
+            const errorData = await response.json().catch(() => ({}));
+            // Si erreur serveur, désabonner localement pour éviter l'incohérence
+            await subscription.unsubscribe().catch(() => {});
+            throw new Error(
+                errorData.error || "Erreur serveur lors de l'abonnement",
+            );
         }
 
-        console.log("[Push] Abonnement réussi");
+        const result = await response.json();
+        console.log("[Push] Abonnement réussi, ID:", result.id);
         document.body.classList.add("push-subscribed");
 
         // Envoyer une notification de test
