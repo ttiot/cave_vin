@@ -16,36 +16,35 @@ document.addEventListener("DOMContentLoaded", () => {
  */
 function initServiceWorker() {
     if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-            navigator.serviceWorker
-                .register("/static/sw.js")
-                .then((registration) => {
-                    console.log(
-                        "[PWA] Service Worker enregistré:",
-                        registration.scope,
-                    );
+        // Enregistrer immédiatement, pas besoin d'attendre 'load'
+        navigator.serviceWorker
+            .register("/static/sw.js")
+            .then((registration) => {
+                console.log(
+                    "[PWA] Service Worker enregistré:",
+                    registration.scope,
+                );
 
-                    // Vérifier les mises à jour
-                    registration.addEventListener("updatefound", () => {
-                        const newWorker = registration.installing;
-                        newWorker.addEventListener("statechange", () => {
-                            if (
-                                newWorker.state === "installed" &&
-                                navigator.serviceWorker.controller
-                            ) {
-                                // Nouvelle version disponible
-                                showUpdateNotification();
-                            }
-                        });
+                // Vérifier les mises à jour
+                registration.addEventListener("updatefound", () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener("statechange", () => {
+                        if (
+                            newWorker.state === "installed" &&
+                            navigator.serviceWorker.controller
+                        ) {
+                            // Nouvelle version disponible
+                            showUpdateNotification();
+                        }
                     });
-                })
-                .catch((error) => {
-                    console.error(
-                        "[PWA] Erreur d'enregistrement du Service Worker:",
-                        error,
-                    );
                 });
-        });
+            })
+            .catch((error) => {
+                console.error(
+                    "[PWA] Erreur d'enregistrement du Service Worker:",
+                    error,
+                );
+            });
     }
 }
 
@@ -80,6 +79,7 @@ function showUpdateNotification() {
  */
 function initPushNotifications() {
     const enableBtn = document.getElementById("enableNotifications");
+    console.log("[Push] Initialisation, bouton trouvé:", !!enableBtn);
 
     // Vérifier si les notifications sont supportées
     if (
@@ -87,6 +87,11 @@ function initPushNotifications() {
         !("serviceWorker" in navigator) ||
         !("PushManager" in window)
     ) {
+        console.log("[Push] Notifications non supportées:", {
+            Notification: "Notification" in window,
+            serviceWorker: "serviceWorker" in navigator,
+            PushManager: "PushManager" in window,
+        });
         if (enableBtn) {
             enableBtn.disabled = true;
             enableBtn.textContent = "Notifications non supportées";
@@ -94,11 +99,20 @@ function initPushNotifications() {
         return;
     }
 
+    console.log(
+        "[Push] Notifications supportées, permission actuelle:",
+        Notification.permission,
+    );
+
     // Mettre à jour l'état du bouton si présent
     if (enableBtn) {
         updateNotificationButton(enableBtn);
 
         enableBtn.addEventListener("click", async () => {
+            console.log(
+                "[Push] Clic sur le bouton, permission:",
+                Notification.permission,
+            );
             const isCompact = enableBtn.classList.contains("theme-toggle");
             const originalContent = enableBtn.innerHTML;
 
@@ -115,10 +129,18 @@ function initPushNotifications() {
 
             try {
                 if (Notification.permission === "granted") {
+                    console.log(
+                        "[Push] Permission déjà accordée, vérification abonnement...",
+                    );
                     // Vérifier si déjà abonné
                     const registration = await navigator.serviceWorker.ready;
+                    console.log(
+                        "[Push] Service Worker prêt:",
+                        registration.scope,
+                    );
                     const subscription =
                         await registration.pushManager.getSubscription();
+                    console.log("[Push] Abonnement existant:", !!subscription);
 
                     if (subscription) {
                         await unsubscribeFromPush();
@@ -126,12 +148,19 @@ function initPushNotifications() {
                         await subscribeToPush();
                     }
                 } else if (Notification.permission === "default") {
+                    console.log("[Push] Demande de permission...");
                     // Demander la permission
                     const permission = await Notification.requestPermission();
+                    console.log("[Push] Permission obtenue:", permission);
                     if (permission === "granted") {
                         await subscribeToPush();
                         showNotificationSuccess();
                     }
+                } else {
+                    console.log(
+                        "[Push] Permission refusée:",
+                        Notification.permission,
+                    );
                 }
             } catch (error) {
                 console.error("[Push] Erreur:", error);
@@ -221,7 +250,10 @@ function updateNotificationButton(btn) {
 
 async function subscribeToPush() {
     try {
+        console.log("[Push] Début subscribeToPush...");
+
         // Attendre que le service worker soit prêt avec un timeout
+        console.log("[Push] Attente du Service Worker...");
         const registration = await Promise.race([
             navigator.serviceWorker.ready,
             new Promise((_, reject) =>
@@ -232,11 +264,17 @@ async function subscribeToPush() {
                 ),
             ),
         ]);
+        console.log("[Push] Service Worker prêt:", registration.scope);
 
         // Récupérer la clé VAPID depuis le serveur si non définie
         let vapidKey = window.VAPID_PUBLIC_KEY;
+        console.log("[Push] Clé VAPID en cache:", !!vapidKey);
+
         if (!vapidKey) {
+            console.log("[Push] Récupération de la clé VAPID...");
             const response = await fetch("/api/push/vapid-key");
+            console.log("[Push] Réponse VAPID:", response.status);
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(
@@ -245,6 +283,10 @@ async function subscribeToPush() {
             }
             const data = await response.json();
             vapidKey = data.publicKey;
+            console.log(
+                "[Push] Clé VAPID reçue:",
+                vapidKey ? vapidKey.substring(0, 20) + "..." : "null",
+            );
         }
 
         if (!vapidKey) {
@@ -254,20 +296,33 @@ async function subscribeToPush() {
         }
 
         // S'abonner aux notifications push
+        console.log("[Push] Création de l'abonnement pushManager...");
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey),
         });
+        console.log(
+            "[Push] Abonnement créé:",
+            subscription.endpoint.substring(0, 50) + "...",
+        );
 
         // Envoyer la subscription au serveur
+        const subscriptionData = subscription.toJSON();
+        console.log(
+            "[Push] Données à envoyer:",
+            JSON.stringify(subscriptionData).substring(0, 100) + "...",
+        );
+
         const response = await fetch("/api/push/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(subscription.toJSON()),
+            body: JSON.stringify(subscriptionData),
         });
+        console.log("[Push] Réponse serveur:", response.status);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            console.error("[Push] Erreur serveur:", errorData);
             // Si erreur serveur, désabonner localement pour éviter l'incohérence
             await subscription.unsubscribe().catch(() => {});
             throw new Error(
