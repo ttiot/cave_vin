@@ -24,6 +24,12 @@ from models import (
 from app.field_config import iter_fields
 from app.utils.formatters import resolve_redirect
 from tasks import schedule_wine_enrichment
+from services.push_notification_service import (
+    notify_wine_added,
+    notify_wine_consumed,
+    notify_wine_deleted,
+    notify_low_stock,
+)
 
 
 wines_bp = Blueprint('wines', __name__, url_prefix='/wines')
@@ -468,6 +474,13 @@ def add_wine():
         db.session.add(wine)
         db.session.commit()
         schedule_wine_enrichment(wine.id)
+        
+        # Envoyer une notification push aux autres membres de la famille de comptes
+        try:
+            notify_wine_added(wine, current_user.id)
+        except Exception:
+            pass  # Ne pas bloquer si la notification échoue
+        
         flash('Bouteille ajoutée avec succès.')
         return redirect(url_for('main.index'))
 
@@ -745,6 +758,17 @@ def consume_wine(wine_id):
     db.session.add(consumption)
     db.session.commit()
 
+    # Envoyer des notifications push
+    try:
+        # Notifier les autres membres de la famille de comptes
+        notify_wine_consumed(wine, 1, current_user.id)
+        
+        # Vérifier si le stock est bas (seuil de 2 bouteilles)
+        if wine.quantity <= 2 and wine.quantity > 0:
+            notify_low_stock(wine, threshold=2)
+    except Exception:
+        pass  # Ne pas bloquer si la notification échoue
+
     flash("Une bouteille a été marquée comme consommée.")
     return redirect(resolve_redirect('main.index'))
 
@@ -760,7 +784,18 @@ def delete_wine(wine_id):
     wine = (
         Wine.query.filter_by(id=wine_id, user_id=owner_id).first_or_404()
     )
+    
+    # Sauvegarder le nom avant suppression pour la notification
+    wine_name = wine.name
+    
     db.session.delete(wine)
     db.session.commit()
+    
+    # Envoyer une notification push aux autres membres de la famille de comptes
+    try:
+        notify_wine_deleted(wine_name, current_user.id)
+    except Exception:
+        pass  # Ne pas bloquer si la notification échoue
+    
     flash("La bouteille a été supprimée de votre cave.")
     return redirect(resolve_redirect('main.index'))

@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications Push - Administration{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-bell me-2"></i>Notifications Push
+            </h1>
+            <p class="text-muted mb-0">Envoyez des notifications aux utilisateurs de l'application</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin.push_subscriptions') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-list-ul me-1"></i>Voir les abonnements
+            </a>
+        </div>
+    </div>
+
+    {% if not push_configured %}
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
+        <div>
+            <strong>Notifications non configurées</strong><br>
+            Les variables d'environnement VAPID_PUBLIC_KEY et VAPID_PRIVATE_KEY ne sont pas définies.
+            <a href="https://web.dev/push-notifications-overview/" target="_blank" class="alert-link">En savoir plus</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Statistiques -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">Abonnements actifs</h6>
+                            <h2 class="card-title mb-0">{{ total_subscriptions }}</h2>
+                        </div>
+                        <i class="bi bi-phone fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">Utilisateurs avec push</h6>
+                            <h2 class="card-title mb-0">{{ users_with_push }}</h2>
+                        </div>
+                        <i class="bi bi-people fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">Comptes principaux</h6>
+                            <h2 class="card-title mb-0">{{ users_data|length }}</h2>
+                        </div>
+                        <i class="bi bi-person-badge fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Formulaire d'envoi -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-send me-2"></i>Envoyer une notification
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.send_notification') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Titre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="title" name="title" 
+                                   placeholder="🍷 Nouvelle fonctionnalité" required maxlength="100">
+                            <div class="form-text">Maximum 100 caractères. Utilisez des emojis pour attirer l'attention.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="body" class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="body" name="body" rows="3" 
+                                      placeholder="Découvrez les nouvelles statistiques avancées..." 
+                                      required maxlength="500"></textarea>
+                            <div class="form-text">Maximum 500 caractères.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="url" class="form-label">URL de destination</label>
+                            <input type="text" class="form-control" id="url" name="url" 
+                                   placeholder="/" value="/">
+                            <div class="form-text">Page à ouvrir quand l'utilisateur clique sur la notification.</div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="mb-3">
+                            <label class="form-label">Destinataires <span class="text-danger">*</span></label>
+                            
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="target_type" 
+                                       id="target_all" value="all" checked>
+                                <label class="form-check-label" for="target_all">
+                                    <i class="bi bi-globe me-1"></i>Tous les utilisateurs
+                                    <span class="badge bg-secondary ms-1">{{ total_subscriptions }} appareils</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="target_type" 
+                                       id="target_user" value="user">
+                                <label class="form-check-label" for="target_user">
+                                    <i class="bi bi-person me-1"></i>Utilisateur spécifique
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="user_select_container" class="mb-3" style="display: none;">
+                            <label for="user_id" class="form-label">Sélectionner l'utilisateur</label>
+                            <select class="form-select" id="user_id" name="user_id">
+                                <option value="">-- Choisir un utilisateur --</option>
+                                {% for data in users_data %}
+                                <option value="{{ data.user.id }}" 
+                                        data-has-push="{{ 'true' if data.push_subscriptions > 0 else 'false' }}"
+                                        data-sub-count="{{ data.sub_accounts_count }}">
+                                    {{ data.user.username }}
+                                    {% if data.push_subscriptions > 0 %}
+                                        ({{ data.push_subscriptions }} appareil{{ 's' if data.push_subscriptions > 1 else '' }})
+                                    {% else %}
+                                        (pas d'abonnement)
+                                    {% endif %}
+                                    {% if data.sub_accounts_count > 0 %}
+                                        - {{ data.sub_accounts_count }} sous-compte{{ 's' if data.sub_accounts_count > 1 else '' }}
+                                    {% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            
+                            <div class="form-check mt-2" id="include_sub_container" style="display: none;">
+                                <input class="form-check-input" type="checkbox" name="include_sub_accounts" 
+                                       id="include_sub_accounts" value="1">
+                                <label class="form-check-label" for="include_sub_accounts">
+                                    <i class="bi bi-people me-1"></i>Inclure les sous-comptes
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" {% if not push_configured %}disabled{% endif %}>
+                                <i class="bi bi-send me-2"></i>Envoyer la notification
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des utilisateurs avec push -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-people me-2"></i>Utilisateurs avec notifications
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Utilisateur</th>
+                                    <th class="text-center">Appareils</th>
+                                    <th class="text-center">Sous-comptes</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for data in users_data %}
+                                {% if data.push_subscriptions > 0 or data.sub_accounts_with_push > 0 %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ data.user.username }}</strong>
+                                        {% if data.user.is_admin %}
+                                        <span class="badge bg-danger ms-1">Admin</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if data.push_subscriptions > 0 %}
+                                        <span class="badge bg-success">{{ data.push_subscriptions }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if data.sub_accounts_count > 0 %}
+                                        <span class="text-muted">{{ data.sub_accounts_with_push }}/{{ data.sub_accounts_count }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if data.push_subscriptions > 0 %}
+                                        <form action="{{ url_for('admin.test_push_notification', user_id=data.user.id) }}" 
+                                              method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary" 
+                                                    title="Envoyer un test"
+                                                    {% if not push_configured %}disabled{% endif %}>
+                                                <i class="bi bi-send"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        <a href="{{ url_for('admin.push_subscriptions', user_id=data.user.id) }}" 
+                                           class="btn btn-sm btn-outline-secondary" title="Voir les abonnements">
+                                            <i class="bi bi-list"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                                
+                                {% set has_push_users = users_data|selectattr('push_subscriptions', 'gt', 0)|list|length + users_data|selectattr('sub_accounts_with_push', 'gt', 0)|list|length %}
+                                {% if has_push_users == 0 %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">
+                                        <i class="bi bi-bell-slash fs-1 d-block mb-2"></i>
+                                        Aucun utilisateur n'a activé les notifications push
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aide -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-question-circle me-2"></i>Comment ça marche ?
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li class="mb-2">
+                            <strong>Configuration serveur</strong> : Les clés VAPID doivent être configurées 
+                            (<code>VAPID_PUBLIC_KEY</code>, <code>VAPID_PRIVATE_KEY</code>).
+                        </li>
+                        <li class="mb-2">
+                            <strong>Abonnement utilisateur</strong> : L'utilisateur doit autoriser les notifications 
+                            dans son navigateur et s'abonner via l'application.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Envoi</strong> : Vous pouvez envoyer des notifications à tous les utilisateurs 
+                            ou cibler un utilisateur spécifique (avec ou sans ses sous-comptes).
+                        </li>
+                        <li>
+                            <strong>Notifications automatiques</strong> : Les actions comme l'ajout ou la consommation 
+                            de bouteilles déclenchent automatiquement des notifications vers les comptes liés.
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const targetAll = document.getElementById('target_all');
+    const targetUser = document.getElementById('target_user');
+    const userSelectContainer = document.getElementById('user_select_container');
+    const userSelect = document.getElementById('user_id');
+    const includeSubContainer = document.getElementById('include_sub_container');
+
+    function updateUserSelectVisibility() {
+        if (targetUser.checked) {
+            userSelectContainer.style.display = 'block';
+            userSelect.required = true;
+        } else {
+            userSelectContainer.style.display = 'none';
+            userSelect.required = false;
+        }
+    }
+
+    function updateSubAccountsVisibility() {
+        const selectedOption = userSelect.options[userSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.subCount > 0) {
+            includeSubContainer.style.display = 'block';
+        } else {
+            includeSubContainer.style.display = 'none';
+        }
+    }
+
+    targetAll.addEventListener('change', updateUserSelectVisibility);
+    targetUser.addEventListener('change', updateUserSelectVisibility);
+    userSelect.addEventListener('change', updateSubAccountsVisibility);
+
+    // Initial state
+    updateUserSelectVisibility();
+});
+</script>
+{% endblock %}

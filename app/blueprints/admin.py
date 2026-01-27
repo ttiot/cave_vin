@@ -19,7 +19,7 @@ from flask_login import login_required, current_user, login_user
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 
-from models import User, Wine, Cellar, WineConsumption, ActivityLog, UserSettings, db
+from models import User, Wine, Cellar, WineConsumption, ActivityLog, UserSettings, PushSubscription, db
 from app.utils.decorators import admin_required
 
 
@@ -580,3 +580,229 @@ def global_statistics_api():
     return jsonify({
         "monthly_stats": monthly_stats,
     })
+
+
+# ============================================================================
+# Notifications Push
+# ============================================================================
+
+
+@admin_bp.route("/notifications")
+@login_required
+@admin_required
+def notifications():
+    """Interface d'administration pour les notifications push."""
+    from services.push_notification_service import is_push_configured
+    
+    # Récupérer tous les utilisateurs principaux (pas les sous-comptes)
+    users = User.query.filter_by(parent_id=None).order_by(User.username.asc()).all()
+    
+    # Statistiques des abonnements push
+    total_subscriptions = PushSubscription.query.filter_by(is_active=True).count()
+    users_with_push = db.session.query(
+        func.count(func.distinct(PushSubscription.user_id))
+    ).filter(PushSubscription.is_active == True).scalar() or 0
+    
+    # Récupérer les utilisateurs avec leurs abonnements push
+    users_data = []
+    for user in users:
+        sub_count = PushSubscription.query.filter_by(
+            user_id=user.id, is_active=True
+        ).count()
+        
+        # Compter aussi les sous-comptes avec push
+        sub_accounts_with_push = 0
+        for sub_account in user.sub_accounts:
+            if PushSubscription.query.filter_by(user_id=sub_account.id, is_active=True).count() > 0:
+                sub_accounts_with_push += 1
+        
+        users_data.append({
+            "user": user,
+            "push_subscriptions": sub_count,
+            "sub_accounts_count": user.sub_accounts.count(),
+            "sub_accounts_with_push": sub_accounts_with_push,
+        })
+    
+    return render_template(
+        "admin/notifications.html",
+        users_data=users_data,
+        total_subscriptions=total_subscriptions,
+        users_with_push=users_with_push,
+        push_configured=is_push_configured(),
+    )
+
+
+@admin_bp.route("/notifications/send", methods=["POST"])
+@login_required
+@admin_required
+def send_notification():
+    """Envoyer une notification push."""
+    from services.push_notification_service import (
+        is_push_configured,
+        send_push_to_user,
+        send_push_to_account_family,
+        send_push_to_all_users,
+    )
+    
+    if not is_push_configured():
+        flash("Les notifications push ne sont pas configurées sur ce serveur.", "error")
+        return redirect(url_for("admin.notifications"))
+    
+    # Récupérer les données du formulaire
+    title = (request.form.get("title") or "").strip()
+    body = (request.form.get("body") or "").strip()
+    url = (request.form.get("url") or "/").strip()
+    target_type = request.form.get("target_type", "all")
+    user_id = request.form.get("user_id", type=int)
+    include_sub_accounts = bool(request.form.get("include_sub_accounts"))
+    
+    # Validation
+    if not title:
+        flash("Le titre est obligatoire.", "error")
+        return redirect(url_for("admin.notifications"))
+    
+    if not body:
+        flash("Le message est obligatoire.", "error")
+        return redirect(url_for("admin.notifications"))
+    
+    # Envoyer selon le type de cible
+    result = {"sent": 0, "failed": 0, "errors": []}
+    
+    if target_type == "all":
+        result = send_push_to_all_users(title, body, url)
+        target_desc = "tous les utilisateurs"
+    
+    elif target_type == "user" and user_id:
+        user = User.query.get(user_id)
+        if not user:
+            flash("Utilisateur non trouvé.", "error")
+            return redirect(url_for("admin.notifications"))
+        
+        if include_sub_accounts:
+            result = send_push_to_account_family(
+                user_id=user_id,
+                title=title,
+                body=body,
+                url=url,
+                include_parent=True,
+                include_sub_accounts=True,
+                exclude_self=False,
+            )
+            target_desc = f"{user.username} et ses sous-comptes"
+        else:
+            result = send_push_to_user(user_id, title, body, url)
+            target_desc = user.username
+    
+    else:
+        flash("Veuillez sélectionner une cible valide.", "error")
+        return redirect(url_for("admin.notifications"))
+    
+    # Afficher le résultat
+    if result["sent"] > 0:
+        flash(
+            f"Notification envoyée avec succès à {result['sent']} appareil(s) ({target_desc}).",
+            "success"
+        )
+    else:
+        error_msg = result["errors"][0] if result["errors"] else "Aucun abonnement actif trouvé"
+        flash(f"Aucune notification envoyée : {error_msg}", "warning")
+    
+    if result.get("failed", 0) > 0:
+        flash(f"{result['failed']} envoi(s) ont échoué.", "warning")
+    
+    # Logger l'action
+    ActivityLog.log(
+        user_id=current_user.id,
+        action="push_notification_sent",
+        entity_type="notification",
+        details={
+            "title": title,
+            "body": body,
+            "url": url,
+            "target_type": target_type,
+            "target_user_id": user_id,
+            "include_sub_accounts": include_sub_accounts,
+            "sent": result["sent"],
+            "failed": result.get("failed", 0),
+        },
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+    db.session.commit()
+    
+    return redirect(url_for("admin.notifications"))
+
+
+@admin_bp.route("/notifications/subscriptions")
+@login_required
+@admin_required
+def push_subscriptions():
+    """Liste détaillée des abonnements push."""
+    
+    page = request.args.get("page", 1, type=int)
+    user_id = request.args.get("user_id", type=int)
+    per_page = 50
+    
+    query = PushSubscription.query
+    
+    if user_id:
+        query = query.filter(PushSubscription.user_id == user_id)
+    
+    subscriptions = query.order_by(
+        PushSubscription.created_at.desc()
+    ).paginate(page=page, per_page=per_page, error_out=False)
+    
+    users = User.query.order_by(User.username.asc()).all()
+    
+    return render_template(
+        "admin/push_subscriptions.html",
+        subscriptions=subscriptions,
+        users=users,
+        current_user_id=user_id,
+    )
+
+
+@admin_bp.route("/notifications/subscriptions/<int:sub_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def delete_push_subscription(sub_id: int):
+    """Supprimer un abonnement push."""
+    
+    subscription = PushSubscription.query.get_or_404(sub_id)
+    user = User.query.get(subscription.user_id)
+    
+    db.session.delete(subscription)
+    db.session.commit()
+    
+    flash(f"Abonnement de {user.username if user else 'utilisateur inconnu'} supprimé.", "success")
+    return redirect(url_for("admin.push_subscriptions"))
+
+
+@admin_bp.route("/notifications/test/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def test_push_notification(user_id: int):
+    """Envoyer une notification de test à un utilisateur."""
+    from services.push_notification_service import is_push_configured, send_push_to_user
+    
+    if not is_push_configured():
+        flash("Les notifications push ne sont pas configurées.", "error")
+        return redirect(url_for("admin.notifications"))
+    
+    user = User.query.get_or_404(user_id)
+    
+    result = send_push_to_user(
+        user_id=user_id,
+        title="🔔 Test de notification",
+        body=f"Ceci est un test envoyé par l'administrateur.",
+        url="/",
+        tag="admin-test",
+    )
+    
+    if result["sent"] > 0:
+        flash(f"Notification de test envoyée à {user.username} ({result['sent']} appareil(s)).", "success")
+    else:
+        error_msg = result["errors"][0] if result["errors"] else "Aucun abonnement actif"
+        flash(f"Échec de l'envoi à {user.username} : {error_msg}", "warning")
+    
+    return redirect(url_for("admin.notifications"))

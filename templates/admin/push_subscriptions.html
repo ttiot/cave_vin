@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Abonnements Push - Administration{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.notifications') }}">Notifications</a></li>
+                    <li class="breadcrumb-item active">Abonnements</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">
+                <i class="bi bi-phone me-2"></i>Abonnements Push
+            </h1>
+            <p class="text-muted mb-0">Liste des appareils enregistrés pour les notifications push</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin.notifications') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Retour
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="user_id" class="form-label">Filtrer par utilisateur</label>
+                    <select class="form-select" id="user_id" name="user_id">
+                        <option value="">Tous les utilisateurs</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if current_user_id == user.id %}selected{% endif %}>
+                            {{ user.username }}
+                            {% if user.is_sub_account %} (sous-compte){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-filter me-1"></i>Filtrer
+                    </button>
+                    {% if current_user_id %}
+                    <a href="{{ url_for('admin.push_subscriptions') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x me-1"></i>Réinitialiser
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Liste des abonnements -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                {{ subscriptions.total }} abonnement{{ 's' if subscriptions.total > 1 else '' }}
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Utilisateur</th>
+                            <th>Appareil</th>
+                            <th>Statut</th>
+                            <th>Créé le</th>
+                            <th>Dernière utilisation</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in subscriptions.items %}
+                        <tr>
+                            <td>
+                                {% set user = sub.user %}
+                                {% if user %}
+                                <strong>{{ user.username }}</strong>
+                                {% if user.is_sub_account %}
+                                <span class="badge bg-info ms-1">Sous-compte</span>
+                                {% endif %}
+                                {% if user.is_admin %}
+                                <span class="badge bg-danger ms-1">Admin</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">Utilisateur supprimé</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    {% if sub.user_agent %}
+                                        {% if 'Mobile' in sub.user_agent or 'Android' in sub.user_agent or 'iPhone' in sub.user_agent %}
+                                        <i class="bi bi-phone me-1"></i>Mobile
+                                        {% elif 'Windows' in sub.user_agent %}
+                                        <i class="bi bi-windows me-1"></i>Windows
+                                        {% elif 'Mac' in sub.user_agent %}
+                                        <i class="bi bi-apple me-1"></i>Mac
+                                        {% elif 'Linux' in sub.user_agent %}
+                                        <i class="bi bi-ubuntu me-1"></i>Linux
+                                        {% else %}
+                                        <i class="bi bi-display me-1"></i>Desktop
+                                        {% endif %}
+                                        
+                                        {% if 'Chrome' in sub.user_agent %}
+                                        Chrome
+                                        {% elif 'Firefox' in sub.user_agent %}
+                                        Firefox
+                                        {% elif 'Safari' in sub.user_agent %}
+                                        Safari
+                                        {% elif 'Edge' in sub.user_agent %}
+                                        Edge
+                                        {% else %}
+                                        Navigateur
+                                        {% endif %}
+                                    {% else %}
+                                    <i class="bi bi-question-circle me-1"></i>Inconnu
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td>
+                                {% if sub.is_active %}
+                                <span class="badge bg-success">Actif</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactif</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ sub.created_at.strftime('%d/%m/%Y %H:%M') if sub.created_at else '-' }}</small>
+                            </td>
+                            <td>
+                                {% if sub.last_used_at %}
+                                <small>{{ sub.last_used_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                                {% else %}
+                                <small class="text-muted">Jamais</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <form action="{{ url_for('admin.delete_push_subscription', sub_id=sub.id) }}" 
+                                      method="POST" class="d-inline"
+                                      onsubmit="return confirm('Supprimer cet abonnement ?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                Aucun abonnement trouvé
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        {% if subscriptions.pages > 1 %}
+        <div class="card-footer">
+            <nav aria-label="Pagination">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if subscriptions.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.push_subscriptions', page=subscriptions.prev_num, user_id=current_user_id) }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in subscriptions.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num == subscriptions.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.push_subscriptions', page=page_num, user_id=current_user_id) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if subscriptions.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.push_subscriptions', page=subscriptions.next_num, user_id=current_user_id) }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Informations techniques -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-info-circle me-2"></i>Informations techniques
+            </h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-2">
+                <strong>Endpoint</strong> : L'URL unique fournie par le service push du navigateur (FCM pour Chrome, Mozilla pour Firefox, etc.)
+            </p>
+            <p class="mb-2">
+                <strong>Statut "Inactif"</strong> : L'abonnement a été désactivé automatiquement car le navigateur a retourné une erreur 
+                (l'utilisateur a révoqué les permissions ou changé de navigateur).
+            </p>
+            <p class="mb-0">
+                <strong>Suppression</strong> : Supprimer un abonnement empêchera l'envoi de notifications à cet appareil. 
+                L'utilisateur devra se réabonner.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

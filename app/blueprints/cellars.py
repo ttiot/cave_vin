@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 
 from models import Cellar, CellarCategory, CellarFloor, User, db
+from services.push_notification_service import notify_cellar_created, notify_cellar_deleted
 
 
 cellars_bp = Blueprint('cellars', __name__, url_prefix='/cellars')
@@ -87,6 +88,13 @@ def add_cellar():
         
         db.session.add(cellar)
         db.session.commit()
+        
+        # Envoyer une notification push aux autres membres de la famille de comptes
+        try:
+            notify_cellar_created(cellar, current_user.id)
+        except Exception:
+            pass  # Ne pas bloquer si la notification échoue
+        
         flash('Cave créée avec succès.')
         return redirect(url_for('cellars.list_cellars'))
 
