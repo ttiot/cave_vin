@@ -27,18 +27,22 @@ def apply_schema_updates() -> None:
     engine = db.engine
     inspector = inspect(engine)
 
-    if "wine_consumption" not in inspector.get_table_names():
-        return
+    # Migration: Add comment column to wine_consumption table
+    if "wine_consumption" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("wine_consumption")}
+        if "comment" not in columns:
+            # Older installations miss the ``comment`` column that now backs optional
+            # tasting notes. Add it on the fly to avoid breaking the application at
+            # startup when the ORM issues SELECT statements.
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE wine_consumption ADD COLUMN comment TEXT"))
 
-    columns = {column["name"] for column in inspector.get_columns("wine_consumption")}
-    if "comment" in columns:
-        return
-
-    # Older installations miss the ``comment`` column that now backs optional
-    # tasting notes. Add it on the fly to avoid breaking the application at
-    # startup when the ORM issues SELECT statements.
-    with engine.begin() as connection:
-        connection.execute(text("ALTER TABLE wine_consumption ADD COLUMN comment TEXT"))
+    # Migration: Add default_cellar_id column to user table
+    if "user" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("user")}
+        if "default_cellar_id" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user ADD COLUMN default_cellar_id INTEGER REFERENCES cellar(id) ON DELETE SET NULL"))
 
 
 ALCOHOL_CATEGORIES: list[dict[str, object]] = [

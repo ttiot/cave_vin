@@ -41,6 +41,14 @@ def overview():
         .all()
     )
 
+    # Trier les caves pour mettre la cave par défaut en premier
+    default_cellar_id = current_user.default_cellar_id
+    if default_cellar_id:
+        cellars = sorted(
+            cellars,
+            key=lambda c: (0 if c.id == default_cellar_id else 1, c.name.lower())
+        )
+
     wines = (
         Wine.query.options(
             selectinload(Wine.subcategory),
@@ -95,6 +103,7 @@ def overview():
                 "vintage_range": (
                     (min(year_values), max(year_values)) if year_values else None
                 ),
+                "is_default": cellar.id == default_cellar_id,
             }
         )
 
@@ -309,7 +318,8 @@ def add_wine():
         flash("Créez d'abord une cave avant d'ajouter des bouteilles.")
         return redirect(url_for('cellars.add_cellar'))
 
-    selected_cellar_id = cellars[0].id if len(cellars) == 1 else None
+    # Pré-sélectionner la cave par défaut si définie, sinon la première cave si une seule existe
+    selected_cellar_id = current_user.default_cellar_id or (cellars[0].id if len(cellars) == 1 else None)
     selected_subcategory_id = None
 
     if request.method == 'POST':

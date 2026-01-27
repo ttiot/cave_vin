@@ -469,6 +469,32 @@ def update_consumption_comment(consumption_id: int):
     return redirect(resolve_redirect('main.consumption_history'))
 
 
+@main_bp.route('/consommations/<int:consumption_id>/restock', methods=['POST'])
+@login_required
+def restock_consumption(consumption_id: int):
+    """Remet une bouteille consommée en stock."""
+    consumption = (
+        WineConsumption.query.filter_by(
+            id=consumption_id, user_id=current_user.id
+        ).first_or_404()
+    )
+
+    wine = consumption.wine
+    if wine is None:
+        flash("La bouteille associée n'existe plus.")
+        return redirect(resolve_redirect('main.consumption_history'))
+
+    # Remettre la quantité en stock
+    wine.quantity += consumption.quantity
+
+    # Supprimer l'enregistrement de consommation
+    db.session.delete(consumption)
+    db.session.commit()
+
+    flash(f"La bouteille « {consumption.snapshot_name} » a été remise en stock.")
+    return redirect(resolve_redirect('main.consumption_history'))
+
+
 @main_bp.route('/stats', methods=['GET'])
 @login_required
 def statistics():

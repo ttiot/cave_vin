@@ -223,6 +223,8 @@ migrations/versions/*.py
 # Uploads (si applicable)
 uploads/
 static/uploads/
+data/
 
 # Cache
 .cache/
+

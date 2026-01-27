@@ -148,7 +148,12 @@
         <button class="nav-link{% if loop.first %} active{% endif %}" id="cellar-{{ panel.cellar.id }}-tab"
                 data-bs-toggle="pill" data-bs-target="#cellar-{{ panel.cellar.id }}" type="button" role="tab"
                 aria-controls="cellar-{{ panel.cellar.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
-          <span class="fw-semibold d-block">{{ panel.cellar.name }}</span>
+          <span class="fw-semibold d-block">
+            {{ panel.cellar.name }}
+            {% if panel.is_default %}
+            <i class="bi bi-star-fill text-warning ms-1" title="Cave par défaut"></i>
+            {% endif %}
+          </span>
           <small>{{ panel.total_quantity }} bouteille{% if panel.total_quantity > 1 %}s{% endif %} · {{ panel.wines|length }} référence{% if panel.wines|length > 1 %}s{% endif %}</small>
         </button>
       </li>

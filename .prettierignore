@@ -1,0 +1,3 @@
+# Ignorer les templates Jinja2
+templates/
+*.html

@@ -21,6 +21,8 @@ def search_wines():
     # Récupérer les paramètres de recherche
     subcategory_id = request.args.get('subcategory_id', type=int)
     food_pairing = request.args.get('food_pairing', '').strip()
+    wine_name = request.args.get('wine_name', '').strip()
+    stock_filter = request.args.get('stock_filter', 'all').strip()
     
     # Récupérer toutes les catégories pour le formulaire
     categories = AlcoholCategory.query.order_by(
@@ -29,21 +31,36 @@ def search_wines():
     ).all()
     
     # Si aucun critère n'est fourni, afficher juste le formulaire
-    if not subcategory_id and not food_pairing:
+    if not subcategory_id and not food_pairing and not wine_name:
         return render_template(
             'search.html',
             categories=categories,
             wines=[],
             subcategory_id=None,
-            food_pairing=''
+            food_pairing='',
+            wine_name='',
+            stock_filter=stock_filter
         )
     
-    # Construire la requête de base
+    # Construire la requête de base (inclut toutes les bouteilles)
     query = Wine.query.options(
         selectinload(Wine.cellar),
         selectinload(Wine.subcategory),
         selectinload(Wine.insights)
-    ).filter(Wine.quantity > 0, Wine.user_id == current_user.id)
+    ).filter(Wine.user_id == current_user.id)
+    
+    # Filtrer par statut de stock
+    if stock_filter == 'in_stock':
+        query = query.filter(Wine.quantity > 0)
+    elif stock_filter == 'consumed':
+        query = query.filter(Wine.quantity == 0)
+    # 'all' = pas de filtre sur la quantité
+    
+    # Filtrer par nom de vin si spécifié
+    if wine_name:
+        escaped_wine_name = wine_name.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        search_pattern = f"%{escaped_wine_name}%"
+        query = query.filter(Wine.name.ilike(search_pattern, escape='\\'))
     
     # Filtrer par sous-catégorie si spécifié
     if subcategory_id:
@@ -72,7 +89,9 @@ def search_wines():
         categories=categories,
         wines=wines,
         subcategory_id=subcategory_id,
-        food_pairing=food_pairing
+        food_pairing=food_pairing,
+        wine_name=wine_name,
+        stock_filter=stock_filter
     )
 
 

@@ -2,13 +2,20 @@
 {% block content %}
 <div class="mb-4">
   <h3>Recherche multi-critères</h3>
-  <p class="text-muted">Recherchez vos bouteilles par type d'alcool et/ou par accord mets-vins</p>
+  <p class="text-muted">Recherchez vos bouteilles par nom, type d'alcool et/ou par accord mets-vins</p>
 </div>
 
 <div class="card mb-4">
   <div class="card-body">
     <form method="get" action="{{ url_for('search.search_wines') }}">
       <div class="row g-3">
+        <div class="col-12">
+          <label for="wine_name" class="form-label">Nom du vin</label>
+          <input type="text" class="form-control" id="wine_name" name="wine_name" 
+                 value="{{ wine_name }}" placeholder="Ex: Château Margaux, Côtes du Rhône...">
+          <div class="form-text">Recherche par nom ou partie du nom de la bouteille</div>
+        </div>
+        
         <div class="col-md-6">
           <label for="subcategory_id" class="form-label">Type d'alcool</label>
           <select class="form-select" id="subcategory_id" name="subcategory_id">
@@ -28,9 +35,19 @@
         
         <div class="col-md-6">
           <label for="food_pairing" class="form-label">Accord mets-vins</label>
-          <input type="text" class="form-control" id="food_pairing" name="food_pairing" 
+          <input type="text" class="form-control" id="food_pairing" name="food_pairing"
                  value="{{ food_pairing }}" placeholder="Ex: viande, poisson, fromage...">
           <div class="form-text">Recherche dans les informations enrichies (insights)</div>
+        </div>
+        
+        <div class="col-md-6">
+          <label for="stock_filter" class="form-label">Statut</label>
+          <select class="form-select" id="stock_filter" name="stock_filter">
+            <option value="all" {% if stock_filter == 'all' %}selected{% endif %}>Toutes les bouteilles</option>
+            <option value="in_stock" {% if stock_filter == 'in_stock' %}selected{% endif %}>En stock uniquement</option>
+            <option value="consumed" {% if stock_filter == 'consumed' %}selected{% endif %}>Consommées uniquement</option>
+          </select>
+          <div class="form-text">Filtrer par disponibilité</div>
         </div>
       </div>
       
@@ -41,7 +58,7 @@
           </svg>
           Rechercher
         </button>
-        {% if subcategory_id or food_pairing %}
+        {% if subcategory_id or food_pairing or wine_name %}
         <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary">Réinitialiser</a>
         {% endif %}
       </div>
@@ -49,7 +66,7 @@
   </div>
 </div>
 
-{% if subcategory_id or food_pairing %}
+{% if subcategory_id or food_pairing or wine_name %}
 <div class="mb-3">
   <h4>Résultats de la recherche</h4>
   {% if wines %}
@@ -106,25 +123,32 @@
         {% endif %}
       </div>
       <div class="card-footer bg-white">
-        <small class="text-muted d-block">Quantité : {{ wine.quantity }}</small>
+        <small class="text-muted d-block">
+          Quantité : {{ wine.quantity }}
+          {% if wine.quantity == 0 %}
+            <span class="badge bg-warning text-dark ms-2">Consommée</span>
+          {% endif %}
+        </small>
         <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
       </div>
       <div class="card-actions border-top bg-light p-3">
         <div class="btn-group d-flex" role="group">
+          {% if wine.quantity > 0 %}
           <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <input type="hidden" name="redirect" value="{{ request.full_path }}">
             <input type="text" name="comment" class="form-control form-control-sm mb-2" placeholder="Commentaire (optionnel)">
             <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
           </form>
+          {% endif %}
           <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <input type="hidden" name="redirect" value="{{ request.full_path }}">
             <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
           </form>
           <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="redirect" value="{{ request.path }}">
+            <input type="hidden" name="redirect" value="{{ request.full_path }}">
             <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
           </form>
         </div>

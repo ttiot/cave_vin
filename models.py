@@ -15,11 +15,18 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     has_temporary_password = db.Column(db.Boolean, default=False, nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    default_cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id", ondelete="SET NULL"), nullable=True)
 
     cellars = db.relationship(
         "Cellar",
         back_populates="owner",
         cascade="all, delete-orphan",
+        foreign_keys="Cellar.user_id",
+    )
+    default_cellar = db.relationship(
+        "Cellar",
+        foreign_keys=[default_cellar_id],
+        post_update=True,
     )
     wines = db.relationship(
         "Wine",
@@ -56,7 +63,7 @@ class Cellar(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey("cellar_category.id"), nullable=False)
 
     wines = db.relationship("Wine", back_populates="cellar", lazy="dynamic")
-    owner = db.relationship("User", back_populates="cellars")
+    owner = db.relationship("User", back_populates="cellars", foreign_keys=[user_id])
     category = db.relationship("CellarCategory", back_populates="cellars")
     levels = db.relationship(
         "CellarFloor",

@@ -118,14 +118,23 @@
       <ul class="list-group list-group-flush">
         {% for item in wine.consumptions %}
         <li class="list-group-item">
-          <div class="d-flex justify-content-between align-items-start">
-            <div>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="flex-grow-1">
               <span>{{ item.describe() }}</span>
               {% if item.comment %}
               <div class="text-muted small mt-1">{{ item.comment }}</div>
               {% endif %}
             </div>
-            <span class="text-muted small">{{ item.consumed_at.strftime('%d/%m/%Y %H:%M') }}</span>
+            <div class="d-flex align-items-center gap-3">
+              <span class="text-muted small">{{ item.consumed_at.strftime('%d/%m/%Y %H:%M') }}</span>
+              <form method="post" action="{{ url_for('main.restock_consumption', consumption_id=item.id) }}" class="d-inline" onsubmit="return confirm('Remettre cette bouteille en stock ?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="redirect" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-success btn-sm" title="Remettre en stock">
+                  <i class="bi bi-arrow-counterclockwise"></i> Remettre en stock
+                </button>
+              </form>
+            </div>
           </div>
         </li>
         {% endfor %}

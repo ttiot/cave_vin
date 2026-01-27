@@ -3,7 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 
-from models import Cellar, CellarCategory, CellarFloor, db
+from models import Cellar, CellarCategory, CellarFloor, User, db
 
 
 cellars_bp = Blueprint('cellars', __name__, url_prefix='/cellars')
@@ -146,3 +146,27 @@ def edit_cellar(cellar_id):
         return redirect(url_for('cellars.list_cellars'))
     
     return render_template('edit_cellar.html', cellar=cellar, categories=categories)
+
+
+@cellars_bp.route('/<int:cellar_id>/set-default', methods=['POST'])
+@login_required
+def set_default_cellar(cellar_id):
+    """Définir une cave comme cave par défaut."""
+    cellar = Cellar.query.filter_by(id=cellar_id, user_id=current_user.id).first_or_404()
+    
+    current_user.default_cellar_id = cellar.id
+    db.session.commit()
+    
+    flash(f'La cave « {cellar.name} » est maintenant votre cave par défaut.')
+    return redirect(url_for('cellars.list_cellars'))
+
+
+@cellars_bp.route('/clear-default', methods=['POST'])
+@login_required
+def clear_default_cellar():
+    """Supprimer la cave par défaut."""
+    current_user.default_cellar_id = None
+    db.session.commit()
+    
+    flash('La cave par défaut a été supprimée.')
+    return redirect(url_for('cellars.list_cellars'))
