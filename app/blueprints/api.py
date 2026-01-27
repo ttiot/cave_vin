@@ -1073,6 +1073,15 @@ def get_vapid_key():
     if not vapid_public_key:
         return jsonify({"error": "Notifications push non configurées"}), 503
     
+    # Nettoyer la clé : supprimer les guillemets si présents
+    vapid_public_key = vapid_public_key.strip()
+    if vapid_public_key.startswith('"') and vapid_public_key.endswith('"'):
+        vapid_public_key = vapid_public_key[1:-1]
+    if vapid_public_key.startswith("'") and vapid_public_key.endswith("'"):
+        vapid_public_key = vapid_public_key[1:-1]
+    
+    current_app.logger.info(f"[Push] Clé VAPID envoyée: {vapid_public_key[:30]}...")
+    
     return jsonify({"publicKey": vapid_public_key})
 
 

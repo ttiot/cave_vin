@@ -53,6 +53,11 @@ def create_app(config_class=Config):
     csrf.exempt("api.test_webhook")
     csrf.exempt("api.openapi_spec")
     csrf.exempt("api.swagger_ui")
+    # Routes push notifications (appelées via fetch depuis le JS)
+    csrf.exempt("api.get_vapid_key")
+    csrf.exempt("api.subscribe_push")
+    csrf.exempt("api.unsubscribe_push")
+    csrf.exempt("api.test_push")
 
     @flask_app.after_request
     def set_security_headers(response):
