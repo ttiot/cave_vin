@@ -83,6 +83,7 @@
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('admin.send_notification') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                         <div class="mb-3">
                             <label for="title" class="form-label">Titre <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="title" name="title" 
@@ -213,9 +214,10 @@
                                     </td>
                                     <td class="text-end">
                                         {% if data.push_subscriptions > 0 %}
-                                        <form action="{{ url_for('admin.test_push_notification', user_id=data.user.id) }}" 
+                                        <form action="{{ url_for('admin.test_push_notification', user_id=data.user.id) }}"
                                               method="POST" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary" 
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                            <button type="submit" class="btn btn-sm btn-outline-primary"
                                                     title="Envoyer un test"
                                                     {% if not push_configured %}disabled{% endif %}>
                                                 <i class="bi bi-send"></i>
