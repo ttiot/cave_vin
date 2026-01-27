@@ -99,9 +99,19 @@ function initPushNotifications() {
         updateNotificationButton(enableBtn);
 
         enableBtn.addEventListener("click", async () => {
+            const isCompact = enableBtn.classList.contains("theme-toggle");
+            const originalContent = enableBtn.innerHTML;
+
             enableBtn.disabled = true;
-            enableBtn.innerHTML =
-                '<span class="spinner-border spinner-border-sm me-1"></span>Chargement...';
+
+            if (isCompact) {
+                // Mode compact : afficher un spinner à la place de l'icône
+                enableBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm"></span>';
+            } else {
+                enableBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm me-1"></span>Chargement...';
+            }
 
             try {
                 if (Notification.permission === "granted") {
@@ -157,28 +167,53 @@ async function checkPushSubscription() {
 function updateNotificationButton(btn) {
     navigator.serviceWorker.ready.then(async (registration) => {
         const subscription = await registration.pushManager.getSubscription();
+        const icon = btn.querySelector("i") || btn;
+        const isCompact = btn.classList.contains("theme-toggle");
 
         if (Notification.permission === "denied") {
-            btn.innerHTML =
-                '<i class="bi bi-bell-slash me-1"></i>Notifications bloquées';
+            if (isCompact) {
+                // Mode compact (navbar)
+                icon.className = "bi bi-bell-slash";
+                btn.title = "Notifications bloquées par le navigateur";
+                btn.style.opacity = "0.5";
+            } else {
+                btn.innerHTML =
+                    '<i class="bi bi-bell-slash me-1"></i>Notifications bloquées';
+                btn.classList.remove("btn-primary", "btn-outline-secondary");
+                btn.classList.add("btn-secondary");
+            }
             btn.disabled = true;
-            btn.classList.remove("btn-primary", "btn-outline-secondary");
-            btn.classList.add("btn-secondary");
         } else if (subscription) {
-            btn.innerHTML =
-                '<i class="bi bi-bell-fill me-1"></i>Notifications activées';
-            btn.classList.remove("btn-primary", "btn-secondary");
-            btn.classList.add("btn-outline-success");
+            if (isCompact) {
+                // Mode compact (navbar) - abonné
+                icon.className = "bi bi-bell-fill";
+                btn.title = "Notifications activées (cliquer pour désactiver)";
+                btn.style.opacity = "1";
+                btn.style.color = "#28a745"; // Vert pour indiquer actif
+            } else {
+                btn.innerHTML =
+                    '<i class="bi bi-bell-fill me-1"></i>Notifications activées';
+                btn.classList.remove("btn-primary", "btn-secondary");
+                btn.classList.add("btn-outline-success");
+            }
             btn.disabled = false;
         } else {
-            btn.innerHTML =
-                '<i class="bi bi-bell me-1"></i>Activer les notifications';
-            btn.classList.remove(
-                "btn-outline-secondary",
-                "btn-outline-success",
-                "btn-secondary",
-            );
-            btn.classList.add("btn-primary");
+            if (isCompact) {
+                // Mode compact (navbar) - non abonné
+                icon.className = "bi bi-bell";
+                btn.title = "Activer les notifications";
+                btn.style.opacity = "1";
+                btn.style.color = ""; // Couleur par défaut
+            } else {
+                btn.innerHTML =
+                    '<i class="bi bi-bell me-1"></i>Activer les notifications';
+                btn.classList.remove(
+                    "btn-outline-secondary",
+                    "btn-outline-success",
+                    "btn-secondary",
+                );
+                btn.classList.add("btn-primary");
+            }
             btn.disabled = false;
         }
     });
