@@ -1,65 +1,323 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<style>
+  /* Carte de cave moderne */
+  .cellar-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  
+  .cellar-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -8px var(--shadow-hover);
+  }
+  
+  .cellar-card.is-default {
+    border: 2px solid var(--accent-success);
+  }
+  
+  .cellar-card-header {
+    padding: var(--spacing-lg);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+    color: #fff;
+    position: relative;
+  }
+  
+  .cellar-card.is-default .cellar-card-header {
+    background: linear-gradient(135deg, var(--accent-success), #2dd4bf);
+  }
+  
+  .cellar-card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .cellar-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.6rem;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-lg);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .cellar-card-category {
+    margin-top: var(--spacing-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.6rem;
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+  }
+  
+  .cellar-card-body {
+    padding: var(--spacing-lg);
+    flex: 1;
+  }
+  
+  .cellar-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .cellar-stat:last-child {
+    border-bottom: none;
+  }
+  
+  .cellar-stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .cellar-stat-label i {
+    color: var(--text-muted);
+  }
+  
+  .cellar-stat-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .cellar-floors {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-md);
+  }
+  
+  .cellar-floors-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .cellar-floor-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding: 4px 0;
+  }
+  
+  .cellar-floor-item span:first-child {
+    color: var(--text-secondary);
+  }
+  
+  .cellar-floor-item span:last-child {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  
+  .cellar-card-actions {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background-color: var(--bg-hover);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+  }
+  
+  .btn-cellar-action {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border-color);
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    text-decoration: none;
+  }
+  
+  .btn-cellar-action:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+  
+  .btn-cellar-action.btn-edit {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+  
+  .btn-cellar-action.btn-edit:hover {
+    background-color: var(--accent-primary);
+    color: #fff;
+  }
+  
+  .btn-cellar-action.btn-default {
+    border-color: var(--accent-success);
+    color: var(--accent-success);
+  }
+  
+  .btn-cellar-action.btn-default:hover {
+    background-color: var(--accent-success);
+    color: #fff;
+  }
+  
+  /* Empty state */
+  .empty-state-cellars {
+    text-align: center;
+    padding: var(--spacing-xl) * 2;
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color);
+  }
+  
+  .empty-state-cellars-icon {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-lg);
+    opacity: 0.6;
+  }
+  
+  .empty-state-cellars-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .empty-state-cellars-text {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="m-0">Mes caves</h3>
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
   <div>
-    <a href="{{ url_for('cellar_categories.list_cellar_categories') }}" class="btn btn-outline-secondary me-2">📁 Catégories</a>
-    <a href="{{ url_for('cellars.add_cellar') }}" class="btn btn-dark">+ Nouvelle cave</a>
+    <h3 class="m-0">Mes caves</h3>
+    <p class="text-muted mb-0">Gérez vos espaces de stockage</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('cellar_categories.list_cellar_categories') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-folder me-1"></i> Catégories
+    </a>
+    <a href="{{ url_for('cellars.add_cellar') }}" class="btn btn-dark">
+      <i class="bi bi-plus-lg me-1"></i> Nouvelle cave
+    </a>
   </div>
 </div>
+
 {% if cellars %}
-<div class="row row-cols-1 row-cols-md-2 g-4">
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
   {% for cellar in cellars %}
   <div class="col">
-    <div class="card h-100 shadow-sm {% if current_user.default_cellar_id == cellar.id %}border-success border-2{% endif %}">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <h5 class="card-title mb-0">{{ cellar.name }}</h5>
+    <div class="cellar-card {% if current_user.default_cellar_id == cellar.id %}is-default{% endif %}">
+      <!-- Header -->
+      <div class="cellar-card-header">
+        <h5 class="cellar-card-title">
+          <i class="bi bi-box-seam"></i>
+          {{ cellar.name }}
           {% if current_user.default_cellar_id == cellar.id %}
-          <span class="badge bg-success"><i class="bi bi-star-fill me-1"></i>Par défaut</span>
+          <span class="cellar-card-badge">
+            <i class="bi bi-star-fill"></i> Par défaut
+          </span>
           {% endif %}
-        </div>
+        </h5>
         {% if cellar.category %}
-        <p class="card-text mb-1">
-          <span class="badge bg-primary">{{ cellar.category.name }}</span>
-        </p>
-        {% endif %}
-        <p class="card-text mb-1">Étages : {{ cellar.floors }}</p>
-        <ul class="list-unstyled small mb-2">
-          {% for index, capacity in cellar.floor_breakdown %}
-          <li>Étage {{ index }} : {{ capacity }} bouteilles</li>
-          {% endfor %}
-        </ul>
-        <p class="card-text">Capacité totale : {{ cellar.capacity }}</p>
-        <small class="text-muted">Vins stockés : {{ cellar.wines.count() }}</small>
-      </div>
-      <div class="card-footer bg-transparent border-0 pt-0">
-        <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ url_for('cellars.edit_cellar', cellar_id=cellar.id) }}" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-pencil"></i> Modifier
-          </a>
-          {% if current_user.default_cellar_id != cellar.id %}
-          <form method="post" action="{{ url_for('cellars.set_default_cellar', cellar_id=cellar.id) }}" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <button type="submit" class="btn btn-sm btn-outline-success">
-              <i class="bi bi-star"></i> Définir par défaut
-            </button>
-          </form>
-          {% else %}
-          <form method="post" action="{{ url_for('cellars.clear_default_cellar') }}" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <button type="submit" class="btn btn-sm btn-outline-secondary">
-              <i class="bi bi-star-fill"></i> Retirer par défaut
-            </button>
-          </form>
-          {% endif %}
+        <div class="cellar-card-category">
+          <i class="bi bi-tag"></i> {{ cellar.category.name }}
         </div>
+        {% endif %}
+      </div>
+      
+      <!-- Body -->
+      <div class="cellar-card-body">
+        <div class="cellar-stat">
+          <span class="cellar-stat-label">
+            <i class="bi bi-layers"></i> Étages
+          </span>
+          <span class="cellar-stat-value">{{ cellar.floors }}</span>
+        </div>
+        
+        <div class="cellar-stat">
+          <span class="cellar-stat-label">
+            <i class="bi bi-box"></i> Capacité totale
+          </span>
+          <span class="cellar-stat-value">{{ cellar.capacity }} bouteilles</span>
+        </div>
+        
+        <div class="cellar-stat">
+          <span class="cellar-stat-label">
+            <i class="bi bi-cup-straw"></i> Vins stockés
+          </span>
+          <span class="cellar-stat-value">{{ cellar.wines.count() }}</span>
+        </div>
+        
+        {% if cellar.floor_breakdown %}
+        <div class="cellar-floors">
+          <div class="cellar-floors-title">Détail par étage</div>
+          {% for index, capacity in cellar.floor_breakdown %}
+          <div class="cellar-floor-item">
+            <span>Étage {{ index }}</span>
+            <span>{{ capacity }} bouteilles</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Actions -->
+      <div class="cellar-card-actions">
+        <a href="{{ url_for('cellars.edit_cellar', cellar_id=cellar.id) }}" class="btn-cellar-action btn-edit">
+          <i class="bi bi-pencil"></i> Modifier
+        </a>
+        {% if current_user.default_cellar_id != cellar.id %}
+        <form method="post" action="{{ url_for('cellars.set_default_cellar', cellar_id=cellar.id) }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn-cellar-action btn-default">
+            <i class="bi bi-star"></i> Définir par défaut
+          </button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('cellars.clear_default_cellar') }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn-cellar-action">
+            <i class="bi bi-star-fill"></i> Retirer par défaut
+          </button>
+        </form>
+        {% endif %}
       </div>
     </div>
   </div>
   {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-secondary">Aucune cave enregistrée pour le moment. Créez votre première cave pour commencer.</div>
+<div class="empty-state-cellars">
+  <div class="empty-state-cellars-icon">📦</div>
+  <h4 class="empty-state-cellars-title">Aucune cave enregistrée</h4>
+  <p class="empty-state-cellars-text">Créez votre première cave pour commencer à organiser vos bouteilles.</p>
+  <a href="{{ url_for('cellars.add_cellar') }}" class="btn btn-dark">
+    <i class="bi bi-plus-lg me-1"></i> Créer ma première cave
+  </a>
+</div>
 {% endif %}
 {% endblock %}

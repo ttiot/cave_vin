@@ -1,22 +1,349 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<style>
+  /* Section card moderne */
+  .admin-section {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    height: 100%;
+  }
+  
+  .admin-section-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .admin-section-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.1rem;
+  }
+  
+  .admin-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .admin-section-body {
+    padding: var(--spacing-lg);
+  }
+  
+  /* Formulaire moderne */
+  .form-modern .form-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .form-modern .form-control,
+  .form-modern .form-select {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-color);
+    background-color: var(--bg-input);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  
+  .form-modern .form-control:focus,
+  .form-modern .form-select:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.15);
+  }
+  
+  .form-modern .form-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .form-modern .form-check {
+    padding: var(--spacing-sm) var(--spacing-md);
+    padding-left: 2.5rem;
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .form-modern .form-check-label {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+  }
+  
+  .btn-create {
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    background-color: var(--accent-primary);
+    border: none;
+    color: #fff;
+    transition: background-color var(--transition-fast), transform var(--transition-fast);
+  }
+  
+  .btn-create:hover {
+    background-color: var(--accent-primary-dark);
+    transform: translateY(-1px);
+  }
+  
+  /* Carte utilisateur */
+  .user-card {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color var(--transition-fast);
+  }
+  
+  .user-card:last-child {
+    border-bottom: none;
+  }
+  
+  .user-card:hover {
+    background-color: var(--bg-hover);
+  }
+  
+  .user-card.is-sub-account {
+    padding-left: calc(var(--spacing-lg) + 1.5rem);
+    background-color: var(--bg-hover);
+  }
+  
+  .user-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+  
+  .user-card-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .user-card-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .user-card-name .you-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    background-color: var(--accent-info);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+  }
+  
+  .user-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  
+  .user-badge.admin {
+    background-color: var(--accent-danger);
+    color: #fff;
+  }
+  
+  .user-badge.main-account {
+    background-color: var(--accent-primary);
+    color: #fff;
+  }
+  
+  .user-badge.sub-account {
+    background-color: var(--text-muted);
+    color: #fff;
+  }
+  
+  .user-badge.sub-count {
+    background-color: var(--accent-info);
+    color: #fff;
+  }
+  
+  .user-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    justify-content: flex-end;
+  }
+  
+  .btn-user-action {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border-color);
+    background-color: var(--bg-card);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+  
+  .btn-user-action:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+  
+  .btn-user-action.btn-admin {
+    border-color: var(--accent-warning);
+    color: var(--accent-warning);
+  }
+  
+  .btn-user-action.btn-admin:hover {
+    background-color: var(--accent-warning);
+    color: #1d1d1f;
+  }
+  
+  .btn-user-action.btn-link-user {
+    border-color: var(--accent-info);
+    color: var(--accent-info);
+  }
+  
+  .btn-user-action.btn-link-user:hover {
+    background-color: var(--accent-info);
+    color: #fff;
+  }
+  
+  .btn-user-action.btn-impersonate {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+  
+  .btn-user-action.btn-impersonate:hover {
+    background-color: var(--accent-primary);
+    color: #fff;
+  }
+  
+  .btn-user-action.btn-delete {
+    border-color: var(--accent-danger);
+    color: var(--accent-danger);
+  }
+  
+  .btn-user-action.btn-delete:hover {
+    background-color: var(--accent-danger);
+    color: #fff;
+  }
+  
+  .btn-user-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  /* Empty state */
+  .users-empty {
+    text-align: center;
+    padding: var(--spacing-xl) * 2;
+    color: var(--text-muted);
+  }
+  
+  .users-empty-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+  }
+  
+  /* Impersonation banner */
+  .impersonation-banner {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--accent-warning), #fbbf24);
+    border-top: 1px solid var(--border-color);
+  }
+  
+  .impersonation-banner .btn {
+    background-color: rgba(0, 0, 0, 0.2);
+    border: none;
+    color: #1d1d1f;
+    font-weight: 600;
+  }
+  
+  .impersonation-banner .btn:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Modal moderne */
+  .modal-content {
+    border-radius: var(--radius-xl);
+  }
+  
+  .modal-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .modal-title {
+    font-weight: 600;
+  }
+  
+  .modal-body {
+    padding: var(--spacing-lg);
+  }
+  
+  .modal-footer {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<h3>Gestion des utilisateurs</h3>
-<div class="row">
-  <div class="col-lg-6">
-    <div class="card mb-4">
-      <div class="card-header">Créer un utilisateur</div>
-      <div class="card-body">
-        <form method="POST" action="{{ url_for('admin.manage_users') }}">
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <h3 class="m-0">Gestion des utilisateurs</h3>
+    <p class="text-muted mb-0">Créez et gérez les comptes utilisateurs</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Formulaire de création -->
+  <div class="col-lg-5">
+    <div class="admin-section">
+      <div class="admin-section-header">
+        <div class="admin-section-icon">
+          <i class="bi bi-person-plus"></i>
+        </div>
+        <h5 class="admin-section-title">Créer un utilisateur</h5>
+      </div>
+      <div class="admin-section-body">
+        <form method="POST" action="{{ url_for('admin.manage_users') }}" class="form-modern">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          
           <div class="mb-3">
             <label class="form-label">Nom d'utilisateur</label>
-            <input type="text" class="form-control" name="username" required />
+            <input type="text" class="form-control" name="username" required placeholder="ex: jean.dupont" />
           </div>
+          
           <div class="mb-3">
             <label class="form-label">Mot de passe</label>
-            <input type="password" class="form-control" name="password" minlength="6" required />
+            <input type="password" class="form-control" name="password" minlength="6" required placeholder="Minimum 6 caractères" />
             <div class="form-text">Un mot de passe temporaire oblige l'utilisateur à le changer lors de sa première connexion.</div>
           </div>
+          
           <div class="mb-3">
             <label class="form-label">Type de compte</label>
             <select class="form-select" name="parent_id" id="parent_id_select">
@@ -27,136 +354,178 @@
             </select>
             <div class="form-text">Un sous-compte accède aux ressources (caves, bouteilles) du compte principal.</div>
           </div>
-          <div class="form-check form-switch mb-2">
+          
+          <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" id="temporary" name="temporary" value="1" />
-            <label class="form-check-label" for="temporary">Mot de passe temporaire</label>
+            <label class="form-check-label" for="temporary">
+              <i class="bi bi-clock me-1"></i> Mot de passe temporaire
+            </label>
           </div>
-          <div class="form-check form-switch mb-3" id="admin_checkbox_container">
+          
+          <div class="form-check form-switch" id="admin_checkbox_container">
             <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin" value="1" />
-            <label class="form-check-label" for="is_admin">Accorder les droits administrateur</label>
+            <label class="form-check-label" for="is_admin">
+              <i class="bi bi-shield-check me-1"></i> Accorder les droits administrateur
+            </label>
           </div>
-          <button type="submit" class="btn btn-dark w-100">Créer</button>
+          
+          <button type="submit" class="btn btn-create w-100 mt-3">
+            <i class="bi bi-plus-lg me-1"></i> Créer l'utilisateur
+          </button>
         </form>
       </div>
     </div>
   </div>
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">Utilisateurs existants</div>
-      <div class="card-body p-0">
-        <div class="list-group list-group-flush">
-          {% for user in users %}
-          <div class="list-group-item {% if user.is_sub_account %}ps-4 bg-light{% endif %}">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fw-semibold">
-                  {% if user.is_sub_account %}
-                  <i class="bi bi-arrow-return-right text-muted me-1"></i>
-                  {% endif %}
-                  {{ user.username }}{% if user.id == current_user.id %} (vous){% endif %}
-                </div>
-                <div class="text-muted small">
-                  {% if user.is_admin %}
-                    <span class="badge bg-danger">Administrateur</span>
-                  {% elif user.is_sub_account %}
-                    <span class="badge bg-secondary">Sous-compte de {{ user.parent.username }}</span>
-                  {% else %}
-                    <span class="badge bg-primary">Compte principal</span>
-                    {% if user.sub_accounts.count() > 0 %}
-                    <span class="badge bg-info">{{ user.sub_accounts.count() }} sous-compte(s)</span>
-                    {% endif %}
-                  {% endif %}
-                </div>
-              </div>
-              <div class="d-flex gap-1 flex-wrap justify-content-end">
-                {% if not user.is_sub_account %}
-                <form method="POST" action="{{ url_for('admin.update_role', user_id=user.id) }}" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                  <input type="hidden" name="is_admin" value="{{ 1 if not user.is_admin else 0 }}" />
-                  <button type="submit" class="btn btn-sm btn-outline-secondary" {% if user.id == current_user.id %}disabled{% endif %}>
-                    {% if user.is_admin %}Retirer admin{% else %}Promouvoir admin{% endif %}
-                  </button>
-                </form>
-                {% endif %}
-                <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#parentModal{{ user.id }}" {% if user.id == current_user.id %}disabled{% endif %}>
-                  Rattachement
-                </button>
-                <form method="POST" action="{{ url_for('admin.impersonate', user_id=user.id) }}" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                  <button type="submit" class="btn btn-sm btn-outline-primary" {% if user.id == current_user.id or is_impersonating %}disabled{% endif %}>
-                    Se connecter
-                  </button>
-                </form>
-                <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                  <button
-                    type="submit"
-                    class="btn btn-sm btn-outline-danger"
-                    {% if user.id == current_user.id %}disabled{% endif %}
-                    onclick="return confirm('Supprimer définitivement cet utilisateur et toutes ses données ?{% if user.sub_accounts.count() > 0 %} Attention : ses {{ user.sub_accounts.count() }} sous-compte(s) seront également supprimés !{% endif %}');"
-                  >
-                    Supprimer
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Modal pour modifier le rattachement -->
-          <div class="modal fade" id="parentModal{{ user.id }}" tabindex="-1" aria-labelledby="parentModalLabel{{ user.id }}" aria-hidden="true">
-            <div class="modal-dialog">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title" id="parentModalLabel{{ user.id }}">Modifier le rattachement de {{ user.username }}</h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                </div>
-                <form method="POST" action="{{ url_for('admin.update_parent', user_id=user.id) }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                  <div class="modal-body">
-                    {% if user.sub_accounts.count() > 0 %}
-                    <div class="alert alert-warning">
-                      <i class="bi bi-exclamation-triangle me-2"></i>
-                      Cet utilisateur a {{ user.sub_accounts.count() }} sous-compte(s) et ne peut pas devenir lui-même un sous-compte.
-                    </div>
-                    {% endif %}
-                    <div class="mb-3">
-                      <label class="form-label">Rattacher à</label>
-                      <select class="form-select" name="parent_id" {% if user.sub_accounts.count() > 0 %}disabled{% endif %}>
-                        <option value="" {% if not user.is_sub_account %}selected{% endif %}>Compte indépendant</option>
-                        {% for account in main_accounts %}
-                        {% if account.id != user.id %}
-                        <option value="{{ account.id }}" {% if user.parent_id == account.id %}selected{% endif %}>
-                          Sous-compte de {{ account.username }}
-                        </option>
-                        {% endif %}
-                        {% endfor %}
-                      </select>
-                    </div>
-                    {% if user.is_admin %}
-                    <div class="alert alert-info">
-                      <i class="bi bi-info-circle me-2"></i>
-                      Si vous rattachez cet utilisateur à un compte parent, ses droits administrateur seront automatiquement retirés.
-                    </div>
-                    {% endif %}
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="submit" class="btn btn-primary" {% if user.sub_accounts.count() > 0 %}disabled{% endif %}>Enregistrer</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-          {% else %}
-          <div class="list-group-item text-center text-muted py-5">Aucun utilisateur enregistré.</div>
-          {% endfor %}
+  
+  <!-- Liste des utilisateurs -->
+  <div class="col-lg-7">
+    <div class="admin-section">
+      <div class="admin-section-header">
+        <div class="admin-section-icon">
+          <i class="bi bi-people"></i>
         </div>
+        <h5 class="admin-section-title">Utilisateurs existants</h5>
+        <span class="badge bg-secondary ms-auto">{{ users|length }}</span>
       </div>
+      
+      <div class="admin-section-body p-0">
+        {% for user in users %}
+        <div class="user-card {% if user.is_sub_account %}is-sub-account{% endif %}">
+          <div class="user-card-header">
+            <div class="user-card-info">
+              <div class="user-card-name">
+                {% if user.is_sub_account %}
+                <i class="bi bi-arrow-return-right text-muted"></i>
+                {% endif %}
+                {{ user.username }}
+                {% if user.id == current_user.id %}
+                <span class="you-badge">vous</span>
+                {% endif %}
+              </div>
+              <div class="user-card-badges">
+                {% if user.is_admin %}
+                <span class="user-badge admin">
+                  <i class="bi bi-shield-fill"></i> Administrateur
+                </span>
+                {% elif user.is_sub_account %}
+                <span class="user-badge sub-account">
+                  <i class="bi bi-link-45deg"></i> Sous-compte de {{ user.parent.username }}
+                </span>
+                {% else %}
+                <span class="user-badge main-account">
+                  <i class="bi bi-person-fill"></i> Compte principal
+                </span>
+                {% if user.sub_accounts.count() > 0 %}
+                <span class="user-badge sub-count">
+                  <i class="bi bi-people-fill"></i> {{ user.sub_accounts.count() }} sous-compte(s)
+                </span>
+                {% endif %}
+                {% endif %}
+              </div>
+            </div>
+            
+            <div class="user-card-actions">
+              {% if not user.is_sub_account %}
+              <form method="POST" action="{{ url_for('admin.update_role', user_id=user.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="is_admin" value="{{ 1 if not user.is_admin else 0 }}" />
+                <button type="submit" class="btn-user-action btn-admin" {% if user.id == current_user.id %}disabled{% endif %}>
+                  <i class="bi bi-shield{% if user.is_admin %}-slash{% endif %}"></i>
+                  {% if user.is_admin %}Retirer{% else %}Promouvoir{% endif %}
+                </button>
+              </form>
+              {% endif %}
+              
+              <button type="button" class="btn-user-action btn-link-user" data-bs-toggle="modal" data-bs-target="#parentModal{{ user.id }}" {% if user.id == current_user.id %}disabled{% endif %}>
+                <i class="bi bi-link-45deg"></i> Rattacher
+              </button>
+              
+              <form method="POST" action="{{ url_for('admin.impersonate', user_id=user.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn-user-action btn-impersonate" {% if user.id == current_user.id or is_impersonating %}disabled{% endif %}>
+                  <i class="bi bi-box-arrow-in-right"></i> Connecter
+                </button>
+              </form>
+              
+              <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button
+                  type="submit"
+                  class="btn-user-action btn-delete"
+                  {% if user.id == current_user.id %}disabled{% endif %}
+                  onclick="return confirm('Supprimer définitivement cet utilisateur et toutes ses données ?{% if user.sub_accounts.count() > 0 %} Attention : ses {{ user.sub_accounts.count() }} sous-compte(s) seront également supprimés !{% endif %}');"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal pour modifier le rattachement -->
+        <div class="modal fade" id="parentModal{{ user.id }}" tabindex="-1" aria-labelledby="parentModalLabel{{ user.id }}" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="parentModalLabel{{ user.id }}">
+                  <i class="bi bi-link-45deg me-2"></i>Rattachement de {{ user.username }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+              </div>
+              <form method="POST" action="{{ url_for('admin.update_parent', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <div class="modal-body">
+                  {% if user.sub_accounts.count() > 0 %}
+                  <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Cet utilisateur a {{ user.sub_accounts.count() }} sous-compte(s) et ne peut pas devenir lui-même un sous-compte.
+                  </div>
+                  {% endif %}
+                  <div class="mb-3">
+                    <label class="form-label">Rattacher à</label>
+                    <select class="form-select" name="parent_id" {% if user.sub_accounts.count() > 0 %}disabled{% endif %}>
+                      <option value="" {% if not user.is_sub_account %}selected{% endif %}>Compte indépendant</option>
+                      {% for account in main_accounts %}
+                      {% if account.id != user.id %}
+                      <option value="{{ account.id }}" {% if user.parent_id == account.id %}selected{% endif %}>
+                        Sous-compte de {{ account.username }}
+                      </option>
+                      {% endif %}
+                      {% endfor %}
+                    </select>
+                  </div>
+                  {% if user.is_admin %}
+                  <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Si vous rattachez cet utilisateur à un compte parent, ses droits administrateur seront automatiquement retirés.
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                  <button type="submit" class="btn btn-primary" {% if user.sub_accounts.count() > 0 %}disabled{% endif %}>
+                    <i class="bi bi-check-lg me-1"></i> Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="users-empty">
+          <div class="users-empty-icon">👥</div>
+          <p>Aucun utilisateur enregistré.</p>
+        </div>
+        {% endfor %}
+      </div>
+      
       {% if is_impersonating %}
-      <div class="card-footer">
+      <div class="impersonation-banner">
         <form method="POST" action="{{ url_for('admin.stop_impersonation') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-          <button type="submit" class="btn btn-warning w-100">Quitter l'impersonation</button>
+          <button type="submit" class="btn w-100">
+            <i class="bi bi-box-arrow-left me-1"></i> Quitter l'impersonation
+          </button>
         </form>
       </div>
       {% endif %}

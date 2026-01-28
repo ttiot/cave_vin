@@ -23,9 +23,9 @@
   }
 
   .cellar-tabs .nav-link.active {
-    background: linear-gradient(135deg, #6b46c1, #3182ce);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
     color: #fff;
-    box-shadow: 0 0.75rem 1.5rem rgba(79, 70, 229, 0.2);
+    box-shadow: 0 0.75rem 1.5rem rgba(114, 47, 55, 0.25);
   }
 
   .cellar-tabs .nav-link.active small {
@@ -33,18 +33,19 @@
   }
 
   .cellar-metric {
-    background: #fff;
-    border-radius: 1rem;
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
     padding: 1rem 1.25rem;
-    box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.08);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
     height: 100%;
+    transition: var(--transition-theme);
   }
 
   .cellar-metric .metric-label {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.75rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     display: block;
     margin-bottom: 0.5rem;
   }
@@ -52,51 +53,31 @@
   .cellar-metric .metric-value {
     font-size: 1.75rem;
     font-weight: 700;
-    color: #1f2933;
+    color: var(--text-primary);
     display: block;
   }
 
-  .wine-card-cover {
-    height: 190px;
-    border-top-left-radius: 1rem;
-    border-top-right-radius: 1rem;
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.75), rgba(14, 165, 233, 0.75));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255, 255, 255, 0.92);
-    font-size: 2.5rem;
-    font-weight: 600;
-    text-transform: uppercase;
+  .cellar-tabs .nav-link {
+    background: var(--bg-card);
+    color: var(--text-primary);
   }
 
-  .wine-card img.card-img-top {
-    border-top-left-radius: 1rem;
-    border-top-right-radius: 1rem;
-    height: 190px;
-    object-fit: contain;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    padding: 0.5rem;
-  }
-
-  .wine-card img.card-img-top[src*="openfoodfacts"] {
-    object-fit: cover;
-    padding: 0;
-  }
-
-  .wine-card.card {
-    border: none;
-    border-radius: 1rem;
-    overflow: hidden;
+  [data-theme="dark"] .cellar-tabs .nav-link {
+    background: var(--bg-hover);
   }
 
   .wine-highlight-chip {
-    background: rgba(79, 70, 229, 0.08);
-    color: #4338ca;
+    background: rgba(114, 47, 55, 0.1);
+    color: var(--accent-primary);
     border-radius: 999px;
     padding: 0.35rem 0.9rem;
     font-size: 0.8rem;
     font-weight: 600;
+  }
+
+  [data-theme="dark"] .wine-highlight-chip {
+    background: rgba(139, 61, 71, 0.2);
+    color: var(--accent-primary-light);
   }
 
   @media (max-width: 767.98px) {
@@ -224,68 +205,98 @@
           {% for wine in panel.wines %}
           {% set extras = wine.extra_attributes or {} %}
           <div class="col">
-            <div class="card shadow-sm h-100 wine-card"
+            <div class="wine-card-modern animate-in"
                  data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
                  data-wine-preview='{{ wine.preview_insights()|tojson }}'>
-              {% if wine.label_image_data %}
-              <img src="data:image/png;base64,{{ wine.label_image_data }}" class="card-img-top" alt="Étiquette stylisée de {{ wine.name }}">
-              {% elif wine.image_url %}
-              <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
-              {% else %}
-              <div class="wine-card-cover" aria-hidden="true">{{ wine.name[:1] }}</div>
-              {% endif %}
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                  <div>
-                    <h5 class="card-title mb-1">{{ wine.name }}</h5>
-                    {% if extras.year %}
-                      <small class="text-muted">Millésime {{ extras.year }}</small>
-                    {% elif extras.get('aging_potential') %}
-                      <small class="text-muted">{{ extras.get('aging_potential') }}</small>
-                    {% else %}
-                      <small class="text-muted">Millésime non renseigné</small>
-                    {% endif %}
-                  </div>
-                  <span class="badge text-bg-dark">x{{ wine.quantity }}</span>
-                </div>
-                <p class="mb-2">
-                  {% if wine.subcategory %}
-                    <span class="badge" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
+              
+              <!-- Image -->
+              <div class="wine-card-image">
+                {% if wine.label_image_data %}
+                <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="Étiquette de {{ wine.name }}">
+                {% elif wine.image_url %}
+                <img src="{{ wine.image_url }}" alt="{{ wine.name }}">
+                {% else %}
+                <div class="wine-card-placeholder" aria-hidden="true">{{ wine.name[:1] }}</div>
+                {% endif %}
+                <span class="wine-card-quantity">×{{ wine.quantity }}</span>
+              </div>
+              
+              <!-- Corps -->
+              <div class="wine-card-body">
+                <h5 class="wine-card-title">{{ wine.name }}</h5>
+                <p class="wine-card-subtitle">
+                  {% if extras.year %}
+                    Millésime {{ extras.year }}
+                  {% elif extras.get('aging_potential') %}
+                    {{ extras.get('aging_potential') }}
                   {% else %}
-                    <span class="badge bg-secondary">Non catégorisé</span>
+                    Millésime non renseigné
                   {% endif %}
                 </p>
-                <ul class="list-unstyled small text-muted mb-3">
-                  <li><i class="bi bi-geo-alt me-1"></i>{{ extras.region or 'Région inconnue' }}</li>
+                
+                {% if wine.subcategory %}
+                <span class="wine-card-category" style="{{ wine.subcategory|subcategory_badge_style }}">
+                  {{ wine.subcategory.name }}
+                </span>
+                {% else %}
+                <span class="wine-card-category" style="background-color: var(--text-muted); color: #fff;">
+                  Non catégorisé
+                </span>
+                {% endif %}
+                
+                <div class="wine-card-info">
+                  <div class="wine-card-info-item">
+                    <i class="bi bi-geo-alt"></i>
+                    <span>{{ extras.region or 'Région inconnue' }}</span>
+                  </div>
                   {% if extras.get('grape') %}
-                  <li><i class="bi bi-flower2 me-1"></i>{{ extras.get('grape') }}</li>
+                  <div class="wine-card-info-item">
+                    <i class="bi bi-flower2"></i>
+                    <span>{{ extras.get('grape') }}</span>
+                  </div>
                   {% endif %}
                   {% if extras.get('volume_ml') %}
-                  <li><i class="bi bi-droplet-half me-1"></i>{{ extras.get('volume_ml') }} mL</li>
+                  <div class="wine-card-info-item">
+                    <i class="bi bi-droplet-half"></i>
+                    <span>{{ extras.get('volume_ml') }} mL</span>
+                  </div>
                   {% endif %}
-                </ul>
+                </div>
+                
                 {% if wine.barcode %}
-                <span class="badge text-bg-secondary">EAN {{ wine.barcode }}</span>
+                <span class="wine-card-ean">
+                  <i class="bi bi-upc"></i> {{ wine.barcode }}
+                </span>
                 {% endif %}
               </div>
-              <div class="card-footer bg-white border-0 pt-0">
-                <div class="btn-group d-flex" role="group">
-                  <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+              
+              <!-- Actions -->
+              <div class="wine-card-actions">
+                <div class="wine-card-actions-grid with-comment">
+                  <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="wine-action-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
-                    <input type="text" name="comment" class="form-control form-control-sm mb-2" placeholder="Commentaire (optionnel)">
-                    <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
+                    <input type="text" name="comment" class="wine-card-comment-input" placeholder="Commentaire (optionnel)">
+                    <div class="wine-card-action-buttons">
+                      <button type="submit" class="btn-wine-action btn-consume">
+                        <i class="bi bi-cup-straw me-1"></i>Consommer
+                      </button>
                   </form>
-                  <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+                  <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="wine-action-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
-                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
+                    <button type="submit" class="btn-wine-action btn-refresh">
+                      <i class="bi bi-arrow-clockwise me-1"></i>Rafraîchir
+                    </button>
                   </form>
-                  <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+                  <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="redirect" value="{{ request.path }}">
-                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
+                    <button type="submit" class="btn-wine-action btn-delete">
+                      <i class="bi bi-trash me-1"></i>Supprimer
+                    </button>
                   </form>
+                    </div>
                 </div>
               </div>
             </div>

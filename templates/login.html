@@ -1,27 +1,112 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-4">
-    <h3 class="text-center mb-3">Connexion</h3>
-    <form method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-      <input type="hidden" name="next" value="{{ next_url or '' }}"/>
-      <div class="mb-3">
-        <label class="form-label">Utilisateur</label>
-        <input type="text" class="form-control" name="username" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Mot de passe</label>
-        <input type="password" class="form-control" name="password" required>
-      </div>
-      <div class="form-check mb-3">
-        <input class="form-check-input" type="checkbox" value="1" id="remember_me" name="remember_me">
-        <label class="form-check-label" for="remember_me">
-          Se souvenir de moi sur cet appareil
-        </label>
-      </div>
-      <button type="submit" class="btn btn-dark w-100">Connexion</button>
-    </form>
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <title>Connexion - Cave à vin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Connexion à votre cave à vin">
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#722f37">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ma Cave">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favico.png') }}">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favico.png') }}">
+  
+  <!-- Script pour le thème -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body class="login-page">
+  <!-- Fond avec motif de bouteilles -->
+  <div class="login-background">
+    <div class="bottle-pattern"></div>
   </div>
-</div>
-{% endblock %}
+  
+  <!-- Carte de connexion -->
+  <div class="login-container">
+    <div class="login-card">
+      <!-- Icône bouteille -->
+      <div class="login-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 2h4v4l2 2v4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2V8l2-2V2z"/>
+          <path d="M8 14v6c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-6"/>
+          <line x1="10" y1="6" x2="14" y2="6"/>
+        </svg>
+      </div>
+      
+      <!-- Titre -->
+      <h1 class="login-title">Connexion</h1>
+      
+      <!-- Messages flash -->
+      {% with messages = get_flashed_messages() %}
+      {% if messages %}
+      <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+        {% for msg in messages %}{{ msg }}{% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+      </div>
+      {% endif %}
+      {% endwith %}
+      
+      <!-- Formulaire -->
+      <form method="POST" class="login-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="next" value="{{ next_url or '' }}"/>
+        
+        <div class="form-group">
+          <label class="form-label" for="username">Utilisateur</label>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="username"
+            name="username" 
+            required
+            autocomplete="username"
+            autofocus
+          >
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="password">Mot de passe</label>
+          <input 
+            type="password" 
+            class="form-control" 
+            id="password"
+            name="password" 
+            required
+            autocomplete="current-password"
+          >
+        </div>
+        
+        <button type="submit" class="btn btn-login">
+          Connexion
+        </button>
+        
+        <div class="login-footer">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="remember_me" name="remember_me">
+            <label class="form-check-label" for="remember_me">
+              Se souvenir de moi
+            </label>
+          </div>
+          <a href="#" class="forgot-password">Mot de passe oublié?</a>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

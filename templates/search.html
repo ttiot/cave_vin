@@ -79,78 +79,126 @@
 </div>
 
 {% if wines %}
-<div class="row row-cols-1 row-cols-md-3 g-4">
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
   {% for wine in wines %}
+  {% set extras = wine.extra_attributes or {} %}
   <div class="col">
-    <div class="card shadow-sm h-100 wine-card"
+    <div class="wine-card-modern animate-in"
          data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
          data-wine-preview='{{ wine.preview_insights()|tojson }}'>
-      {% if wine.image_url %}
-      <img src="{{ wine.image_url }}" class="card-img-top" alt="{{ wine.name }}">
-      {% endif %}
-      <div class="card-body">
-        <h5 class="card-title">{{ wine.name }}</h5>
-        <p class="mb-1">
-          {% if wine.subcategory %}
-            <span class="badge" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
+      
+      <!-- Image -->
+      <div class="wine-card-image">
+        {% if wine.label_image_data %}
+        <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="Étiquette de {{ wine.name }}">
+        {% elif wine.image_url %}
+        <img src="{{ wine.image_url }}" alt="{{ wine.name }}">
+        {% else %}
+        <div class="wine-card-placeholder" aria-hidden="true">{{ wine.name[:1] }}</div>
+        {% endif %}
+        <span class="wine-card-quantity">×{{ wine.quantity }}</span>
+        {% if wine.quantity == 0 %}
+        <span class="wine-card-urgency patience">Consommée</span>
+        {% endif %}
+      </div>
+      
+      <!-- Corps -->
+      <div class="wine-card-body">
+        <h5 class="wine-card-title">{{ wine.name }}</h5>
+        <p class="wine-card-subtitle">
+          {% if extras.year %}
+            {{ extras.region or 'Région inconnue' }} — {{ extras.year }}
           {% else %}
-            <span class="badge bg-secondary">Non catégorisé</span>
+            {{ extras.region or 'Région inconnue' }}
           {% endif %}
         </p>
-        <p class="card-text">
-          {{ wine.extra_attributes.region or 'Région inconnue' }}{% if wine.extra_attributes.year %} — {{ wine.extra_attributes.year }}{% endif %}<br>
-          {% if wine.extra_attributes.volume_ml %}Contenance : {{ wine.extra_attributes.volume_ml }} mL<br>{% endif %}
-          {% if wine.extra_attributes.grape %}Cépage : {{ wine.extra_attributes.grape }}{% endif %}
-        </p>
-        {% if wine.barcode %}<span class="badge text-bg-secondary">EAN: {{ wine.barcode }}</span>{% endif %}
+        
+        {% if wine.subcategory %}
+        <span class="wine-card-category" style="{{ wine.subcategory|subcategory_badge_style }}">
+          {{ wine.subcategory.name }}
+        </span>
+        {% else %}
+        <span class="wine-card-category" style="background-color: var(--text-muted); color: #fff;">
+          Non catégorisé
+        </span>
+        {% endif %}
+        
+        <div class="wine-card-info">
+          {% if extras.get('volume_ml') %}
+          <div class="wine-card-info-item">
+            <i class="bi bi-droplet-half"></i>
+            <span>{{ extras.get('volume_ml') }} mL</span>
+          </div>
+          {% endif %}
+          {% if extras.get('grape') %}
+          <div class="wine-card-info-item">
+            <i class="bi bi-flower2"></i>
+            <span>{{ extras.get('grape') }}</span>
+          </div>
+          {% endif %}
+        </div>
+        
+        {% if wine.barcode %}
+        <span class="wine-card-ean">
+          <i class="bi bi-upc"></i> {{ wine.barcode }}
+        </span>
+        {% endif %}
         
         {% if food_pairing %}
-        <div class="mt-2">
-          <small class="text-muted d-block"><strong>Insights correspondants :</strong></small>
+        <div class="wine-card-insights">
+          <div class="wine-card-insights-title">Insights correspondants</div>
           {% for insight in wine.insights %}
-            {% if food_pairing.lower() in insight.content.lower() or 
+            {% if food_pairing.lower() in insight.content.lower() or
                   (insight.title and food_pairing.lower() in insight.title.lower()) or
                   (insight.category and food_pairing.lower() in insight.category.lower()) %}
-              <small class="d-block text-truncate" title="{{ insight.content }}">
-                {% if insight.title %}
-                  <strong>{{ insight.title }}:</strong>
-                {% endif %}
+              <div class="wine-card-insights-content">
+                {% if insight.title %}<strong>{{ insight.title }}:</strong> {% endif %}
                 {{ insight.content[:100] }}{% if insight.content|length > 100 %}...{% endif %}
-              </small>
+              </div>
             {% endif %}
           {% endfor %}
         </div>
         {% endif %}
       </div>
-      <div class="card-footer bg-white">
-        <small class="text-muted d-block">
-          Quantité : {{ wine.quantity }}
-          {% if wine.quantity == 0 %}
-            <span class="badge bg-warning text-dark ms-2">Consommée</span>
-          {% endif %}
-        </small>
-        <small class="text-muted">Cave : {{ wine.cellar.name }}</small>
+      
+      <!-- Footer -->
+      <div class="wine-card-footer">
+        <div class="wine-card-footer-info">
+          <span><i class="bi bi-box-seam me-1"></i>Cave : {{ wine.cellar.name }}</span>
+        </div>
       </div>
-      <div class="card-actions border-top bg-light p-3">
-        <div class="btn-group d-flex" role="group">
+      
+      <!-- Actions -->
+      <div class="wine-card-actions">
+        <div class="wine-card-actions-grid with-comment">
           {% if wine.quantity > 0 %}
-          <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+          <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="wine-action-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <input type="hidden" name="redirect" value="{{ request.full_path }}">
-            <input type="text" name="comment" class="form-control form-control-sm mb-2" placeholder="Commentaire (optionnel)">
-            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Consommer</button>
+            <input type="text" name="comment" class="wine-card-comment-input" placeholder="Commentaire (optionnel)">
+            <div class="wine-card-action-buttons">
+              <button type="submit" class="btn-wine-action btn-consume">
+                <i class="bi bi-cup-straw me-1"></i>Consommer
+              </button>
           </form>
+          {% else %}
+          <div class="wine-card-action-buttons">
           {% endif %}
-          <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form">
+          <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="wine-action-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <input type="hidden" name="redirect" value="{{ request.full_path }}">
-            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Rafraîchir</button>
+            <button type="submit" class="btn-wine-action btn-refresh">
+              <i class="bi bi-arrow-clockwise me-1"></i>Rafraîchir
+            </button>
           </form>
-          <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="flex-fill wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
+          <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <input type="hidden" name="redirect" value="{{ request.full_path }}">
-            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Supprimer</button>
+            <button type="submit" class="btn-wine-action btn-delete">
+              <i class="bi bi-trash me-1"></i>Supprimer
+            </button>
           </form>
+          </div>
         </div>
       </div>
     </div>

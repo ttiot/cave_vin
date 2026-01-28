@@ -4,47 +4,64 @@
 
 :root {
   /* Couleurs de base - Mode clair */
-  --bg-body: #f8f9fa;
+  --bg-body: #f5f5f7;
   --bg-card: #ffffff;
-  --bg-input: #ffffff;
+  --bg-input: #f8f9fa;
   --bg-hover: #f1f3f5;
-  --text-primary: #212529;
-  --text-secondary: #6c757d;
-  --text-muted: #adb5bd;
-  --border-color: #dee2e6;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --shadow-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --border-color: #d2d2d7;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+  --shadow-hover: rgba(0, 0, 0, 0.12);
   
   /* Couleurs d'accent */
   --accent-primary: #722f37;
-  --accent-success: #10b981;
-  --accent-info: #0dcaf0;
-  --accent-warning: #ffc107;
-  --accent-danger: #dc3545;
+  --accent-primary-light: #8b3d47;
+  --accent-primary-dark: #5a252c;
+  --accent-success: #34c759;
+  --accent-info: #5ac8fa;
+  --accent-warning: #ff9f0a;
+  --accent-danger: #ff3b30;
   
   /* Navbar */
-  --navbar-bg: #343a40;
+  --navbar-bg: #1d1d1f;
   --navbar-text: rgba(255, 255, 255, 0.85);
   --navbar-hover: rgba(255, 255, 255, 0.1);
   
   /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
   --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
 }
 
 /* Mode sombre */
 [data-theme="dark"] {
-  --bg-body: #1a1d21;
-  --bg-card: #212529;
-  --bg-input: #2d3238;
-  --bg-hover: #343a40;
-  --text-primary: #e9ecef;
-  --text-secondary: #adb5bd;
-  --text-muted: #6c757d;
-  --border-color: #495057;
-  --shadow-color: rgba(0, 0, 0, 0.3);
-  --shadow-hover: rgba(0, 0, 0, 0.4);
+  --bg-body: #000000;
+  --bg-card: #1c1c1e;
+  --bg-input: #2c2c2e;
+  --bg-hover: #3a3a3c;
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-muted: #636366;
+  --border-color: #38383a;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --shadow-hover: rgba(0, 0, 0, 0.5);
   
-  --navbar-bg: #0d1117;
+  --navbar-bg: #1c1c1e;
   --navbar-text: rgba(255, 255, 255, 0.9);
   --navbar-hover: rgba(255, 255, 255, 0.15);
 }
@@ -302,25 +319,51 @@ body {
   background-color: rgba(255, 255, 255, 0.15);
 }
 
-/* Dropdown menu styling */
-.dropdown-menu-dark {
-  background-color: #2d3748;
-  border: none;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  border-radius: 0.5rem;
+/* Dropdown menu styling - Mode sombre (navbar) */
+.navbar .dropdown-menu-dark,
+.navbar-dark .dropdown-menu-dark,
+.navbar.bg-dark .dropdown-menu-dark,
+nav.navbar .dropdown-menu.dropdown-menu-dark {
+  background-color: #2d3748 !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 0.5rem !important;
 }
 
-.dropdown-menu-dark .dropdown-item {
-  padding: 0.625rem 1rem;
-  transition: background-color 0.15s ease;
+.navbar .dropdown-menu-dark .dropdown-item,
+.navbar-dark .dropdown-menu-dark .dropdown-item,
+.navbar.bg-dark .dropdown-menu-dark .dropdown-item,
+nav.navbar .dropdown-menu.dropdown-menu-dark .dropdown-item {
+  padding: 0.625rem 1rem !important;
+  transition: background-color 0.15s ease !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  background-color: transparent !important;
 }
 
-.dropdown-menu-dark .dropdown-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.navbar .dropdown-menu-dark .dropdown-item:hover,
+.navbar .dropdown-menu-dark .dropdown-item:focus,
+.navbar-dark .dropdown-menu-dark .dropdown-item:hover,
+.navbar-dark .dropdown-menu-dark .dropdown-item:focus,
+.navbar.bg-dark .dropdown-menu-dark .dropdown-item:hover,
+.navbar.bg-dark .dropdown-menu-dark .dropdown-item:focus,
+nav.navbar .dropdown-menu.dropdown-menu-dark .dropdown-item:hover,
+nav.navbar .dropdown-menu.dropdown-menu-dark .dropdown-item:focus {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
 }
 
-.dropdown-menu-dark .dropdown-divider {
-  border-color: rgba(255, 255, 255, 0.1);
+.navbar .dropdown-menu-dark .dropdown-item i,
+.navbar-dark .dropdown-menu-dark .dropdown-item i,
+.navbar.bg-dark .dropdown-menu-dark .dropdown-item i,
+nav.navbar .dropdown-menu.dropdown-menu-dark .dropdown-item i {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.navbar .dropdown-menu-dark .dropdown-divider,
+.navbar-dark .dropdown-menu-dark .dropdown-divider,
+.navbar.bg-dark .dropdown-menu-dark .dropdown-divider,
+nav.navbar .dropdown-menu.dropdown-menu-dark .dropdown-divider {
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Mobile navigation improvements */
@@ -747,3 +790,907 @@ body {
     gap: 0.5rem;
   }
 }
+
+/* ============================================================================
+   Page de connexion
+   ============================================================================ */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-body);
+}
+
+/* Fond avec motif de bouteilles */
+.login-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.bottle-pattern {
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='96' viewBox='0 0 60 96'%3E%3Cpath fill='%23722f37' d='M25 2h10v8l4 4v12c0 2.2-1.8 4-4 4h-10c-2.2 0-4-1.8-4-4V14l4-4V2zm0 30v24c0 2.2 1.8 4 4 4h2c2.2 0 4-1.8 4-4V32h-10z'/%3E%3C/svg%3E");
+  background-size: 60px 96px;
+  background-repeat: repeat;
+}
+
+[data-theme="dark"] .bottle-pattern {
+  opacity: 0.15;
+  filter: invert(1);
+}
+
+/* Container de connexion */
+.login-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Carte de connexion */
+.login-card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  box-shadow:
+    0 4px 6px -1px var(--shadow-color),
+    0 10px 20px -5px var(--shadow-color),
+    0 25px 50px -12px var(--shadow-color);
+  transition: var(--transition-theme);
+}
+
+/* Icône bouteille */
+.login-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--spacing-lg);
+  color: var(--text-primary);
+}
+
+.login-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Titre */
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xl);
+  letter-spacing: -0.02em;
+}
+
+/* Formulaire */
+.login-form .form-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.login-form .form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.login-form .form-control {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  background-color: var(--bg-input);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.login-form .form-control:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.15);
+  background-color: var(--bg-card);
+}
+
+.login-form .form-control::placeholder {
+  color: var(--text-muted);
+}
+
+/* Bouton de connexion */
+.btn-login {
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: var(--accent-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  margin-bottom: var(--spacing-lg);
+}
+
+.btn-login:hover {
+  background-color: var(--accent-primary-dark);
+  transform: translateY(-1px);
+}
+
+.btn-login:active {
+  transform: translateY(0);
+}
+
+/* Footer du formulaire */
+.login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.login-footer .form-check {
+  margin: 0;
+}
+
+.login-footer .form-check-input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  border-color: var(--border-color);
+  background-color: var(--bg-input);
+}
+
+.login-footer .form-check-input:checked {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.login-footer .form-check-label {
+  color: var(--text-secondary);
+  margin-left: 0.25rem;
+}
+
+.forgot-password {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.forgot-password:hover {
+  color: var(--accent-primary);
+}
+
+/* Responsive login */
+@media (max-width: 480px) {
+  .login-card {
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+  }
+  
+  .login-title {
+    font-size: 1.5rem;
+  }
+  
+  .login-footer {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    text-align: center;
+  }
+}
+
+/* ============================================================================
+   Améliorations globales du design
+   ============================================================================ */
+
+/* Typography améliorée */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* Cards améliorées */
+.card {
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px var(--shadow-color), 0 4px 12px var(--shadow-color);
+  overflow: hidden;
+}
+
+.card-header {
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-weight: 600;
+}
+
+.card-body {
+  padding: var(--spacing-lg);
+}
+
+.card-footer {
+  border-top: 1px solid var(--border-color);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* Boutons améliorés */
+.btn {
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-primary-dark);
+  border-color: var(--accent-primary-dark);
+}
+
+.btn-outline-primary {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-dark {
+  background-color: var(--navbar-bg);
+  border-color: var(--navbar-bg);
+}
+
+.btn-dark:hover {
+  background-color: #000;
+  border-color: #000;
+}
+
+/* Inputs améliorés */
+.form-control, .form-select {
+  border-radius: var(--radius-sm);
+  padding: 0.625rem 0.875rem;
+  border-width: 1.5px;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.15);
+}
+
+/* Tables améliorées */
+.table {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.table thead th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom-width: 2px;
+}
+
+/* Badges améliorés */
+.badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+  border-radius: var(--radius-sm);
+}
+
+/* Alerts améliorées */
+.alert {
+  border-radius: var(--radius-md);
+  border: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* Navbar améliorée */
+.navbar {
+  background-color: var(--navbar-bg) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.navbar-brand {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Wine cards améliorées */
+.wine-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.wine-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px var(--shadow-hover);
+}
+
+.wine-card .card-img-top {
+  transition: transform var(--transition-normal);
+}
+
+.wine-card:hover .card-img-top {
+  transform: scale(1.05);
+}
+
+/* Container avec max-width plus large */
+@media (min-width: 1400px) {
+  .container {
+    max-width: 1320px;
+  }
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-body);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+/* Focus visible pour accessibilité */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Animations subtiles */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Liste d'items améliorée */
+.list-group-item {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.list-group-item:first-child {
+  border-top: none;
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+}
+
+.list-group-item:last-child {
+  border-bottom: none;
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+/* Modal amélioré */
+.modal-content {
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 50px -12px var(--shadow-color);
+}
+
+.modal-header {
+  padding: var(--spacing-lg);
+  border-bottom-color: var(--border-color);
+}
+
+.modal-body {
+  padding: var(--spacing-lg);
+}
+
+.modal-footer {
+  padding: var(--spacing-lg);
+  border-top-color: var(--border-color);
+}
+
+/* Dropdown amélioré */
+.dropdown-menu {
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 40px var(--shadow-color);
+  padding: var(--spacing-sm);
+}
+
+.dropdown-item {
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  margin: 2px 0;
+}
+
+/* Pagination améliorée */
+.pagination {
+  gap: 4px;
+}
+
+.page-link {
+  border-radius: var(--radius-sm);
+  border: none;
+  padding: 0.5rem 0.875rem;
+}
+
+.page-item.active .page-link {
+  background-color: var(--accent-primary);
+}
+
+/* Progress bars */
+.progress {
+  border-radius: var(--radius-sm);
+  height: 8px;
+  background-color: var(--bg-hover);
+}
+
+.progress-bar {
+  border-radius: var(--radius-sm);
+  background-color: var(--accent-primary);
+}
+
+/* Tooltips */
+.tooltip-inner {
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+}
+
+/* ============================================================================
+   Cartes de vin modernes - Style inspiré de la page de login
+   ============================================================================ */
+
+/* Carte de vin moderne */
+.wine-card-modern {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow:
+    0 4px 6px -1px var(--shadow-color),
+    0 10px 20px -5px var(--shadow-color);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), var(--transition-theme);
+  cursor: pointer;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.wine-card-modern:hover {
+  transform: translateY(-8px);
+  box-shadow:
+    0 12px 24px -8px var(--shadow-hover),
+    0 25px 50px -12px var(--shadow-hover);
+}
+
+/* Image de la carte */
+.wine-card-modern .wine-card-image {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(114, 47, 55, 0.1), rgba(114, 47, 55, 0.05));
+}
+
+.wine-card-modern .wine-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: var(--spacing-md);
+  transition: transform var(--transition-normal);
+}
+
+.wine-card-modern:hover .wine-card-image img {
+  transform: scale(1.08);
+}
+
+/* Placeholder pour les vins sans image */
+.wine-card-modern .wine-card-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 3rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Badge de quantité sur l'image */
+.wine-card-modern .wine-card-quantity {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+/* Badge d'urgence */
+.wine-card-modern .wine-card-urgency {
+  position: absolute;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wine-card-urgency.urgent {
+  background-color: var(--accent-danger);
+  color: #fff;
+}
+
+.wine-card-urgency.priority {
+  background-color: var(--accent-warning);
+  color: #1d1d1f;
+}
+
+.wine-card-urgency.optimal {
+  background-color: var(--accent-success);
+  color: #fff;
+}
+
+.wine-card-urgency.patience {
+  background-color: var(--text-muted);
+  color: #fff;
+}
+
+/* Corps de la carte */
+.wine-card-modern .wine-card-body {
+  padding: var(--spacing-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Titre du vin */
+.wine-card-modern .wine-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Sous-titre (millésime, région) */
+.wine-card-modern .wine-card-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Badge de catégorie */
+.wine-card-modern .wine-card-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-bottom: var(--spacing-md);
+}
+
+/* Informations du vin */
+.wine-card-modern .wine-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+  flex: 1;
+}
+
+.wine-card-modern .wine-card-info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.wine-card-modern .wine-card-info-item i {
+  width: 16px;
+  color: var(--text-muted);
+}
+
+/* Barre de progression (pour urgence) */
+.wine-card-modern .wine-card-progress {
+  margin-top: auto;
+  padding-top: var(--spacing-md);
+}
+
+.wine-card-modern .wine-card-progress-bar {
+  height: 6px;
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: var(--spacing-xs);
+}
+
+.wine-card-modern .wine-card-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width var(--transition-normal);
+}
+
+.wine-card-modern .wine-card-progress-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Footer de la carte */
+.wine-card-modern .wine-card-footer {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--bg-hover);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.wine-card-modern .wine-card-footer-info {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.wine-card-modern .wine-card-footer-info span {
+  display: block;
+}
+
+/* Actions de la carte */
+.wine-card-modern .wine-card-actions {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  cursor: default;
+}
+
+.wine-card-modern .wine-card-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.wine-card-modern .wine-card-actions-grid.with-comment {
+  grid-template-columns: 1fr;
+}
+
+.wine-card-modern .wine-card-actions-grid.with-comment .wine-card-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+/* Boutons d'action */
+.wine-card-modern .btn-wine-action {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.wine-card-modern .btn-wine-action:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.wine-card-modern .btn-wine-action.btn-consume {
+  border-color: var(--accent-success);
+  color: var(--accent-success);
+}
+
+.wine-card-modern .btn-wine-action.btn-consume:hover {
+  background-color: var(--accent-success);
+  color: #fff;
+}
+
+.wine-card-modern .btn-wine-action.btn-refresh {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.wine-card-modern .btn-wine-action.btn-refresh:hover {
+  background-color: var(--accent-primary);
+  color: #fff;
+}
+
+.wine-card-modern .btn-wine-action.btn-delete {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
+}
+
+.wine-card-modern .btn-wine-action.btn-delete:hover {
+  background-color: var(--accent-danger);
+  color: #fff;
+}
+
+.wine-card-modern .btn-wine-action.btn-detail {
+  border-color: var(--accent-info);
+  color: var(--accent-info);
+}
+
+.wine-card-modern .btn-wine-action.btn-detail:hover {
+  background-color: var(--accent-info);
+  color: #fff;
+}
+
+/* Input de commentaire */
+.wine-card-modern .wine-card-comment-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.wine-card-modern .wine-card-comment-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.15);
+}
+
+.wine-card-modern .wine-card-comment-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Badge EAN */
+.wine-card-modern .wine-card-ean {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
+/* Insights correspondants */
+.wine-card-modern .wine-card-insights {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+}
+
+.wine-card-modern .wine-card-insights-title {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.wine-card-modern .wine-card-insights-content {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Info de garde */
+.wine-card-modern .wine-card-garde {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: rgba(90, 200, 250, 0.1);
+  border-left: 3px solid var(--accent-info);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 767.98px) {
+  .wine-card-modern .wine-card-image {
+    height: 180px;
+  }
+  
+  .wine-card-modern .wine-card-body {
+    padding: var(--spacing-md);
+  }
+  
+  .wine-card-modern .wine-card-title {
+    font-size: 1rem;
+  }
+  
+  .wine-card-modern .wine-card-actions-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+  }
+  
+  .wine-card-modern .wine-card-actions-grid.with-comment .wine-card-action-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animation d'entrée pour les cartes */
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wine-card-modern.animate-in {
+  animation: cardFadeIn 0.4s ease forwards;
+}
+
+.wine-card-modern.animate-in:nth-child(1) { animation-delay: 0.05s; }
+.wine-card-modern.animate-in:nth-child(2) { animation-delay: 0.1s; }
+.wine-card-modern.animate-in:nth-child(3) { animation-delay: 0.15s; }
+.wine-card-modern.animate-in:nth-child(4) { animation-delay: 0.2s; }
+.wine-card-modern.animate-in:nth-child(5) { animation-delay: 0.25s; }
+.wine-card-modern.animate-in:nth-child(6) { animation-delay: 0.3s; }
