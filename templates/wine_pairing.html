@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .pairing-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .pairing-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .score-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+  }
+  .score-high {
+    background-color: #198754;
+    color: white;
+  }
+  .score-medium {
+    background-color: #ffc107;
+    color: #212529;
+  }
+  .score-low {
+    background-color: #dc3545;
+    color: white;
+  }
+  .priority-badge {
+    background: linear-gradient(135deg, #722f37 0%, #4a1f24 100%);
+    color: white;
+  }
+  .best-badge {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+  }
+  .wine-info {
+    font-size: 0.9rem;
+    color: #6c757d;
+  }
+  .garde-info {
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+  .explanation-box {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #722f37;
+  }
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  .dish-input {
+    font-size: 1.1rem;
+  }
+  .section-title {
+    border-bottom: 2px solid;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .priority-section .section-title {
+    border-color: #722f37;
+    color: #722f37;
+  }
+  .best-section .section-title {
+    border-color: #0d6efd;
+    color: #0d6efd;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <!-- En-tête -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex align-items-center mb-3">
+        <span class="fs-1 me-3">🍷</span>
+        <div>
+          <h1 class="mb-0">Conseils de vins</h1>
+          <p class="text-muted mb-0">Trouvez le vin parfait pour accompagner votre repas</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulaire de recherche -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="POST" id="pairingForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <div class="mb-3">
+              <label for="dish" class="form-label fw-semibold">
+                <i class="bi bi-egg-fried me-1"></i>Quel plat prévoyez-vous ?
+              </label>
+              <div class="input-group">
+                <input 
+                  type="text" 
+                  class="form-control dish-input" 
+                  id="dish" 
+                  name="dish" 
+                  value="{{ dish }}"
+                  placeholder="Ex: Bœuf bourguignon, Saumon grillé, Plateau de fromages..."
+                  required
+                  autocomplete="off"
+                >
+                <button type="submit" class="btn btn-primary btn-lg">
+                  <i class="bi bi-magic me-1"></i>Obtenir des conseils
+                </button>
+              </div>
+              <div class="form-text">
+                L'IA analysera votre cave et vous proposera les meilleurs accords mets-vins.
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Résultats -->
+  {% if result %}
+  <div class="row">
+    <div class="col-12">
+      <!-- Explication générale -->
+      <div class="card mb-4 explanation-box border-0">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-lightbulb me-2"></i>Analyse pour « {{ result.dish }} »
+          </h5>
+          <p class="card-text mb-0">{{ result.explanation }}</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <!-- Section vins à consommer en priorité -->
+        <div class="col-lg-6 mb-4">
+          <div class="priority-section">
+            <h4 class="section-title">
+              <i class="bi bi-hourglass-split me-2"></i>À consommer en priorité
+            </h4>
+            <p class="text-muted small mb-3">
+              Ces vins sont dans leur fenêtre de dégustation optimale ou doivent être bus rapidement.
+            </p>
+            
+            {% if result.priority_wines %}
+              {% for wine in result.priority_wines %}
+              <div class="card pairing-card mb-3 border-start border-4 border-danger">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="d-flex align-items-center mb-2">
+                        <span class="badge priority-badge me-2">Prioritaire</span>
+                        <h5 class="card-title mb-0">
+                          <a href="{{ url_for('wines.wine_detail', wine_id=wine.wine_id) }}" class="text-decoration-none">
+                            {{ wine.wine_name }}
+                          </a>
+                        </h5>
+                      </div>
+                      <div class="wine-info mb-2">
+                        {% if wine.year %}<span class="me-2"><i class="bi bi-calendar me-1"></i>{{ wine.year }}</span>{% endif %}
+                        {% if wine.region %}<span class="me-2"><i class="bi bi-geo-alt me-1"></i>{{ wine.region }}</span>{% endif %}
+                        {% if wine.grape %}<span class="me-2"><i class="bi bi-flower1 me-1"></i>{{ wine.grape }}</span>{% endif %}
+                        {% if wine.cellar_name %}<span><i class="bi bi-archive me-1"></i>{{ wine.cellar_name }}</span>{% endif %}
+                      </div>
+                      {% if wine.subcategory %}
+                      <span class="badge bg-secondary mb-2">{{ wine.subcategory }}</span>
+                      {% endif %}
+                      <p class="card-text">{{ wine.reason }}</p>
+                      {% if wine.garde_info %}
+                      <p class="garde-info text-warning mb-0">
+                        <i class="bi bi-clock-history me-1"></i>{{ wine.garde_info }}
+                      </p>
+                      {% endif %}
+                    </div>
+                    <div class="score-badge {% if wine.score >= 8 %}score-high{% elif wine.score >= 5 %}score-medium{% else %}score-low{% endif %}">
+                      {{ wine.score }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Aucun vin à consommer en priorité n'a été identifié pour ce plat.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Section meilleurs vins -->
+        <div class="col-lg-6 mb-4">
+          <div class="best-section">
+            <h4 class="section-title">
+              <i class="bi bi-trophy me-2"></i>Meilleurs accords
+            </h4>
+            <p class="text-muted small mb-3">
+              Les vins les plus adaptés à ce plat, peu importe leur potentiel de garde.
+            </p>
+            
+            {% if result.best_wines %}
+              {% for wine in result.best_wines %}
+              <div class="card pairing-card mb-3 border-start border-4 border-primary">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="d-flex align-items-center mb-2">
+                        <span class="badge best-badge me-2">Meilleur choix</span>
+                        <h5 class="card-title mb-0">
+                          <a href="{{ url_for('wines.wine_detail', wine_id=wine.wine_id) }}" class="text-decoration-none">
+                            {{ wine.wine_name }}
+                          </a>
+                        </h5>
+                      </div>
+                      <div class="wine-info mb-2">
+                        {% if wine.year %}<span class="me-2"><i class="bi bi-calendar me-1"></i>{{ wine.year }}</span>{% endif %}
+                        {% if wine.region %}<span class="me-2"><i class="bi bi-geo-alt me-1"></i>{{ wine.region }}</span>{% endif %}
+                        {% if wine.grape %}<span class="me-2"><i class="bi bi-flower1 me-1"></i>{{ wine.grape }}</span>{% endif %}
+                        {% if wine.cellar_name %}<span><i class="bi bi-archive me-1"></i>{{ wine.cellar_name }}</span>{% endif %}
+                      </div>
+                      {% if wine.subcategory %}
+                      <span class="badge bg-secondary mb-2">{{ wine.subcategory }}</span>
+                      {% endif %}
+                      <p class="card-text">{{ wine.reason }}</p>
+                      {% if wine.garde_info %}
+                      <p class="garde-info text-info mb-0">
+                        <i class="bi bi-clock-history me-1"></i>{{ wine.garde_info }}
+                      </p>
+                      {% endif %}
+                    </div>
+                    <div class="score-badge {% if wine.score >= 8 %}score-high{% elif wine.score >= 5 %}score-medium{% else %}score-low{% endif %}">
+                      {{ wine.score }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Aucune recommandation de meilleur vin n'a été générée pour ce plat.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% elif error %}
+  <div class="row">
+    <div class="col-12">
+      <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+      </div>
+    </div>
+  </div>
+  {% elif dish %}
+  <div class="row">
+    <div class="col-12">
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        Aucune recommandation n'a pu être générée. Veuillez réessayer.
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <!-- État initial - suggestions -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card bg-light border-0">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-lightbulb display-1 text-muted mb-3"></i>
+          <h4 class="text-muted">Comment ça marche ?</h4>
+          <p class="text-muted mb-4">
+            Entrez le plat que vous prévoyez de préparer et notre IA analysera votre cave<br>
+            pour vous recommander les meilleurs vins en tenant compte des accords mets-vins<br>
+            et de la garde de vos bouteilles.
+          </p>
+          <div class="row justify-content-center">
+            <div class="col-md-4 mb-3">
+              <div class="card h-100">
+                <div class="card-body">
+                  <i class="bi bi-hourglass-split fs-2 text-danger mb-2"></i>
+                  <h6>Vins à consommer</h6>
+                  <p class="small text-muted mb-0">
+                    Priorité aux vins qui sont dans leur fenêtre de dégustation optimale
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <div class="card h-100">
+                <div class="card-body">
+                  <i class="bi bi-trophy fs-2 text-primary mb-2"></i>
+                  <h6>Meilleurs accords</h6>
+                  <p class="small text-muted mb-0">
+                    Les vins les plus adaptés au plat, peu importe leur garde
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <hr class="my-4">
+          <h6 class="text-muted mb-3">Exemples de plats :</h6>
+          <div class="d-flex flex-wrap justify-content-center gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm suggestion-btn" data-dish="Bœuf bourguignon">
+              🥩 Bœuf bourguignon
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm suggestion-btn" data-dish="Saumon grillé aux herbes">
+              🐟 Saumon grillé
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm suggestion-btn" data-dish="Plateau de fromages affinés">
+              🧀 Plateau de fromages
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm suggestion-btn" data-dish="Poulet rôti aux légumes">
+              🍗 Poulet rôti
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm suggestion-btn" data-dish="Risotto aux champignons">
+              🍄 Risotto champignons
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm suggestion-btn" data-dish="Tarte aux fruits rouges">
+              🍓 Tarte aux fruits
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay" style="display: none;">
+  <div class="text-center">
+    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Chargement...</span>
+    </div>
+    <h5>Analyse en cours...</h5>
+    <p class="text-muted">L'IA analyse votre cave pour trouver les meilleurs accords</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('pairingForm');
+  const dishInput = document.getElementById('dish');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+
+  // Afficher le loading lors de la soumission
+  if (form) {
+    form.addEventListener('submit', function() {
+      if (dishInput.value.trim()) {
+        loadingOverlay.style.display = 'flex';
+      }
+    });
+  }
+
+  // Gérer les boutons de suggestion
+  suggestionBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const dish = this.getAttribute('data-dish');
+      if (dishInput && dish) {
+        dishInput.value = dish;
+        dishInput.focus();
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

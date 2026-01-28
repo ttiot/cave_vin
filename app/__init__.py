@@ -128,6 +128,7 @@ def create_app(config_class=Config):
     from app.blueprints.api import api_bp
     from app.blueprints.advanced_stats import advanced_stats_bp
     from app.blueprints.smtp import smtp_bp
+    from app.blueprints.pairing import pairing_bp
 
     # Exempter tout le blueprint API du CSRF (appelé via fetch/js)
     csrf.exempt(api_bp)
@@ -145,5 +146,6 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(api_bp)
     flask_app.register_blueprint(advanced_stats_bp)
     flask_app.register_blueprint(smtp_bp)
+    flask_app.register_blueprint(pairing_bp)
 
     return flask_app
