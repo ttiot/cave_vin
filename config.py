@@ -34,6 +34,11 @@ class Config:
     PREFERRED_URL_SCHEME = 'https'
     OPENAI_LOG_REQUESTS = False
     
+    # Configuration SMTP pour l'envoi d'emails
+    # Clé de chiffrement pour les mots de passe SMTP (Fernet key)
+    # Générer avec: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    SMTP_ENCRYPTION_KEY = os.environ.get('SMTP_ENCRYPTION_KEY')
+    
     @staticmethod
     def get_default_admin_password():
         """Retourne le mot de passe admin par défaut depuis la configuration."""

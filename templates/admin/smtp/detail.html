@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .detail-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .detail-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .detail-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .detail-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .detail-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+  }
+  
+  .info-item {
+    padding: var(--spacing-md);
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-md);
+  }
+  
+  .info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .info-value {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  .info-value.mono {
+    font-family: monospace;
+  }
+  
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  
+  .status-badge.active {
+    background-color: var(--accent-success);
+    color: #fff;
+  }
+  
+  .status-badge.inactive {
+    background-color: var(--text-muted);
+    color: #fff;
+  }
+  
+  .status-badge.default {
+    background-color: var(--accent-primary);
+    color: #fff;
+  }
+  
+  .test-section {
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+  }
+  
+  .test-result {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    margin-top: var(--spacing-md);
+  }
+  
+  .test-result.success {
+    background-color: rgba(34, 197, 94, 0.15);
+    border: 1px solid var(--accent-success);
+    color: var(--accent-success);
+  }
+  
+  .test-result.failed {
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--accent-danger);
+    color: var(--accent-danger);
+  }
+  
+  .email-log-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .email-log-item:last-child {
+    border-bottom: none;
+  }
+  
+  .email-log-status {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+  }
+  
+  .email-log-status.sent {
+    background-color: var(--accent-success);
+    color: #fff;
+  }
+  
+  .email-log-status.failed {
+    background-color: var(--accent-danger);
+    color: #fff;
+  }
+  
+  .email-log-status.pending {
+    background-color: var(--accent-warning);
+    color: #fff;
+  }
+  
+  .email-log-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .email-log-subject {
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .email-log-details {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{{ url_for('smtp.index') }}">Configuration SMTP</a></li>
+        <li class="breadcrumb-item active">{{ config.name }}</li>
+      </ol>
+    </nav>
+    <h3 class="m-0">{{ config.name }}</h3>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('smtp.edit', config_id=config.id) }}" class="btn btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i> Modifier
+    </a>
+    <form method="POST" action="{{ url_for('smtp.delete', config_id=config.id) }}" class="d-inline" onsubmit="return confirm('Supprimer cette configuration SMTP ?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="btn btn-outline-danger">
+        <i class="bi bi-trash me-1"></i> Supprimer
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Statut -->
+<div class="mb-4">
+  {% if config.is_active %}
+  <span class="status-badge active"><i class="bi bi-check-circle"></i> Actif</span>
+  {% else %}
+  <span class="status-badge inactive"><i class="bi bi-x-circle"></i> Inactif</span>
+  {% endif %}
+  {% if config.is_default %}
+  <span class="status-badge default ms-2"><i class="bi bi-star-fill"></i> Par défaut</span>
+  {% endif %}
+</div>
+
+<!-- Informations du serveur -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon">
+      <i class="bi bi-hdd-network"></i>
+    </div>
+    <h5 class="detail-card-title">Paramètres du serveur</h5>
+  </div>
+  
+  <div class="detail-card-body">
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Hôte SMTP</div>
+        <div class="info-value mono">{{ config.host }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Port</div>
+        <div class="info-value mono">{{ config.port }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Sécurité</div>
+        <div class="info-value">
+          {% if config.use_tls %}
+          <i class="bi bi-shield-check text-success me-1"></i> STARTTLS
+          {% elif config.use_ssl %}
+          <i class="bi bi-shield-lock text-success me-1"></i> SSL/TLS
+          {% else %}
+          <i class="bi bi-shield-x text-warning me-1"></i> Aucune
+          {% endif %}
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Timeout</div>
+        <div class="info-value">{{ config.timeout }} secondes</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Identifiant</div>
+        <div class="info-value mono">{{ config.username or '—' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Mot de passe</div>
+        <div class="info-value">
+          {% if config.password_encrypted %}
+          <i class="bi bi-key-fill text-success me-1"></i> Configuré
+          {% else %}
+          <i class="bi bi-key text-muted me-1"></i> Non configuré
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Expéditeur -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">
+      <i class="bi bi-person-badge"></i>
+    </div>
+    <h5 class="detail-card-title">Expéditeur</h5>
+  </div>
+  
+  <div class="detail-card-body">
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Email d'expédition</div>
+        <div class="info-value mono">{{ config.sender_email }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Nom d'expéditeur</div>
+        <div class="info-value">{{ config.sender_name or '—' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Test de connexion -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);">
+      <i class="bi bi-lightning"></i>
+    </div>
+    <h5 class="detail-card-title">Test de connexion</h5>
+  </div>
+  
+  <div class="detail-card-body">
+    {% if config.last_test_at %}
+    <div class="test-result {% if config.last_test_success %}success{% else %}failed{% endif %}">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-{% if config.last_test_success %}check-circle{% else %}x-circle{% endif %} fs-4"></i>
+        <div>
+          <strong>{% if config.last_test_success %}Connexion réussie{% else %}Échec de connexion{% endif %}</strong>
+          <div class="small">Dernier test : {{ config.last_test_at.strftime('%d/%m/%Y à %H:%M') }}</div>
+          {% if config.last_test_error %}
+          <div class="small mt-1">{{ config.last_test_error }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">Aucun test effectué.</p>
+    {% endif %}
+    
+    <div class="test-section">
+      <h6 class="mb-3"><i class="bi bi-play-circle me-2"></i>Tester la configuration</h6>
+      
+      <div class="row g-3">
+        <div class="col-md-6">
+          <form method="POST" action="{{ url_for('smtp.test_connection', config_id=config.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button type="submit" class="btn btn-outline-primary w-100">
+              <i class="bi bi-plug me-1"></i> Tester la connexion
+            </button>
+          </form>
+        </div>
+        <div class="col-md-6">
+          <form method="POST" action="{{ url_for('smtp.send_test', config_id=config.id) }}" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="email" class="form-control" name="to_email" placeholder="Email de test" required />
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-send me-1"></i> Envoyer
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Derniers emails -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">
+      <i class="bi bi-envelope"></i>
+    </div>
+    <h5 class="detail-card-title">Derniers emails envoyés</h5>
+    <a href="{{ url_for('smtp.email_logs', config_id=config.id) }}" class="btn btn-sm btn-outline-secondary ms-auto">
+      Voir tous les logs
+    </a>
+  </div>
+  
+  <div class="detail-card-body p-0">
+    {% if recent_emails %}
+      {% for email in recent_emails %}
+      <div class="email-log-item">
+        <div class="email-log-status {{ email.status }}">
+          {% if email.status == 'sent' %}
+          <i class="bi bi-check"></i>
+          {% elif email.status == 'failed' %}
+          <i class="bi bi-x"></i>
+          {% else %}
+          <i class="bi bi-clock"></i>
+          {% endif %}
+        </div>
+        <div class="email-log-info">
+          <div class="email-log-subject">{{ email.subject }}</div>
+          <div class="email-log-details">
+            <i class="bi bi-envelope me-1"></i>{{ email.recipient_email }}
+            <span class="ms-2"><i class="bi bi-clock me-1"></i>{{ email.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+        Aucun email envoyé avec cette configuration.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

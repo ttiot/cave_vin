@@ -109,9 +109,11 @@ def create_app(config_class=Config):
     flask_app.jinja_env.filters['subcategory_badge_style'] = get_subcategory_badge_style
 
     # Hooks before_request
+    # IMPORTANT: ensure_db doit être appelé EN PREMIER pour appliquer les migrations
+    # avant que check_temporary_password n'accède à current_user
     from app.utils.decorators import check_temporary_password, ensure_db
-    flask_app.before_request(check_temporary_password)
     flask_app.before_request(ensure_db)
+    flask_app.before_request(check_temporary_password)
 
     # Enregistrer les blueprints
     from app.blueprints.auth import auth_bp
@@ -125,6 +127,7 @@ def create_app(config_class=Config):
     from app.blueprints.api_tokens import api_tokens_bp
     from app.blueprints.api import api_bp
     from app.blueprints.advanced_stats import advanced_stats_bp
+    from app.blueprints.smtp import smtp_bp
 
     # Exempter tout le blueprint API du CSRF (appelé via fetch/js)
     csrf.exempt(api_bp)
@@ -141,5 +144,6 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(api_tokens_bp)
     flask_app.register_blueprint(api_bp)
     flask_app.register_blueprint(advanced_stats_bp)
+    flask_app.register_blueprint(smtp_bp)
 
     return flask_app

@@ -339,6 +339,12 @@
           </div>
           
           <div class="mb-3">
+            <label class="form-label">Adresse email</label>
+            <input type="email" class="form-control" name="email" placeholder="ex: jean.dupont@example.com" />
+            <div class="form-text">Optionnel. Permet de recevoir des notifications par email.</div>
+          </div>
+          
+          <div class="mb-3">
             <label class="form-label">Mot de passe</label>
             <input type="password" class="form-control" name="password" minlength="6" required placeholder="Minimum 6 caractères" />
             <div class="form-text">Un mot de passe temporaire oblige l'utilisateur à le changer lors de sa première connexion.</div>
@@ -402,6 +408,11 @@
                 <span class="you-badge">vous</span>
                 {% endif %}
               </div>
+              {% if user.email %}
+              <div class="user-card-email text-muted small mt-1">
+                <i class="bi bi-envelope me-1"></i>{{ user.email }}
+              </div>
+              {% endif %}
               <div class="user-card-badges">
                 {% if user.is_admin %}
                 <span class="user-badge admin">
@@ -425,6 +436,10 @@
             </div>
             
             <div class="user-card-actions">
+              <button type="button" class="btn-user-action" data-bs-toggle="modal" data-bs-target="#emailModal{{ user.id }}">
+                <i class="bi bi-envelope"></i> Email
+              </button>
+              
               {% if not user.is_sub_account %}
               <form method="POST" action="{{ url_for('admin.update_role', user_id=user.id) }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -457,6 +472,36 @@
                 >
                   <i class="bi bi-trash"></i>
                 </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal pour modifier l'email -->
+        <div class="modal fade" id="emailModal{{ user.id }}" tabindex="-1" aria-labelledby="emailModalLabel{{ user.id }}" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="emailModalLabel{{ user.id }}">
+                  <i class="bi bi-envelope me-2"></i>Email de {{ user.username }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+              </div>
+              <form method="POST" action="{{ url_for('admin.update_email', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Adresse email</label>
+                    <input type="email" class="form-control" name="email" value="{{ user.email or '' }}" placeholder="ex: utilisateur@example.com" />
+                    <div class="form-text">Laissez vide pour supprimer l'adresse email.</div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Enregistrer
+                  </button>
+                </div>
               </form>
             </div>
           </div>

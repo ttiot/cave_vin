@@ -64,6 +64,65 @@ def apply_schema_updates() -> None:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE user ADD COLUMN created_at DATETIME"))
 
+    # Migration: Add email column to user table
+    # Note: SQLite ne permet pas d'ajouter une colonne UNIQUE directement via ALTER TABLE
+    # On ajoute la colonne sans contrainte, puis on crée un index unique séparément
+    if "user" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("user")}
+        if "email" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(255)"))
+        
+        # Créer l'index unique sur email si pas déjà présent
+        indexes = {idx["name"] for idx in inspector.get_indexes("user")}
+        if "ix_user_email" not in indexes:
+            with engine.begin() as connection:
+                connection.execute(text("CREATE UNIQUE INDEX ix_user_email ON user(email) WHERE email IS NOT NULL"))
+
+    # Migration: Create smtp_config table if not exists
+    if "smtp_config" not in inspector.get_table_names():
+        with engine.begin() as connection:
+            connection.execute(text("""
+                CREATE TABLE smtp_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(100) NOT NULL,
+                    host VARCHAR(255) NOT NULL,
+                    port INTEGER NOT NULL DEFAULT 587,
+                    username VARCHAR(255),
+                    encrypted_password TEXT,
+                    use_tls BOOLEAN DEFAULT 1,
+                    use_ssl BOOLEAN DEFAULT 0,
+                    sender_email VARCHAR(255) NOT NULL,
+                    sender_name VARCHAR(100),
+                    timeout INTEGER DEFAULT 30,
+                    is_active BOOLEAN DEFAULT 1,
+                    is_default BOOLEAN DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    created_by_id INTEGER REFERENCES user(id) ON DELETE SET NULL
+                )
+            """))
+
+    # Migration: Create email_log table if not exists
+    if "email_log" not in inspector.get_table_names():
+        with engine.begin() as connection:
+            connection.execute(text("""
+                CREATE TABLE email_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    smtp_config_id INTEGER REFERENCES smtp_config(id) ON DELETE SET NULL,
+                    recipient_email VARCHAR(255) NOT NULL,
+                    recipient_name VARCHAR(100),
+                    subject VARCHAR(500) NOT NULL,
+                    body_text TEXT,
+                    body_html TEXT,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    error_message TEXT,
+                    sent_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    sent_by_id INTEGER REFERENCES user(id) ON DELETE SET NULL
+                )
+            """))
+
 
 ALCOHOL_CATEGORIES: list[dict[str, object]] = [
     {

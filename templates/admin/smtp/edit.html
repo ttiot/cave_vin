@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .form-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+  }
+  
+  .form-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .form-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .form-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .form-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  .form-section {
+    margin-bottom: var(--spacing-xl);
+  }
+  
+  .form-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .form-modern .form-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .form-modern .form-control,
+  .form-modern .form-select {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-color);
+    background-color: var(--bg-input);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  
+  .form-modern .form-control:focus,
+  .form-modern .form-select:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(114, 47, 55, 0.15);
+  }
+  
+  .form-modern .form-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .form-modern .form-check {
+    padding: var(--spacing-sm) var(--spacing-md);
+    padding-left: 2.5rem;
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .form-modern .form-check-label {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+  }
+  
+  .security-options {
+    display: flex;
+    gap: var(--spacing-md);
+  }
+  
+  .security-option {
+    flex: 1;
+    padding: var(--spacing-md);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: center;
+  }
+  
+  .security-option:hover {
+    border-color: var(--accent-primary);
+  }
+  
+  .security-option.selected {
+    border-color: var(--accent-primary);
+    background-color: rgba(114, 47, 55, 0.1);
+  }
+  
+  .security-option input {
+    display: none;
+  }
+  
+  .security-option-icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .security-option-title {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .security-option-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{{ url_for('smtp.index') }}">Configuration SMTP</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('smtp.detail', config_id=config.id) }}">{{ config.name }}</a></li>
+        <li class="breadcrumb-item active">Modifier</li>
+      </ol>
+    </nav>
+    <h3 class="m-0">Modifier la configuration</h3>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon">
+          <i class="bi bi-pencil"></i>
+        </div>
+        <h5 class="form-card-title">Paramètres du serveur SMTP</h5>
+      </div>
+      
+      <div class="form-card-body">
+        <form method="POST" action="{{ url_for('smtp.edit', config_id=config.id) }}" class="form-modern">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          
+          <!-- Informations générales -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-info-circle me-2"></i>Informations générales
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Nom de la configuration</label>
+              <input type="text" class="form-control" name="name" value="{{ config.name }}" required placeholder="ex: Gmail principal" />
+              <div class="form-text">Un nom pour identifier cette configuration.</div>
+            </div>
+          </div>
+          
+          <!-- Serveur SMTP -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-hdd-network me-2"></i>Serveur SMTP
+            </div>
+            
+            <div class="row">
+              <div class="col-md-8 mb-3">
+                <label class="form-label">Hôte SMTP</label>
+                <input type="text" class="form-control" name="host" value="{{ config.host }}" required placeholder="ex: smtp.gmail.com" />
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Port</label>
+                <input type="number" class="form-control" name="port" id="port" value="{{ config.port }}" min="1" max="65535" required />
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Sécurité de la connexion</label>
+              <div class="security-options">
+                <label class="security-option {% if config.use_tls %}selected{% endif %}" id="option-tls">
+                  <input type="radio" name="security" value="tls" {% if config.use_tls %}checked{% endif %} onchange="updateSecurity()" />
+                  <div class="security-option-icon">🔒</div>
+                  <div class="security-option-title">STARTTLS</div>
+                  <div class="security-option-desc">Port 587 (recommandé)</div>
+                </label>
+                <label class="security-option {% if config.use_ssl %}selected{% endif %}" id="option-ssl">
+                  <input type="radio" name="security" value="ssl" {% if config.use_ssl %}checked{% endif %} onchange="updateSecurity()" />
+                  <div class="security-option-icon">🔐</div>
+                  <div class="security-option-title">SSL/TLS</div>
+                  <div class="security-option-desc">Port 465</div>
+                </label>
+                <label class="security-option {% if not config.use_tls and not config.use_ssl %}selected{% endif %}" id="option-none">
+                  <input type="radio" name="security" value="none" {% if not config.use_tls and not config.use_ssl %}checked{% endif %} onchange="updateSecurity()" />
+                  <div class="security-option-icon">⚠️</div>
+                  <div class="security-option-title">Aucune</div>
+                  <div class="security-option-desc">Non recommandé</div>
+                </label>
+              </div>
+              <input type="hidden" name="use_tls" id="use_tls" value="{{ '1' if config.use_tls else '0' }}" />
+              <input type="hidden" name="use_ssl" id="use_ssl" value="{{ '1' if config.use_ssl else '0' }}" />
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Timeout (secondes)</label>
+              <input type="number" class="form-control" name="timeout" value="{{ config.timeout }}" min="5" max="120" />
+              <div class="form-text">Délai d'attente maximum pour la connexion.</div>
+            </div>
+          </div>
+          
+          <!-- Authentification -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-key me-2"></i>Authentification
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Identifiant</label>
+              <input type="text" class="form-control" name="username" value="{{ config.username or '' }}" placeholder="ex: votre.email@gmail.com" />
+              <div class="form-text">Généralement votre adresse email.</div>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Mot de passe</label>
+              <input type="password" class="form-control" name="password" placeholder="{% if config.password_encrypted %}Laisser vide pour conserver l'actuel{% else %}Mot de passe ou clé API{% endif %}" />
+              <div class="form-text">
+                {% if config.password_encrypted %}
+                <i class="bi bi-check-circle text-success me-1"></i>Un mot de passe est déjà configuré. Laissez vide pour le conserver.
+                {% else %}
+                Pour Gmail, utilisez un mot de passe d'application. Le mot de passe sera chiffré.
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          
+          <!-- Expéditeur -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-person-badge me-2"></i>Expéditeur
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Email d'expédition</label>
+                <input type="email" class="form-control" name="sender_email" value="{{ config.sender_email }}" required placeholder="ex: noreply@example.com" />
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Nom d'expéditeur</label>
+                <input type="text" class="form-control" name="sender_name" value="{{ config.sender_name or '' }}" placeholder="ex: Cave à Vin" />
+              </div>
+            </div>
+          </div>
+          
+          <!-- Options -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-sliders me-2"></i>Options
+            </div>
+            
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="is_active" name="is_active" value="1" {% if config.is_active %}checked{% endif %} />
+              <label class="form-check-label" for="is_active">
+                <i class="bi bi-power me-1"></i> Configuration active
+              </label>
+            </div>
+            
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="is_default" name="is_default" value="1" {% if config.is_default %}checked{% endif %} />
+              <label class="form-check-label" for="is_default">
+                <i class="bi bi-star me-1"></i> Définir comme configuration par défaut
+              </label>
+            </div>
+          </div>
+          
+          <!-- Actions -->
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('smtp.detail', config_id=config.id) }}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-lg me-1"></i> Annuler
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i> Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateSecurity() {
+  const selected = document.querySelector('input[name="security"]:checked').value;
+  
+  // Mettre à jour les champs cachés
+  document.getElementById('use_tls').value = selected === 'tls' ? '1' : '0';
+  document.getElementById('use_ssl').value = selected === 'ssl' ? '1' : '0';
+  
+  // Mettre à jour l'apparence
+  document.querySelectorAll('.security-option').forEach(opt => opt.classList.remove('selected'));
+  document.getElementById('option-' + selected).classList.add('selected');
+}
+
+// Initialiser
+document.addEventListener('DOMContentLoaded', function() {
+  updateSecurity();
+});
+</script>
+{% endblock %}

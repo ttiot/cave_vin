@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .smtp-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .smtp-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .smtp-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .smtp-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .smtp-card-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  
+  .smtp-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  /* Stats cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .stat-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    box-shadow: 0 2px 4px var(--shadow-color);
+  }
+  
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .stat-card.success .stat-value { color: var(--accent-success); }
+  .stat-card.danger .stat-value { color: var(--accent-danger); }
+  .stat-card.info .stat-value { color: var(--accent-info); }
+  
+  /* Config list */
+  .config-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color var(--transition-fast);
+  }
+  
+  .config-item:last-child {
+    border-bottom: none;
+  }
+  
+  .config-item:hover {
+    background-color: var(--bg-hover);
+  }
+  
+  .config-item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background-color: var(--bg-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+  }
+  
+  .config-item-icon.active {
+    background-color: var(--accent-success);
+    color: #fff;
+  }
+  
+  .config-item-icon.inactive {
+    background-color: var(--text-muted);
+    color: #fff;
+    opacity: 0.5;
+  }
+  
+  .config-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .config-item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .config-item-details {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  
+  .config-item-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+  }
+  
+  .badge-default {
+    background-color: var(--accent-primary);
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+  }
+  
+  .badge-inactive {
+    background-color: var(--text-muted);
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+  }
+  
+  .test-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.75rem;
+    margin-top: var(--spacing-xs);
+  }
+  
+  .test-status.success { color: var(--accent-success); }
+  .test-status.failed { color: var(--accent-danger); }
+  
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: var(--spacing-xl) * 2;
+    color: var(--text-muted);
+  }
+  
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+  }
+  
+  .empty-state-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  /* Alert banner */
+  .alert-banner {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .alert-banner.warning {
+    background-color: rgba(251, 191, 36, 0.15);
+    border: 1px solid var(--accent-warning);
+    color: var(--accent-warning);
+  }
+  
+  .alert-banner.success {
+    background-color: rgba(34, 197, 94, 0.15);
+    border: 1px solid var(--accent-success);
+    color: var(--accent-success);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <h3 class="m-0">Configuration SMTP</h3>
+    <p class="text-muted mb-0">Gérez les paramètres d'envoi d'emails</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('smtp.email_logs') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-list-ul me-1"></i> Logs d'emails
+    </a>
+    <a href="{{ url_for('smtp.create') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i> Nouvelle configuration
+    </a>
+  </div>
+</div>
+
+{% if not email_configured %}
+<div class="alert-banner warning">
+  <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+  <div>
+    <strong>Aucune configuration SMTP active</strong>
+    <p class="mb-0 small">L'envoi d'emails n'est pas disponible. Créez une configuration pour activer cette fonctionnalité.</p>
+  </div>
+</div>
+{% else %}
+<div class="alert-banner success">
+  <i class="bi bi-check-circle-fill fs-4"></i>
+  <div>
+    <strong>Envoi d'emails configuré</strong>
+    <p class="mb-0 small">L'application peut envoyer des emails aux utilisateurs.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Statistiques -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ total_emails }}</div>
+    <div class="stat-label">Emails total</div>
+  </div>
+  <div class="stat-card success">
+    <div class="stat-value">{{ emails_sent }}</div>
+    <div class="stat-label">Envoyés</div>
+  </div>
+  <div class="stat-card danger">
+    <div class="stat-value">{{ emails_failed }}</div>
+    <div class="stat-label">Échoués</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-value">{{ recent_emails }}</div>
+    <div class="stat-label">7 derniers jours</div>
+  </div>
+</div>
+
+<!-- Liste des configurations -->
+<div class="smtp-card">
+  <div class="smtp-card-header">
+    <div class="smtp-card-icon">
+      <i class="bi bi-server"></i>
+    </div>
+    <div>
+      <h5 class="smtp-card-title">Serveurs SMTP</h5>
+      <p class="smtp-card-subtitle">{{ configs|length }} configuration(s)</p>
+    </div>
+  </div>
+  
+  <div class="smtp-card-body p-0">
+    {% if configs %}
+      {% for config in configs %}
+      <div class="config-item">
+        <div class="config-item-icon {% if config.is_active %}active{% else %}inactive{% endif %}">
+          <i class="bi bi-{% if config.is_active %}check-lg{% else %}x-lg{% endif %}"></i>
+        </div>
+        <div class="config-item-info">
+          <div class="config-item-name">
+            {{ config.name }}
+            {% if config.is_default %}
+            <span class="badge-default">Par défaut</span>
+            {% endif %}
+            {% if not config.is_active %}
+            <span class="badge-inactive">Inactif</span>
+            {% endif %}
+          </div>
+          <div class="config-item-details">
+            <i class="bi bi-hdd-network me-1"></i>{{ config.host }}:{{ config.port }}
+            {% if config.use_tls %}<span class="ms-2"><i class="bi bi-shield-check me-1"></i>TLS</span>{% endif %}
+            {% if config.use_ssl %}<span class="ms-2"><i class="bi bi-shield-lock me-1"></i>SSL</span>{% endif %}
+          </div>
+          {% if config.last_test_at %}
+          <div class="test-status {% if config.last_test_success %}success{% else %}failed{% endif %}">
+            <i class="bi bi-{% if config.last_test_success %}check-circle{% else %}x-circle{% endif %}"></i>
+            Dernier test : {{ config.last_test_at.strftime('%d/%m/%Y %H:%M') }}
+            {% if not config.last_test_success %}- {{ config.last_test_error[:50] }}...{% endif %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="config-item-actions">
+          <a href="{{ url_for('smtp.detail', config_id=config.id) }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-eye"></i>
+          </a>
+          <a href="{{ url_for('smtp.edit', config_id=config.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-pencil"></i>
+          </a>
+          {% if not config.is_default %}
+          <form method="POST" action="{{ url_for('smtp.set_default', config_id=config.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button type="submit" class="btn btn-sm btn-outline-success" title="Définir par défaut">
+              <i class="bi bi-star"></i>
+            </button>
+          </form>
+          {% endif %}
+          <form method="POST" action="{{ url_for('smtp.toggle_active', config_id=config.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button type="submit" class="btn btn-sm btn-outline-{% if config.is_active %}warning{% else %}success{% endif %}" title="{% if config.is_active %}Désactiver{% else %}Activer{% endif %}">
+              <i class="bi bi-{% if config.is_active %}pause{% else %}play{% endif %}"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">📧</div>
+        <div class="empty-state-title">Aucune configuration SMTP</div>
+        <p>Créez votre première configuration pour activer l'envoi d'emails.</p>
+        <a href="{{ url_for('smtp.create') }}" class="btn btn-primary mt-3">
+          <i class="bi bi-plus-lg me-1"></i> Créer une configuration
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Presets populaires -->
+<div class="smtp-card">
+  <div class="smtp-card-header">
+    <div class="smtp-card-icon" style="background: linear-gradient(135deg, #4285f4, #34a853);">
+      <i class="bi bi-lightning"></i>
+    </div>
+    <div>
+      <h5 class="smtp-card-title">Configurations rapides</h5>
+      <p class="smtp-card-subtitle">Paramètres pré-configurés pour les services populaires</p>
+    </div>
+  </div>
+  
+  <div class="smtp-card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="card-title"><i class="bi bi-google me-2"></i>Gmail</h6>
+            <p class="card-text small text-muted">smtp.gmail.com:587 (TLS)</p>
+            <p class="card-text small">Nécessite un mot de passe d'application.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="card-title"><i class="bi bi-microsoft me-2"></i>Outlook/Office 365</h6>
+            <p class="card-text small text-muted">smtp.office365.com:587 (TLS)</p>
+            <p class="card-text small">Utilisez votre compte Microsoft.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="card-title"><i class="bi bi-send me-2"></i>SendGrid</h6>
+            <p class="card-text small text-muted">smtp.sendgrid.net:587 (TLS)</p>
+            <p class="card-text small">Utilisez une clé API comme mot de passe.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

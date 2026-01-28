@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .detail-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .detail-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .detail-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .detail-card-icon.sent {
+    background: linear-gradient(135deg, #22c55e, #4ade80);
+  }
+  
+  .detail-card-icon.failed {
+    background: linear-gradient(135deg, #ef4444, #f87171);
+  }
+  
+  .detail-card-icon.pending {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  }
+  
+  .detail-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .detail-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+  }
+  
+  .info-item {
+    padding: var(--spacing-md);
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-md);
+  }
+  
+  .info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .info-value {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    word-break: break-all;
+  }
+  
+  .info-value.mono {
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+  
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  .status-badge.sent {
+    background-color: var(--accent-success);
+    color: #fff;
+  }
+  
+  .status-badge.failed {
+    background-color: var(--accent-danger);
+    color: #fff;
+  }
+  
+  .status-badge.pending {
+    background-color: var(--accent-warning);
+    color: #fff;
+  }
+  
+  .error-box {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--accent-danger);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    color: var(--accent-danger);
+  }
+  
+  .error-box-title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .error-box-content {
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{{ url_for('smtp.index') }}">Configuration SMTP</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('smtp.email_logs') }}">Logs d'emails</a></li>
+        <li class="breadcrumb-item active">Détail</li>
+      </ol>
+    </nav>
+    <h3 class="m-0">Détail de l'email</h3>
+  </div>
+  <div>
+    <a href="{{ url_for('smtp.email_logs') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Retour aux logs
+    </a>
+  </div>
+</div>
+
+<!-- Statut -->
+<div class="mb-4">
+  <span class="status-badge {{ log.status }}">
+    {% if log.status == 'sent' %}
+    <i class="bi bi-check-circle"></i> Envoyé
+    {% elif log.status == 'failed' %}
+    <i class="bi bi-x-circle"></i> Échoué
+    {% else %}
+    <i class="bi bi-clock"></i> En attente
+    {% endif %}
+  </span>
+</div>
+
+<!-- Informations principales -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon {{ log.status }}">
+      {% if log.status == 'sent' %}
+      <i class="bi bi-check-lg"></i>
+      {% elif log.status == 'failed' %}
+      <i class="bi bi-x-lg"></i>
+      {% else %}
+      <i class="bi bi-clock"></i>
+      {% endif %}
+    </div>
+    <div>
+      <h5 class="detail-card-title">{{ log.subject }}</h5>
+      <p class="text-muted mb-0 small">ID: {{ log.id }}</p>
+    </div>
+  </div>
+  
+  <div class="detail-card-body">
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Destinataire</div>
+        <div class="info-value mono">{{ log.recipient_email }}</div>
+      </div>
+      
+      {% if log.recipient_user %}
+      <div class="info-item">
+        <div class="info-label">Utilisateur</div>
+        <div class="info-value">
+          <i class="bi bi-person me-1"></i>{{ log.recipient_user.username }}
+        </div>
+      </div>
+      {% endif %}
+      
+      <div class="info-item">
+        <div class="info-label">Date de création</div>
+        <div class="info-value">{{ log.created_at.strftime('%d/%m/%Y à %H:%M:%S') }}</div>
+      </div>
+      
+      {% if log.sent_at %}
+      <div class="info-item">
+        <div class="info-label">Date d'envoi</div>
+        <div class="info-value">{{ log.sent_at.strftime('%d/%m/%Y à %H:%M:%S') }}</div>
+      </div>
+      {% endif %}
+      
+      {% if log.smtp_config %}
+      <div class="info-item">
+        <div class="info-label">Configuration SMTP</div>
+        <div class="info-value">
+          <a href="{{ url_for('smtp.detail', config_id=log.smtp_config.id) }}">
+            {{ log.smtp_config.name }}
+          </a>
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if log.template_name %}
+      <div class="info-item">
+        <div class="info-label">Template</div>
+        <div class="info-value mono">{{ log.template_name }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Erreur (si échec) -->
+{% if log.error_message %}
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon failed">
+      <i class="bi bi-exclamation-triangle"></i>
+    </div>
+    <h5 class="detail-card-title">Erreur</h5>
+  </div>
+  
+  <div class="detail-card-body">
+    <div class="error-box">
+      <div class="error-box-title">
+        <i class="bi bi-bug me-1"></i> Message d'erreur
+      </div>
+      <div class="error-box-content">{{ log.error_message }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Timeline -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">
+      <i class="bi bi-clock-history"></i>
+    </div>
+    <h5 class="detail-card-title">Chronologie</h5>
+  </div>
+  
+  <div class="detail-card-body">
+    <div class="timeline">
+      <div class="d-flex align-items-start gap-3 mb-3">
+        <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
+          <i class="bi bi-plus text-white"></i>
+        </div>
+        <div>
+          <div class="fw-semibold">Email créé</div>
+          <div class="text-muted small">{{ log.created_at.strftime('%d/%m/%Y à %H:%M:%S') }}</div>
+        </div>
+      </div>
+      
+      {% if log.status == 'sent' %}
+      <div class="d-flex align-items-start gap-3">
+        <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
+          <i class="bi bi-check text-white"></i>
+        </div>
+        <div>
+          <div class="fw-semibold text-success">Email envoyé</div>
+          <div class="text-muted small">{{ log.sent_at.strftime('%d/%m/%Y à %H:%M:%S') if log.sent_at else '—' }}</div>
+        </div>
+      </div>
+      {% elif log.status == 'failed' %}
+      <div class="d-flex align-items-start gap-3">
+        <div class="rounded-circle bg-danger d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
+          <i class="bi bi-x text-white"></i>
+        </div>
+        <div>
+          <div class="fw-semibold text-danger">Échec de l'envoi</div>
+          <div class="text-muted small">{{ log.error_message[:50] }}{% if log.error_message|length > 50 %}...{% endif %}</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="d-flex align-items-start gap-3">
+        <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
+          <i class="bi bi-clock text-white"></i>
+        </div>
+        <div>
+          <div class="fw-semibold text-warning">En attente d'envoi</div>
+          <div class="text-muted small">L'email n'a pas encore été traité.</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

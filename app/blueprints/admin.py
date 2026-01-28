@@ -34,6 +34,7 @@ def manage_users():
 
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
+        email = (request.form.get("email") or "").strip() or None
         password = (request.form.get("password") or "").strip()
         is_temporary = bool(request.form.get("temporary"))
         is_admin = bool(request.form.get("is_admin"))
@@ -62,6 +63,8 @@ def manage_users():
             flash("Le mot de passe est obligatoire.")
         elif User.query.filter_by(username=username).first():
             flash("Ce nom d'utilisateur est déjà utilisé.")
+        elif email and User.query.filter_by(email=email).first():
+            flash("Cette adresse email est déjà utilisée.")
         else:
             # Un sous-compte ne peut pas être administrateur
             if parent_id is not None:
@@ -69,6 +72,7 @@ def manage_users():
 
             user = User(
                 username=username,
+                email=email,
                 password=generate_password_hash(password),
                 has_temporary_password=is_temporary,
                 is_admin=is_admin,
@@ -258,6 +262,35 @@ def delete_user(user_id: int):
     db.session.delete(user)
     db.session.commit()
     flash("L'utilisateur et ses données ont été supprimés.")
+    return redirect(url_for("admin.manage_users"))
+
+
+@admin_bp.route("/users/<int:user_id>/update-email", methods=["POST"])
+@login_required
+@admin_required
+def update_email(user_id: int):
+    """Mettre à jour l'adresse email d'un utilisateur."""
+
+    user = User.query.get_or_404(user_id)
+    email = (request.form.get("email") or "").strip() or None
+
+    # Vérifier l'unicité de l'email
+    if email:
+        existing_user = User.query.filter(
+            User.email == email,
+            User.id != user_id
+        ).first()
+        if existing_user:
+            flash("Cette adresse email est déjà utilisée par un autre utilisateur.")
+            return redirect(url_for("admin.manage_users"))
+
+    user.email = email
+    db.session.commit()
+
+    if email:
+        flash(f"L'adresse email de {user.username} a été mise à jour.")
+    else:
+        flash(f"L'adresse email de {user.username} a été supprimée.")
     return redirect(url_for("admin.manage_users"))
 
 
