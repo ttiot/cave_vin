@@ -9,3 +9,4 @@ Pillow>=10.0.0
 bleach>=6.1.0
 pywebpush>=2.0.0
 cryptography>=41.0.0
+APScheduler>=3.10.0

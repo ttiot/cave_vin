@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+# Dockerfile pour le scheduler de tâches planifiées
+# Utilise la même base que l'application principale
+
+FROM python:3.11-slim
+
+# --- Sécurité & perfs ---
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100 \
+    PIP_ROOT_USER_ACTION=ignore
+
+WORKDIR /app
+
+# Créer l'utilisateur applicatif en amont pour profiter de COPY --chown
+RUN useradd -u 10001 -m appuser \
+    && mkdir -p /data \
+    && chown appuser:appuser /data \
+    && chmod 755 /data
+
+# Dépendances système minimales (build puis clean)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+ && apt-get install -y --no-install-recommends build-essential curl ca-certificates wget \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# Dépendances Python
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip \
+ && pip install -r requirements.txt
+
+# Code
+COPY --chown=appuser:appuser . .
+RUN chmod +x scheduler_entrypoint.sh
+
+# Utilisateur non-root
+USER appuser
+
+# Pas de healthcheck pour le scheduler (process long-running)
+# Le scheduler ne répond pas aux requêtes HTTP
+
+# Point d'entrée avec script de vérification des permissions
+ENTRYPOINT ["/app/scheduler_entrypoint.sh"]
+
+# Pas de CMD par défaut, le script d'entrée lance le scheduler

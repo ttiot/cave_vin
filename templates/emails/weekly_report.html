@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport hebdomadaire - Cave à Vin</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset */
+        body, table, td, p, a, li, blockquote {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        table, td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            height: auto;
+            line-height: 100%;
+            outline: none;
+            text-decoration: none;
+        }
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        
+        /* Styles */
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #722f37, #9b4d56);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .content {
+            background: #ffffff;
+            padding: 30px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin: 0 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #722f37;
+        }
+        .stat-grid {
+            display: table;
+            width: 100%;
+        }
+        .stat-item {
+            display: table-cell;
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #722f37;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+        .activity-summary {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .activity-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .activity-row:last-child {
+            border-bottom: none;
+            font-weight: bold;
+        }
+        .positive {
+            color: #28a745;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .wine-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .wine-item {
+            padding: 12px 15px;
+            background: #f8f9fa;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 4px solid #722f37;
+        }
+        .wine-item.urgent {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .wine-item.optimal {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        .wine-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .wine-details {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-urgent {
+            background: #dc3545;
+            color: white;
+        }
+        .badge-optimal {
+            background: #28a745;
+            color: white;
+        }
+        .badge-soon {
+            background: #ffc107;
+            color: #333;
+        }
+        .cellar-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .cellar-table th,
+        .cellar-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .cellar-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+        .progress-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            background: #722f37;
+            height: 100%;
+            border-radius: 10px;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+        }
+        .footer p {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        @media screen and (max-width: 600px) {
+            .email-container {
+                width: 100% !important;
+            }
+            .content {
+                padding: 20px !important;
+            }
+            .stat-item {
+                display: block !important;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5;">
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🍷 Cave à Vin</h1>
+            <p>Votre rapport hebdomadaire</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <!-- Greeting -->
+            <p style="font-size: 16px; color: #333;">
+                Bonjour <strong>{{ user.username }}</strong> !
+            </p>
+            <p style="color: #666; margin-bottom: 30px;">
+                Voici le résumé de votre cave pour la semaine du 
+                {{ report_period.start.strftime('%d/%m/%Y') }} au {{ report_period.end.strftime('%d/%m/%Y') }}.
+            </p>
+            
+            <!-- Statistics Section -->
+            <div class="section">
+                <h2 class="section-title">📊 Vos caves en un coup d'œil</h2>
+                <table width="100%" cellpadding="0" cellspacing="10" style="margin-bottom: 20px;">
+                    <tr>
+                        <td width="50%" style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                            <div class="stat-value">{{ statistics.total_bottles }}</div>
+                            <div class="stat-label">Bouteilles</div>
+                        </td>
+                        <td width="50%" style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                            <div class="stat-value">{{ statistics.total_references }}</div>
+                            <div class="stat-label">Références</div>
+                        </td>
+                    </tr>
+                </table>
+                
+                {% if statistics.cellars %}
+                <table class="cellar-table">
+                    <thead>
+                        <tr>
+                            <th>Cave</th>
+                            <th>Bouteilles</th>
+                            <th>Capacité</th>
+                            <th>Remplissage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cellar in statistics.cellars %}
+                        <tr>
+                            <td>{{ cellar.name }}</td>
+                            <td>{{ cellar.bottles }}</td>
+                            <td>{{ cellar.capacity }}</td>
+                            <td>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: {{ cellar.fill_rate }}%;"></div>
+                                </div>
+                                <span style="font-size: 12px; color: #666;">{{ cellar.fill_rate }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+            
+            <!-- Activity Section -->
+            <div class="section">
+                <h2 class="section-title">📈 Activité de la semaine</h2>
+                <div class="activity-summary">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e0e0e0;">Entrées</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e0e0e0; text-align: right;" class="positive">
+                                +{{ recent_activity.summary.total_entries }} bouteille{% if recent_activity.summary.total_entries > 1 %}s{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e0e0e0;">Sorties</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e0e0e0; text-align: right;" class="negative">
+                                -{{ recent_activity.summary.total_consumptions }} bouteille{% if recent_activity.summary.total_consumptions > 1 %}s{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Variation nette</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold;" class="{% if recent_activity.summary.net_change >= 0 %}positive{% else %}negative{% endif %}">
+                                {% if recent_activity.summary.net_change >= 0 %}+{% endif %}{{ recent_activity.summary.net_change }} bouteille{% if recent_activity.summary.net_change|abs > 1 %}s{% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                {% if recent_activity.entries %}
+                <h3 style="font-size: 14px; color: #333; margin: 20px 0 10px;">Dernières entrées</h3>
+                <ul class="wine-list">
+                    {% for entry in recent_activity.entries[:5] %}
+                    <li class="wine-item">
+                        <div class="wine-name">{{ entry.name }}</div>
+                        <div class="wine-details">
+                            {% if entry.year %}{{ entry.year }} • {% endif %}
+                            {% if entry.region %}{{ entry.region }} • {% endif %}
+                            {{ entry.quantity }} bouteille{% if entry.quantity > 1 %}s{% endif %}
+                            {% if entry.cellar_name %}• {{ entry.cellar_name }}{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                
+                {% if recent_activity.consumptions %}
+                <h3 style="font-size: 14px; color: #333; margin: 20px 0 10px;">Dernières dégustations</h3>
+                <ul class="wine-list">
+                    {% for consumption in recent_activity.consumptions[:5] %}
+                    <li class="wine-item">
+                        <div class="wine-name">{{ consumption.name }}</div>
+                        <div class="wine-details">
+                            {% if consumption.year %}{{ consumption.year }} • {% endif %}
+                            {% if consumption.region %}{{ consumption.region }} • {% endif %}
+                            {{ consumption.consumed_at.strftime('%d/%m/%Y') }}
+                            {% if consumption.comment %}<br><em>"{{ consumption.comment }}"</em>{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            
+            <!-- Wines to Consume Section -->
+            {% if wines_to_consume %}
+            <div class="section">
+                <h2 class="section-title">🍾 Vins à consommer</h2>
+                
+                {% set urgent_wines = wines_to_consume|selectattr('urgency', 'equalto', 'urgent')|list %}
+                {% set optimal_wines = wines_to_consume|selectattr('urgency', 'equalto', 'optimal')|list %}
+                {% set soon_wines = wines_to_consume|selectattr('urgency', 'equalto', 'bientôt')|list %}
+                
+                {% if urgent_wines %}
+                <h3 style="font-size: 14px; color: #dc3545; margin: 15px 0 10px;">⚠️ À consommer rapidement</h3>
+                <ul class="wine-list">
+                    {% for wine in urgent_wines[:5] %}
+                    <li class="wine-item urgent">
+                        <div class="wine-name">
+                            {{ wine.name }}
+                            <span class="badge badge-urgent">Urgent</span>
+                        </div>
+                        <div class="wine-details">
+                            {% if wine.year %}{{ wine.year }} • {% endif %}
+                            {% if wine.region %}{{ wine.region }} • {% endif %}
+                            Apogée {{ wine.apogee }} • 
+                            {{ wine.quantity }} bouteille{% if wine.quantity > 1 %}s{% endif %}
+                            {% if wine.cellar_name %}• {{ wine.cellar_name }}{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                
+                {% if optimal_wines %}
+                <h3 style="font-size: 14px; color: #28a745; margin: 15px 0 10px;">✨ À leur apogée cette année</h3>
+                <ul class="wine-list">
+                    {% for wine in optimal_wines[:5] %}
+                    <li class="wine-item optimal">
+                        <div class="wine-name">
+                            {{ wine.name }}
+                            <span class="badge badge-optimal">Optimal</span>
+                        </div>
+                        <div class="wine-details">
+                            {% if wine.year %}{{ wine.year }} • {% endif %}
+                            {% if wine.region %}{{ wine.region }} • {% endif %}
+                            {{ wine.quantity }} bouteille{% if wine.quantity > 1 %}s{% endif %}
+                            {% if wine.cellar_name %}• {{ wine.cellar_name }}{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                
+                {% if soon_wines %}
+                <h3 style="font-size: 14px; color: #856404; margin: 15px 0 10px;">📅 À prévoir prochainement</h3>
+                <ul class="wine-list">
+                    {% for wine in soon_wines[:3] %}
+                    <li class="wine-item">
+                        <div class="wine-name">
+                            {{ wine.name }}
+                            <span class="badge badge-soon">{{ wine.apogee }}</span>
+                        </div>
+                        <div class="wine-details">
+                            {% if wine.year %}{{ wine.year }} • {% endif %}
+                            {% if wine.region %}{{ wine.region }} • {% endif %}
+                            {{ wine.quantity }} bouteille{% if wine.quantity > 1 %}s{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="section">
+                <h2 class="section-title">🍾 Vins à consommer</h2>
+                <div class="empty-state">
+                    <p>Aucun vin n'atteint son apogée prochainement.</p>
+                    <p style="font-size: 12px;">Pensez à renseigner l'année d'apogée de vos vins pour recevoir des recommandations.</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>
+                Cet email a été envoyé automatiquement par Cave à Vin.<br>
+                Généré le {{ generated_at.strftime('%d/%m/%Y à %H:%M') }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

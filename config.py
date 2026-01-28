@@ -39,6 +39,25 @@ class Config:
     # Générer avec: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     SMTP_ENCRYPTION_KEY = os.environ.get('SMTP_ENCRYPTION_KEY')
     
+    # Configuration du Scheduler (tâches planifiées)
+    # Ces variables sont lues par app/scheduler.py
+    #
+    # SCHEDULER_WEEKLY_REPORT_ENABLED: Active/désactive le rapport hebdomadaire (1/0)
+    # SCHEDULER_WEEKLY_REPORT_DAY: Jour d'envoi (mon, tue, wed, thu, fri, sat, sun)
+    # SCHEDULER_WEEKLY_REPORT_HOUR: Heure d'envoi (0-23)
+    # SCHEDULER_WEEKLY_REPORT_MINUTE: Minute d'envoi (0-59)
+    #
+    # SCHEDULER_CLEANUP_ENABLED: Active/désactive le nettoyage automatique (1/0)
+    # SCHEDULER_CLEANUP_DAY: Jour de nettoyage (mon, tue, wed, thu, fri, sat, sun)
+    # SCHEDULER_CLEANUP_HOUR: Heure de nettoyage (0-23)
+    # SCHEDULER_CLEANUP_MINUTE: Minute de nettoyage (0-59)
+    #
+    # Exemple de configuration:
+    #   SCHEDULER_WEEKLY_REPORT_ENABLED=1
+    #   SCHEDULER_WEEKLY_REPORT_DAY=mon
+    #   SCHEDULER_WEEKLY_REPORT_HOUR=8
+    #   SCHEDULER_WEEKLY_REPORT_MINUTE=0
+    
     @staticmethod
     def get_default_admin_password():
         """Retourne le mot de passe admin par défaut depuis la configuration."""

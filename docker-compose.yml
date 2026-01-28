@@ -1,0 +1,65 @@
+# docker-compose.yml - Exemple de déploiement Cave à Vin avec Scheduler
+#
+# Ce fichier montre comment déployer l'application avec le scheduler
+# de tâches planifiées dans un environnement Docker.
+#
+# Usage:
+#   docker-compose up -d
+#
+# Pour construire les images:
+#   docker-compose build
+#
+# Pour voir les logs du scheduler:
+#   docker-compose logs -f scheduler
+
+services:
+  # Application principale (Gunicorn)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cave-vin-app
+    restart: unless-stopped
+    env_file: "./data/.env"
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////data/wine.db  
+      # Configuration cookies
+      - COOKIE_SECURE=${COOKIE_SECURE:-1}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Scheduler de tâches planifiées
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    container_name: cave-vin-scheduler
+    restart: unless-stopped
+    env_file: "./data/.env"
+    environment:
+      # Configuration obligatoire (même que l'app)
+      - DATABASE_URL=sqlite:////data/wine.db
+      
+      # Configuration du scheduler
+      # Rapport hebdomadaire: lundi à 8h00
+      - SCHEDULER_WEEKLY_REPORT_ENABLED=${SCHEDULER_WEEKLY_REPORT_ENABLED:-1}
+      - SCHEDULER_WEEKLY_REPORT_DAY=${SCHEDULER_WEEKLY_REPORT_DAY:-wed}
+      - SCHEDULER_WEEKLY_REPORT_HOUR=${SCHEDULER_WEEKLY_REPORT_HOUR:-10}
+      - SCHEDULER_WEEKLY_REPORT_MINUTE=${SCHEDULER_WEEKLY_REPORT_MINUTE:-56}
+      
+      # Nettoyage: dimanche à 3h00
+      - SCHEDULER_CLEANUP_ENABLED=${SCHEDULER_CLEANUP_ENABLED:-1}
+      - SCHEDULER_CLEANUP_DAY=${SCHEDULER_CLEANUP_DAY:-sun}
+      - SCHEDULER_CLEANUP_HOUR=${SCHEDULER_CLEANUP_HOUR:-3}
+      - SCHEDULER_CLEANUP_MINUTE=${SCHEDULER_CLEANUP_MINUTE:-0}
+    volumes:
+      - ./data:/data
+    depends_on:
+      - app

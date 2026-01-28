@@ -839,3 +839,188 @@ def test_push_notification(user_id: int):
         flash(f"Échec de l'envoi à {user.username} : {error_msg}", "warning")
     
     return redirect(url_for("admin.notifications"))
+
+
+# ============================================================================
+# Tâches planifiées
+# ============================================================================
+
+
+@admin_bp.route("/scheduled-tasks")
+@login_required
+@admin_required
+def scheduled_tasks():
+    """Interface d'administration pour les tâches planifiées."""
+    from services.email_service import is_email_configured
+    
+    # Récupérer les utilisateurs avec email pour les rapports
+    users_with_email = User.query.filter(
+        User.email.isnot(None),
+        User.parent_id.is_(None)  # Seulement les comptes principaux
+    ).order_by(User.username.asc()).all()
+    
+    # Statistiques des logs d'emails récents
+    from models import EmailLog
+    recent_reports = EmailLog.query.filter(
+        EmailLog.template_name == "weekly_report"
+    ).order_by(EmailLog.created_at.desc()).limit(20).all()
+    
+    # Compter les rapports envoyés ce mois
+    month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    reports_this_month = EmailLog.query.filter(
+        EmailLog.template_name == "weekly_report",
+        EmailLog.created_at >= month_start,
+        EmailLog.status == "sent"
+    ).count()
+    
+    return render_template(
+        "admin/scheduled_tasks.html",
+        users_with_email=users_with_email,
+        recent_reports=recent_reports,
+        reports_this_month=reports_this_month,
+        email_configured=is_email_configured(),
+    )
+
+
+@admin_bp.route("/scheduled-tasks/run-weekly-reports", methods=["POST"])
+@login_required
+@admin_required
+def run_weekly_reports():
+    """Déclencher manuellement l'envoi des rapports hebdomadaires."""
+    from services.email_service import is_email_configured
+    from app.scheduled_tasks import send_weekly_reports_to_all_users
+    
+    if not is_email_configured():
+        flash("L'envoi d'emails n'est pas configuré. Configurez d'abord un serveur SMTP.", "error")
+        return redirect(url_for("admin.scheduled_tasks"))
+    
+    # Exécuter la tâche
+    result = send_weekly_reports_to_all_users()
+    
+    # Logger l'action
+    ActivityLog.log(
+        user_id=current_user.id,
+        action="manual_weekly_reports",
+        entity_type="scheduled_task",
+        details={
+            "sent": result["sent"],
+            "failed": result["failed"],
+            "errors": result.get("errors", [])[:5],  # Limiter les erreurs loggées
+        },
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+    db.session.commit()
+    
+    # Afficher le résultat
+    if result["sent"] > 0:
+        flash(f"Rapports hebdomadaires envoyés avec succès à {result['sent']} utilisateur(s).", "success")
+    
+    if result["failed"] > 0:
+        flash(f"{result['failed']} envoi(s) ont échoué.", "warning")
+        for error in result.get("errors", [])[:3]:
+            flash(f"Erreur : {error}", "error")
+    
+    if result["sent"] == 0 and result["failed"] == 0:
+        flash("Aucun utilisateur avec email trouvé pour l'envoi des rapports.", "info")
+    
+    return redirect(url_for("admin.scheduled_tasks"))
+
+
+@admin_bp.route("/scheduled-tasks/run-weekly-report/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def run_weekly_report_for_user(user_id: int):
+    """Envoyer le rapport hebdomadaire à un utilisateur spécifique."""
+    from services.email_service import is_email_configured
+    from app.scheduled_tasks import send_weekly_report_to_user
+    
+    if not is_email_configured():
+        flash("L'envoi d'emails n'est pas configuré.", "error")
+        return redirect(url_for("admin.scheduled_tasks"))
+    
+    user = User.query.get_or_404(user_id)
+    
+    if not user.email:
+        flash(f"L'utilisateur {user.username} n'a pas d'adresse email.", "error")
+        return redirect(url_for("admin.scheduled_tasks"))
+    
+    # Exécuter la tâche
+    result = send_weekly_report_to_user(user_id)
+    
+    # Logger l'action
+    ActivityLog.log(
+        user_id=current_user.id,
+        action="manual_weekly_report_user",
+        entity_type="scheduled_task",
+        details={
+            "target_user_id": user_id,
+            "target_username": user.username,
+            "success": result["success"],
+            "error": result.get("error"),
+        },
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+    db.session.commit()
+    
+    if result["success"]:
+        flash(f"Rapport hebdomadaire envoyé à {user.username} ({user.email}).", "success")
+    else:
+        flash(f"Échec de l'envoi à {user.username} : {result.get('error', 'Erreur inconnue')}", "error")
+    
+    return redirect(url_for("admin.scheduled_tasks"))
+
+
+@admin_bp.route("/scheduled-tasks/preview-report/<int:user_id>")
+@login_required
+@admin_required
+def preview_weekly_report(user_id: int):
+    """Prévisualiser le rapport hebdomadaire d'un utilisateur."""
+    from app.scheduled_tasks import build_weekly_report_data, render_weekly_report_html
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Construire les données du rapport
+    report_data = build_weekly_report_data(user_id)
+    
+    if not report_data:
+        flash(f"Impossible de générer le rapport pour {user.username}.", "error")
+        return redirect(url_for("admin.scheduled_tasks"))
+    
+    # Générer le HTML
+    html_content = render_weekly_report_html(report_data)
+    
+    return html_content
+
+
+@admin_bp.route("/scheduled-tasks/run-cleanup", methods=["POST"])
+@login_required
+@admin_required
+def run_cleanup():
+    """Déclencher manuellement le nettoyage des anciennes données."""
+    from app.scheduled_tasks import run_all_cleanup_tasks
+    
+    # Exécuter la tâche
+    result = run_all_cleanup_tasks()
+    
+    # Logger l'action
+    ActivityLog.log(
+        user_id=current_user.id,
+        action="manual_cleanup",
+        entity_type="scheduled_task",
+        details=result,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+    db.session.commit()
+    
+    # Afficher le résultat
+    total_deleted = sum(result.values())
+    flash(
+        f"Nettoyage terminé : {total_deleted} enregistrements supprimés "
+        f"(emails: {result['email_logs']}, activité: {result['activity_logs']}, API: {result['api_usage_logs']}).",
+        "success"
+    )
+    
+    return redirect(url_for("admin.scheduled_tasks"))

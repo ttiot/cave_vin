@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Tâches planifiées - Administration{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-clock-history me-2"></i>Tâches planifiées
+        </h1>
+        <a href="{{ url_for('admin.manage_users') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Retour
+        </a>
+    </div>
+
+    {% if not email_configured %}
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+        <div>
+            <strong>Configuration SMTP requise</strong><br>
+            L'envoi d'emails n'est pas configuré. 
+            <a href="{{ url_for('smtp.index') }}" class="alert-link">Configurez un serveur SMTP</a> 
+            pour activer les rapports par email.
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Rapports hebdomadaires -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-envelope-paper me-2"></i>Rapports hebdomadaires
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Les rapports hebdomadaires sont envoyés automatiquement chaque semaine aux utilisateurs 
+                        ayant une adresse email. Ils contiennent un résumé de l'activité et les vins à consommer.
+                    </p>
+
+                    <!-- Actions globales -->
+                    <div class="d-flex gap-2 mb-4">
+                        <form action="{{ url_for('admin.run_weekly_reports') }}" method="post" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-primary" {% if not email_configured %}disabled{% endif %}
+                                    onclick="return confirm('Envoyer les rapports hebdomadaires à tous les utilisateurs ?')">
+                                <i class="bi bi-send me-1"></i>Envoyer à tous
+                            </button>
+                        </form>
+                        <span class="text-muted align-self-center">
+                            {{ users_with_email|length }} utilisateur(s) avec email
+                        </span>
+                    </div>
+
+                    <!-- Liste des utilisateurs -->
+                    {% if users_with_email %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Utilisateur</th>
+                                    <th>Email</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users_with_email %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ user.username }}</strong>
+                                        {% if user.is_admin %}
+                                        <span class="badge bg-danger ms-1">Admin</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <code>{{ user.email }}</code>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('admin.preview_weekly_report', user_id=user.id) }}" 
+                                               class="btn btn-outline-secondary" target="_blank"
+                                               title="Prévisualiser le rapport">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <form action="{{ url_for('admin.run_weekly_report_for_user', user_id=user.id) }}" 
+                                                  method="post" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-primary" 
+                                                        {% if not email_configured %}disabled{% endif %}
+                                                        title="Envoyer le rapport">
+                                                    <i class="bi bi-send"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        Aucun utilisateur avec adresse email.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Panneau latéral -->
+        <div class="col-lg-4">
+            <!-- Statistiques -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-graph-up me-2"></i>Statistiques
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Rapports ce mois</span>
+                        <strong>{{ reports_this_month }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Utilisateurs avec email</span>
+                        <strong>{{ users_with_email|length }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nettoyage -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-trash3 me-2"></i>Nettoyage des données
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Supprime les anciennes données pour maintenir les performances :
+                    </p>
+                    <ul class="small text-muted mb-3">
+                        <li>Logs d'emails > 90 jours</li>
+                        <li>Logs d'activité > 180 jours</li>
+                        <li>Logs API > 30 jours</li>
+                    </ul>
+                    <form action="{{ url_for('admin.run_cleanup') }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-warning w-100"
+                                onclick="return confirm('Lancer le nettoyage des anciennes données ?')">
+                            <i class="bi bi-trash3 me-1"></i>Lancer le nettoyage
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Historique récent -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Derniers rapports envoyés
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_reports %}
+                    <ul class="list-group list-group-flush">
+                        {% for log in recent_reports[:10] %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                            <div>
+                                <small class="text-muted d-block">
+                                    {{ log.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                </small>
+                                <span class="small">{{ log.recipient_email }}</span>
+                            </div>
+                            {% if log.status == 'sent' %}
+                            <span class="badge bg-success">Envoyé</span>
+                            {% elif log.status == 'failed' %}
+                            <span class="badge bg-danger" title="{{ log.error_message }}">Échec</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.status }}</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <small>Aucun rapport envoyé récemment</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information sur le scheduler -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <h6 class="card-title mb-0">
+                <i class="bi bi-info-circle me-2"></i>À propos du scheduler
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Exécution automatique</h6>
+                    <p class="text-muted small mb-0">
+                        Les tâches planifiées sont exécutées automatiquement par un process séparé (scheduler).
+                        Par défaut, les rapports hebdomadaires sont envoyés le <strong>lundi à 8h00</strong>
+                        et le nettoyage est effectué le <strong>dimanche à 3h00</strong>.
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <h6>Configuration</h6>
+                    <p class="text-muted small mb-0">
+                        Les horaires peuvent être modifiés via les variables d'environnement :
+                        <code>SCHEDULER_WEEKLY_REPORT_DAY</code>, <code>SCHEDULER_WEEKLY_REPORT_HOUR</code>, etc.
+                        Consultez la documentation pour plus de détails.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
