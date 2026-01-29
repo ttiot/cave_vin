@@ -73,11 +73,74 @@
     padding: 0.35rem 0.9rem;
     font-size: 0.8rem;
     font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border: 2px solid transparent;
+  }
+
+  .wine-highlight-chip:hover {
+    background: rgba(114, 47, 55, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .wine-highlight-chip.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
   }
 
   [data-theme="dark"] .wine-highlight-chip {
     background: rgba(139, 61, 71, 0.2);
     color: var(--accent-primary-light);
+  }
+
+  [data-theme="dark"] .wine-highlight-chip:hover {
+    background: rgba(139, 61, 71, 0.35);
+  }
+
+  [data-theme="dark"] .wine-highlight-chip.active {
+    background: var(--accent-primary-light);
+    color: #1f2933;
+  }
+
+  .origin-chip {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border: 2px solid transparent !important;
+  }
+
+  .origin-chip:hover {
+    background: rgba(33, 37, 41, 0.15) !important;
+    transform: translateY(-1px);
+  }
+
+  .origin-chip.active {
+    background: var(--accent-primary) !important;
+    color: #fff !important;
+    border-color: var(--accent-primary) !important;
+  }
+
+  [data-theme="dark"] .origin-chip.active {
+    background: var(--accent-primary-light) !important;
+    color: #1f2933 !important;
+  }
+
+  .filter-reset-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: none;
+  }
+
+  .filter-reset-btn.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .wine-card-hidden {
+    display: none !important;
   }
 
   @media (max-width: 767.98px) {
@@ -179,32 +242,45 @@
         </div>
 
         {% if panel.subcategory_labels %}
-        <div class="mb-3">
-          <span class="text-uppercase text-muted small d-block mb-2">Styles en cave</span>
-          <div class="d-flex flex-wrap gap-2">
+        <div class="mb-3 filter-section" data-cellar-id="{{ panel.cellar.id }}">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="text-uppercase text-muted small">Styles en cave</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary filter-reset-btn" data-filter-type="style" data-cellar-id="{{ panel.cellar.id }}">
+              <i class="bi bi-x-lg me-1"></i>Réinitialiser
+            </button>
+          </div>
+          <div class="d-flex flex-wrap gap-2 style-filters" data-cellar-id="{{ panel.cellar.id }}">
             {% for label in panel.subcategory_labels %}
-            <span class="wine-highlight-chip">{{ label }}</span>
+            <span class="wine-highlight-chip" data-filter-style="{{ label }}" data-cellar-id="{{ panel.cellar.id }}">{{ label }}</span>
             {% endfor %}
           </div>
         </div>
         {% endif %}
 
         {% if panel.region_labels %}
-        <div class="mb-4">
-          <span class="text-uppercase text-muted small d-block mb-2">Origines</span>
-          <div class="d-flex flex-wrap gap-2">
+        <div class="mb-4 filter-section" data-cellar-id="{{ panel.cellar.id }}">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="text-uppercase text-muted small">Origines</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary filter-reset-btn" data-filter-type="origin" data-cellar-id="{{ panel.cellar.id }}">
+              <i class="bi bi-x-lg me-1"></i>Réinitialiser
+            </button>
+          </div>
+          <div class="d-flex flex-wrap gap-2 origin-filters" data-cellar-id="{{ panel.cellar.id }}">
             {% for label in panel.region_labels %}
-            <span class="badge rounded-pill text-bg-light text-dark border">{{ label }}</span>
+            <span class="badge rounded-pill text-bg-light text-dark border origin-chip" data-filter-origin="{{ label }}" data-cellar-id="{{ panel.cellar.id }}">{{ label }}</span>
             {% endfor %}
           </div>
         </div>
         {% endif %}
 
         {% if panel.wines %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 wine-cards-container" data-cellar-id="{{ panel.cellar.id }}">
           {% for wine in panel.wines %}
           {% set extras = wine.extra_attributes or {} %}
-          <div class="col">
+          <div class="col wine-card-col"
+               data-wine-style="{{ wine.subcategory.name if wine.subcategory else '' }}"
+               data-wine-origin="{{ extras.region or '' }}"
+               data-cellar-id="{{ panel.cellar.id }}">
             <div class="wine-card-modern animate-in"
                  data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
                  data-wine-preview='{{ wine.preview_insights()|tojson }}'>
@@ -313,4 +389,174 @@
     {% endfor %}
   </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // État des filtres par cave - utilise des Sets pour permettre la sélection multiple
+  const filterState = {};
+  
+  // Initialiser l'état pour chaque cave
+  document.querySelectorAll('.wine-cards-container').forEach(container => {
+    const cellarId = container.dataset.cellarId;
+    filterState[cellarId] = {
+      styles: new Set(),  // Plusieurs styles possibles
+      origins: new Set()  // Plusieurs origines possibles
+    };
+  });
+  
+  // Fonction pour appliquer les filtres
+  function applyFilters(cellarId) {
+    const state = filterState[cellarId];
+    const container = document.querySelector(`.wine-cards-container[data-cellar-id="${cellarId}"]`);
+    if (!container) return;
+    
+    const cards = container.querySelectorAll('.wine-card-col');
+    const originFilters = document.querySelector(`.origin-filters[data-cellar-id="${cellarId}"]`);
+    
+    // Collecter les origines visibles basées sur les filtres de style actifs
+    const visibleOrigins = new Set();
+    
+    cards.forEach(card => {
+      const cardStyle = card.dataset.wineStyle || '';
+      const cardOrigin = card.dataset.wineOrigin || '';
+      
+      // Vérifier si la carte correspond aux filtres
+      // Si aucun style sélectionné, tous les styles passent
+      // Si des styles sont sélectionnés, le style de la carte doit être dans la liste
+      const matchesStyle = state.styles.size === 0 || state.styles.has(cardStyle);
+      const matchesOrigin = state.origins.size === 0 || state.origins.has(cardOrigin);
+      
+      if (matchesStyle && matchesOrigin) {
+        card.classList.remove('wine-card-hidden');
+      } else {
+        card.classList.add('wine-card-hidden');
+      }
+      
+      // Collecter les origines des cartes qui correspondent aux filtres de style
+      if (matchesStyle && cardOrigin) {
+        visibleOrigins.add(cardOrigin);
+      }
+    });
+    
+    // Mettre à jour la visibilité des chips d'origine basée sur les filtres de style
+    if (originFilters && state.styles.size > 0) {
+      originFilters.querySelectorAll('.origin-chip').forEach(chip => {
+        const origin = chip.dataset.filterOrigin;
+        if (visibleOrigins.has(origin)) {
+          chip.style.display = '';
+        } else {
+          // Masquer le chip mais aussi le désélectionner s'il était actif
+          chip.style.display = 'none';
+          if (state.origins.has(origin)) {
+            state.origins.delete(origin);
+            chip.classList.remove('active');
+          }
+        }
+      });
+    } else if (originFilters) {
+      // Réafficher tous les chips d'origine si pas de filtre de style
+      originFilters.querySelectorAll('.origin-chip').forEach(chip => {
+        chip.style.display = '';
+      });
+    }
+    
+    // Mettre à jour les boutons de réinitialisation
+    const styleResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="style"][data-cellar-id="${cellarId}"]`);
+    const originResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="origin"][data-cellar-id="${cellarId}"]`);
+    
+    if (styleResetBtn) {
+      styleResetBtn.classList.toggle('visible', state.styles.size > 0);
+    }
+    if (originResetBtn) {
+      originResetBtn.classList.toggle('visible', state.origins.size > 0);
+    }
+    
+    // Mettre à jour le compteur de filtres actifs (optionnel, pour feedback visuel)
+    updateFilterCount(cellarId, state);
+  }
+  
+  // Fonction pour mettre à jour le compteur de filtres (feedback visuel)
+  function updateFilterCount(cellarId, state) {
+    const styleResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="style"][data-cellar-id="${cellarId}"]`);
+    const originResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="origin"][data-cellar-id="${cellarId}"]`);
+    
+    if (styleResetBtn && state.styles.size > 0) {
+      styleResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser (${state.styles.size})`;
+    } else if (styleResetBtn) {
+      styleResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser`;
+    }
+    
+    if (originResetBtn && state.origins.size > 0) {
+      originResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser (${state.origins.size})`;
+    } else if (originResetBtn) {
+      originResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser`;
+    }
+  }
+  
+  // Gestionnaire de clic sur les filtres de style (sélection multiple)
+  document.querySelectorAll('.wine-highlight-chip[data-filter-style]').forEach(chip => {
+    chip.addEventListener('click', function() {
+      const cellarId = this.dataset.cellarId;
+      const style = this.dataset.filterStyle;
+      const state = filterState[cellarId];
+      
+      // Toggle le filtre dans le Set
+      if (state.styles.has(style)) {
+        state.styles.delete(style);
+        this.classList.remove('active');
+      } else {
+        state.styles.add(style);
+        this.classList.add('active');
+      }
+      
+      applyFilters(cellarId);
+    });
+  });
+  
+  // Gestionnaire de clic sur les filtres d'origine (sélection multiple)
+  document.querySelectorAll('.origin-chip[data-filter-origin]').forEach(chip => {
+    chip.addEventListener('click', function() {
+      const cellarId = this.dataset.cellarId;
+      const origin = this.dataset.filterOrigin;
+      const state = filterState[cellarId];
+      
+      // Toggle le filtre dans le Set
+      if (state.origins.has(origin)) {
+        state.origins.delete(origin);
+        this.classList.remove('active');
+      } else {
+        state.origins.add(origin);
+        this.classList.add('active');
+      }
+      
+      applyFilters(cellarId);
+    });
+  });
+  
+  // Gestionnaire de clic sur les boutons de réinitialisation
+  document.querySelectorAll('.filter-reset-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const cellarId = this.dataset.cellarId;
+      const filterType = this.dataset.filterType;
+      const state = filterState[cellarId];
+      
+      if (filterType === 'style') {
+        state.styles.clear();
+        document.querySelectorAll(`.wine-highlight-chip[data-cellar-id="${cellarId}"]`).forEach(c => {
+          c.classList.remove('active');
+        });
+      } else if (filterType === 'origin') {
+        state.origins.clear();
+        document.querySelectorAll(`.origin-chip[data-cellar-id="${cellarId}"]`).forEach(c => {
+          c.classList.remove('active');
+        });
+      }
+      
+      applyFilters(cellarId);
+    });
+  });
+});
+</script>
 {% endblock %}
