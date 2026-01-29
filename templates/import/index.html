@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col">
+      <h3 class="d-flex align-items-center">
+        <i class="bi bi-camera me-2"></i>
+        Import par photo
+      </h3>
+      <p class="text-muted">
+        Prenez une photo de vos bouteilles et laissez l'IA les identifier automatiquement.
+      </p>
+    </div>
+  </div>
+
+  {% if not detection_results %}
+  <!-- Section Upload -->
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <i class="bi bi-upload me-2"></i>Étape 1 : Télécharger une photo
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('import.analyze_image') }}" enctype="multipart/form-data" id="upload-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            
+            <div class="mb-4">
+              <div class="upload-zone p-5 border border-2 border-dashed rounded text-center" id="upload-zone">
+                <i class="bi bi-cloud-arrow-up display-1 text-muted"></i>
+                <p class="mt-3 mb-2">Glissez-déposez une image ici</p>
+                <p class="text-muted small">ou</p>
+                <label class="btn btn-outline-primary">
+                  <i class="bi bi-folder2-open me-2"></i>Parcourir
+                  <input type="file" name="image" id="image-input" accept="image/*" class="d-none" required>
+                </label>
+                <p class="text-muted small mt-3">
+                  Formats acceptés : JPG, PNG, WebP • Taille max : 10 Mo
+                </p>
+              </div>
+            </div>
+            
+            <!-- Aperçu de l'image -->
+            <div id="preview-container" class="mb-4" style="display: none;">
+              <div class="card">
+                <div class="card-body text-center">
+                  <img id="preview-image" src="" alt="Aperçu" class="img-fluid rounded" style="max-height: 400px;">
+                  <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="clear-preview">
+                    <i class="bi bi-x-lg me-1"></i>Supprimer
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary btn-lg" id="analyze-btn" disabled>
+                <i class="bi bi-magic me-2"></i>Analyser l'image
+              </button>
+            </div>
+          </form>
+          
+          <div class="alert alert-info mt-4 mb-0">
+            <i class="bi bi-lightbulb me-2"></i>
+            <strong>Conseils pour de meilleurs résultats :</strong>
+            <ul class="mb-0 mt-2">
+              <li>Prenez la photo dans un endroit bien éclairé</li>
+              <li>Assurez-vous que les étiquettes sont visibles et lisibles</li>
+              <li>Évitez les reflets sur les bouteilles</li>
+              <li>Vous pouvez photographier plusieurs bouteilles à la fois</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  {% else %}
+  <!-- Formulaire caché pour annuler/nouvelle analyse (en dehors du formulaire principal) -->
+  <form method="POST" action="{{ url_for('import.clear_results') }}" id="clear-results-form" style="display: none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  </form>
+  
+  <!-- Section Résultats -->
+  <form method="POST" action="{{ url_for('import.validate_import') }}" id="import-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="bottle_count" value="{{ detection_results.bottles|length }}"/>
+    
+    <div class="row">
+      <!-- Colonne résumé -->
+      <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm sticky-top" style="top: 80px;">
+          <div class="card-header bg-success text-white">
+            <i class="bi bi-check-circle me-2"></i>Analyse terminée
+          </div>
+          <div class="card-body text-center">
+            <div class="display-4 text-success mb-2">
+              <i class="bi bi-wine"></i>
+            </div>
+            <h4 class="mb-1">{{ detection_results.total_bottles }} bouteille(s)</h4>
+            <p class="text-muted mb-0">détectée(s) en {{ detection_results.processing_time_ms }}ms</p>
+          </div>
+          <div class="card-footer">
+            <p class="small text-muted mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              Vérifiez les informations ci-contre et modifiez-les si nécessaire avant de valider l'import.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Bouton nouvelle analyse -->
+        <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="new-analysis-btn">
+          <i class="bi bi-arrow-repeat me-2"></i>Nouvelle analyse
+        </button>
+      </div>
+      
+      <!-- Colonne bouteilles détectées -->
+      <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <span>
+              <i class="bi bi-list-check me-2"></i>Étape 2 : Vérifier et modifier
+            </span>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="checkbox" id="select-all" checked>
+              <label class="form-check-label text-white" for="select-all">Tout sélectionner</label>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Cave par défaut -->
+            <div class="mb-4 p-3 bg-light rounded">
+              <label class="form-label fw-bold">
+                <i class="bi bi-box-seam me-2"></i>Cave par défaut pour l'import
+              </label>
+              <select class="form-select" name="default_cellar_id" id="default-cellar">
+                <option value="">-- Sélectionner pour chaque bouteille --</option>
+                {% for cellar in cellars %}
+                <option value="{{ cellar.id }}" {% if default_cellar_id == cellar.id %}selected{% endif %}>
+                  {{ cellar.name }}{% if cellar.category %} — {{ cellar.category.name }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">
+                Cette cave sera utilisée pour toutes les bouteilles qui n'ont pas de cave spécifique.
+              </div>
+            </div>
+            
+            <!-- Liste des bouteilles -->
+            <div class="accordion" id="bottles-accordion">
+              {% for bottle in detection_results.bottles %}
+              <div class="accordion-item bottle-item" data-index="{{ loop.index0 }}">
+                <h2 class="accordion-header">
+                  <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
+                          data-bs-toggle="collapse" data-bs-target="#bottle-{{ loop.index0 }}">
+                    <div class="d-flex align-items-center w-100 me-3">
+                      <div class="form-check me-3" onclick="event.stopPropagation();">
+                        <input class="form-check-input bottle-checkbox" type="checkbox" 
+                               name="bottle_{{ loop.index0 }}_selected" value="1" checked
+                               id="check-{{ loop.index0 }}">
+                      </div>
+                      <div class="flex-grow-1">
+                        <strong class="bottle-name">{{ bottle.name }}</strong>
+                        {% if bottle.year %}
+                        <span class="badge bg-secondary ms-2">{{ bottle.year }}</span>
+                        {% endif %}
+                        {% if bottle.alcohol_type %}
+                        <span class="badge bg-info ms-1">{{ bottle.alcohol_type }}</span>
+                        {% endif %}
+                      </div>
+                      <div class="text-end">
+                        <span class="badge bg-primary">x{{ bottle.quantity }}</span>
+                        {% if bottle.confidence >= 0.8 %}
+                        <span class="badge bg-success ms-1" title="Confiance élevée">
+                          <i class="bi bi-check-circle"></i> {{ (bottle.confidence * 100)|int }}%
+                        </span>
+                        {% elif bottle.confidence >= 0.5 %}
+                        <span class="badge bg-warning text-dark ms-1" title="Confiance moyenne">
+                          <i class="bi bi-exclamation-circle"></i> {{ (bottle.confidence * 100)|int }}%
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger ms-1" title="Confiance faible - vérifiez les informations">
+                          <i class="bi bi-question-circle"></i> {{ (bottle.confidence * 100)|int }}%
+                        </span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </button>
+                </h2>
+                {% set bottle_idx = loop.index0 %}
+                <div id="bottle-{{ bottle_idx }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}">
+                  <div class="accordion-body">
+                    {% if bottle.existing_bottles and bottle.existing_bottles|length > 0 %}
+                    <!-- Alerte bouteilles existantes -->
+                    <div class="alert alert-warning mb-3">
+                      <div class="d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                        <div class="flex-grow-1">
+                          <strong>Bouteille(s) similaire(s) trouvée(s) dans votre cave !</strong>
+                          <p class="mb-2 small">Vous pouvez ajouter la quantité à une bouteille existante ou créer une nouvelle entrée.</p>
+                          
+                          <div class="existing-bottles-list">
+                            {% for existing in bottle.existing_bottles %}
+                            <div class="form-check mb-2">
+                              <input class="form-check-input existing-bottle-radio" type="radio"
+                                     name="bottle_{{ bottle_idx }}_add_to_existing"
+                                     value="{{ existing.id }}"
+                                     id="existing-{{ bottle_idx }}-{{ existing.id }}">
+                              <label class="form-check-label" for="existing-{{ bottle_idx }}-{{ existing.id }}">
+                                <span class="fw-semibold">{{ existing.name }}</span>
+                                <span class="badge bg-secondary ms-1">{{ existing.quantity }} en stock</span>
+                                {% if existing.cellar_name %}
+                                <span class="badge bg-info ms-1">{{ existing.cellar_name }}</span>
+                                {% endif %}
+                                {% if existing.year %}
+                                <span class="text-muted small ms-1">({{ existing.year }})</span>
+                                {% endif %}
+                              </label>
+                            </div>
+                            {% endfor %}
+                            <div class="form-check">
+                              <input class="form-check-input existing-bottle-radio" type="radio"
+                                     name="bottle_{{ bottle_idx }}_add_to_existing"
+                                     value=""
+                                     id="existing-{{ bottle_idx }}-new" checked>
+                              <label class="form-check-label" for="existing-{{ bottle_idx }}-new">
+                                <i class="bi bi-plus-circle me-1"></i>
+                                <span class="fw-semibold">Créer une nouvelle entrée</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row g-3 new-bottle-fields" data-bottle-index="{{ bottle_idx }}">
+                      <!-- Nom -->
+                      <div class="col-md-8">
+                        <label class="form-label">Nom <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control bottle-name-input"
+                               name="bottle_{{ bottle_idx }}_name"
+                               value="{{ bottle.name }}" required>
+                      </div>
+                      
+                      <!-- Quantité -->
+                      <div class="col-md-4">
+                        <label class="form-label">Quantité</label>
+                        <input type="number" class="form-control"
+                               name="bottle_{{ bottle_idx }}_quantity"
+                               value="{{ bottle.quantity }}" min="1">
+                      </div>
+                      
+                      <!-- Type d'alcool -->
+                      <div class="col-md-6">
+                        <label class="form-label">Type d'alcool</label>
+                        <select class="form-select" name="bottle_{{ bottle_idx }}_subcategory_id">
+                          <option value="">Non spécifié</option>
+                          {% for category in categories %}
+                          <optgroup label="{{ category.name }}">
+                            {% for subcategory in category.subcategories %}
+                            <option value="{{ subcategory.id }}"
+                                    {% if bottle.matched_subcategory_id == subcategory.id %}selected{% endif %}>
+                              {{ subcategory.name }}
+                            </option>
+                            {% endfor %}
+                          </optgroup>
+                          {% endfor %}
+                        </select>
+                        {% if bottle.alcohol_type and not bottle.matched_subcategory_id %}
+                        <div class="form-text text-warning">
+                          <i class="bi bi-exclamation-triangle me-1"></i>
+                          Type détecté "{{ bottle.alcohol_type }}" non reconnu
+                        </div>
+                        {% endif %}
+                      </div>
+                      
+                      <!-- Cave -->
+                      <div class="col-md-6">
+                        <label class="form-label">Cave</label>
+                        <select class="form-select cellar-select" name="bottle_{{ bottle_idx }}_cellar_id">
+                          <option value="">-- Utiliser la cave par défaut --</option>
+                          {% for cellar in cellars %}
+                          <option value="{{ cellar.id }}">
+                            {{ cellar.name }}{% if cellar.category %} — {{ cellar.category.name }}{% endif %}
+                          </option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      
+                      <!-- Année -->
+                      <div class="col-md-3">
+                        <label class="form-label">Année</label>
+                        <input type="number" class="form-control"
+                               name="bottle_{{ bottle_idx }}_year"
+                               value="{{ bottle.year or '' }}"
+                               min="1000" max="3000">
+                      </div>
+                      
+                      <!-- Région -->
+                      <div class="col-md-5">
+                        <label class="form-label">Région</label>
+                        <input type="text" class="form-control"
+                               name="bottle_{{ bottle_idx }}_region"
+                               value="{{ bottle.region or '' }}"
+                               placeholder="Bordeaux, Bourgogne...">
+                      </div>
+                      
+                      <!-- Cépage -->
+                      <div class="col-md-4">
+                        <label class="form-label">Cépage</label>
+                        <input type="text" class="form-control"
+                               name="bottle_{{ bottle_idx }}_grape"
+                               value="{{ bottle.grape or '' }}"
+                               placeholder="Merlot, Pinot Noir...">
+                      </div>
+                      
+                      <!-- Contenance -->
+                      <div class="col-md-3">
+                        <label class="form-label">Contenance (mL)</label>
+                        <input type="number" class="form-control"
+                               name="bottle_{{ bottle_idx }}_volume_ml"
+                               value="{{ bottle.volume_ml or '' }}"
+                               min="10" step="10"
+                               placeholder="750">
+                      </div>
+                      
+                      <!-- Description -->
+                      <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control"
+                                  name="bottle_{{ bottle_idx }}_description"
+                                  rows="2"
+                                  placeholder="Notes personnelles...">{{ bottle.description or '' }}</textarea>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Boutons d'action -->
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <span class="text-muted">
+                  <span id="selected-count">{{ detection_results.bottles|length }}</span> bouteille(s) sélectionnée(s)
+                </span>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="cancel-import-btn">
+                  <i class="bi bi-x-lg me-2"></i>Annuler
+                </button>
+                <button type="submit" class="btn btn-success btn-lg">
+                  <i class="bi bi-check-lg me-2"></i>Importer les bouteilles
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Loading overlay pour l'analyse -->
+<div class="loading-overlay" id="loading-overlay" style="display: none;">
+  <div class="text-center">
+    <div class="spinner-border text-primary mb-3" role="status">
+      <span class="visually-hidden">Chargement...</span>
+    </div>
+    <h4 class="mb-2">Analyse en cours...</h4>
+    <p class="text-muted mb-3">L'IA examine votre photo pour identifier les bouteilles</p>
+    <div class="progress mb-2">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+           style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    <p class="small text-muted" id="loading-status">Envoi de l'image...</p>
+  </div>
+</div>
+
+<style>
+.upload-zone {
+  background-color: var(--bs-light);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+  background-color: rgba(var(--bs-primary-rgb), 0.1);
+  border-color: var(--bs-primary) !important;
+}
+
+.upload-zone.dragover {
+  transform: scale(1.02);
+}
+
+.bottle-item.disabled {
+  opacity: 0.5;
+}
+
+.bottle-item.disabled .accordion-body {
+  pointer-events: none;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: rgba(var(--bs-success-rgb), 0.1);
+}
+
+/* Styles pour les bouteilles existantes */
+.existing-bottles-list {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+}
+
+.existing-bottles-list .form-check {
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s;
+}
+
+.existing-bottles-list .form-check:hover {
+  background-color: rgba(var(--bs-warning-rgb), 0.1);
+}
+
+.existing-bottles-list .form-check-input:checked + .form-check-label {
+  font-weight: 500;
+}
+
+.new-bottle-fields.fields-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.new-bottle-fields.fields-disabled::before {
+  content: "Les champs ci-dessous ne seront pas utilisés car vous ajoutez à une bouteille existante";
+  display: block;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  background-color: var(--bs-light);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--bs-secondary);
+  text-align: center;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  flex-direction: column;
+}
+
+.loading-overlay .spinner-border {
+  width: 4rem;
+  height: 4rem;
+}
+
+.loading-overlay .progress {
+  width: 300px;
+  height: 8px;
+}
+</style>
+
+<script>
+(function() {
+  // Gestion du loading overlay
+  const loadingOverlay = document.getElementById('loading-overlay');
+  const loadingStatus = document.getElementById('loading-status');
+  const uploadForm = document.getElementById('upload-form');
+  
+  if (uploadForm && loadingOverlay) {
+    uploadForm.addEventListener('submit', function(e) {
+      // Afficher l'overlay
+      loadingOverlay.style.display = 'flex';
+      
+      // Simuler les étapes de progression
+      const steps = [
+        { text: 'Envoi de l\'image...', delay: 0 },
+        { text: 'Analyse de l\'image par l\'IA...', delay: 2000 },
+        { text: 'Identification des bouteilles...', delay: 5000 },
+        { text: 'Extraction des informations...', delay: 10000 },
+        { text: 'Finalisation...', delay: 15000 }
+      ];
+      
+      steps.forEach(step => {
+        setTimeout(() => {
+          if (loadingStatus) {
+            loadingStatus.textContent = step.text;
+          }
+        }, step.delay);
+      });
+    });
+  }
+  
+  // Gestion du drag & drop
+  const uploadZone = document.getElementById('upload-zone');
+  const imageInput = document.getElementById('image-input');
+  const previewContainer = document.getElementById('preview-container');
+  const previewImage = document.getElementById('preview-image');
+  const clearPreview = document.getElementById('clear-preview');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  
+  if (uploadZone && imageInput) {
+    // Clic sur la zone
+    uploadZone.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        imageInput.click();
+      }
+    });
+    
+    // Drag & drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, () => {
+        uploadZone.classList.add('dragover');
+      });
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+      uploadZone.addEventListener(eventName, () => {
+        uploadZone.classList.remove('dragover');
+      });
+    });
+    
+    uploadZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        imageInput.files = files;
+        showPreview(files[0]);
+      }
+    });
+    
+    // Changement de fichier
+    imageInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        showPreview(e.target.files[0]);
+      }
+    });
+    
+    // Effacer l'aperçu
+    if (clearPreview) {
+      clearPreview.addEventListener('click', () => {
+        imageInput.value = '';
+        previewContainer.style.display = 'none';
+        analyzeBtn.disabled = true;
+      });
+    }
+    
+    function showPreview(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        previewImage.src = e.target.result;
+        previewContainer.style.display = 'block';
+        analyzeBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+  
+  // Gestion des checkboxes de sélection
+  const selectAll = document.getElementById('select-all');
+  const bottleCheckboxes = document.querySelectorAll('.bottle-checkbox');
+  const selectedCount = document.getElementById('selected-count');
+  
+  if (selectAll && bottleCheckboxes.length > 0) {
+    selectAll.addEventListener('change', () => {
+      bottleCheckboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+        updateBottleState(cb);
+      });
+      updateSelectedCount();
+    });
+    
+    bottleCheckboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        updateBottleState(cb);
+        updateSelectedCount();
+        
+        // Mettre à jour "Tout sélectionner"
+        const allChecked = Array.from(bottleCheckboxes).every(c => c.checked);
+        const noneChecked = Array.from(bottleCheckboxes).every(c => !c.checked);
+        selectAll.checked = allChecked;
+        selectAll.indeterminate = !allChecked && !noneChecked;
+      });
+    });
+  }
+  
+  function updateBottleState(checkbox) {
+    const item = checkbox.closest('.bottle-item');
+    if (item) {
+      item.classList.toggle('disabled', !checkbox.checked);
+    }
+  }
+  
+  function updateSelectedCount() {
+    if (selectedCount) {
+      const count = Array.from(bottleCheckboxes).filter(cb => cb.checked).length;
+      selectedCount.textContent = count;
+    }
+  }
+  
+  // Synchroniser le nom dans l'en-tête de l'accordéon
+  document.querySelectorAll('.bottle-name-input').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const item = e.target.closest('.bottle-item');
+      if (item) {
+        const nameSpan = item.querySelector('.bottle-name');
+        if (nameSpan) {
+          nameSpan.textContent = e.target.value || 'Sans nom';
+        }
+      }
+    });
+  });
+  
+  // Appliquer la cave par défaut aux sélecteurs vides
+  const defaultCellar = document.getElementById('default-cellar');
+  if (defaultCellar) {
+    defaultCellar.addEventListener('change', () => {
+      // Optionnel : mettre à jour visuellement les caves non sélectionnées
+    });
+  }
+  
+  // Gestion des bouteilles existantes (doublons)
+  document.querySelectorAll('.existing-bottle-radio').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const accordionBody = e.target.closest('.accordion-body');
+      if (!accordionBody) return;
+      
+      const fieldsContainer = accordionBody.querySelector('.new-bottle-fields');
+      if (!fieldsContainer) return;
+      
+      // Si une bouteille existante est sélectionnée (valeur non vide), désactiver les champs
+      if (e.target.value) {
+        fieldsContainer.classList.add('fields-disabled');
+      } else {
+        fieldsContainer.classList.remove('fields-disabled');
+      }
+    });
+  });
+  
+  // Initialiser l'état des champs au chargement
+  document.querySelectorAll('.existing-bottles-list').forEach(list => {
+    const checkedRadio = list.querySelector('.existing-bottle-radio:checked');
+    if (checkedRadio && checkedRadio.value) {
+      const accordionBody = list.closest('.accordion-body');
+      const fieldsContainer = accordionBody?.querySelector('.new-bottle-fields');
+      if (fieldsContainer) {
+        fieldsContainer.classList.add('fields-disabled');
+      }
+    }
+  });
+  
+  // Gestion du bouton Annuler et Nouvelle analyse
+  const cancelBtn = document.getElementById('cancel-import-btn');
+  const newAnalysisBtn = document.getElementById('new-analysis-btn');
+  const clearForm = document.getElementById('clear-results-form');
+  
+  if (clearForm) {
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        clearForm.submit();
+      });
+    }
+    if (newAnalysisBtn) {
+      newAnalysisBtn.addEventListener('click', () => {
+        clearForm.submit();
+      });
+    }
+  }
+})();
+</script>
+{% endblock %}
