@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 import requests
 from PIL import Image
 
-from models import (
+from app.models import (
     AlcoholCategory,
     AlcoholFieldRequirement,
     AlcoholSubcategory,

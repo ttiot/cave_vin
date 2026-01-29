@@ -16,7 +16,7 @@ from flask import (
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
-from models import SMTPConfig, EmailLog, User, db
+from app.models import SMTPConfig, EmailLog, User, db
 from app.utils.decorators import admin_required
 from services.email_service import test_smtp_connection, send_test_email, is_email_configured
 

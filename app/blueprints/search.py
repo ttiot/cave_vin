@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
-from models import Wine, AlcoholCategory, WineInsight, db
+from app.models import Wine, AlcoholCategory, WineInsight, db
 
 
 search_bp = Blueprint('search', __name__, url_prefix='/search')

@@ -13,12 +13,12 @@ from typing import TYPE_CHECKING
 from flask import current_app, render_template
 
 if TYPE_CHECKING:
-    from models import SMTPConfig, User
+    from app.models import SMTPConfig, User
 
 
 def get_smtp_config() -> "SMTPConfig | None":
     """Récupère la configuration SMTP active."""
-    from models import SMTPConfig
+    from app.models import SMTPConfig
     return SMTPConfig.get_active()
 
 
@@ -70,7 +70,7 @@ def send_email(
     Returns:
         dict avec les clés 'success', 'error' (si échec)
     """
-    from models import EmailLog, db
+    from app.models import EmailLog, db
     
     if config is None:
         config = get_smtp_config()
@@ -151,7 +151,7 @@ def test_smtp_connection(config: "SMTPConfig") -> dict:
     Returns:
         dict avec les clés 'success', 'error' (si échec)
     """
-    from models import db
+    from app.models import db
     
     try:
         with create_smtp_connection(config) as server:
@@ -325,7 +325,7 @@ def send_email_to_users_with_email(
     Returns:
         dict avec les clés 'sent', 'failed', 'errors'
     """
-    from models import User
+    from app.models import User
     
     query = User.query.filter(User.email.isnot(None))
     if user_ids:

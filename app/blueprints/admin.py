@@ -19,7 +19,7 @@ from flask_login import login_required, current_user, login_user
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 
-from models import User, Wine, Cellar, WineConsumption, ActivityLog, UserSettings, PushSubscription, db
+from app.models import User, Wine, Cellar, WineConsumption, ActivityLog, UserSettings, PushSubscription, db
 from app.utils.decorators import admin_required
 
 
@@ -550,7 +550,7 @@ def global_statistics():
         })
     
     # Répartition par catégorie (global)
-    from models import AlcoholSubcategory
+    from app.models import AlcoholSubcategory
     category_distribution_rows = db.session.query(
         AlcoholSubcategory.name,
         func.sum(Wine.quantity).label("total")
@@ -860,7 +860,7 @@ def scheduled_tasks():
     ).order_by(User.username.asc()).all()
     
     # Statistiques des logs d'emails récents
-    from models import EmailLog
+    from app.models import EmailLog
     recent_reports = EmailLog.query.filter(
         EmailLog.template_name == "weekly_report"
     ).order_by(EmailLog.created_at.desc()).limit(20).all()

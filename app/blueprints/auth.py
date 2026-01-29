@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import User, db
+from app.models import User, db
 
 
 auth_bp = Blueprint('auth', __name__)

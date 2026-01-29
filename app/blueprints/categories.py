@@ -4,7 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from sqlalchemy.orm import selectinload
 
-from models import (
+from app.models import (
     AlcoholCategory,
     AlcoholSubcategory,
     AlcoholFieldRequirement,

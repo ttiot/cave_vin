@@ -11,7 +11,7 @@ from flask import Blueprint, flash, redirect, render_template, request, send_fro
 from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 
-from models import AlcoholSubcategory, Cellar, Wine, WineConsumption, db
+from app.models import AlcoholSubcategory, Cellar, Wine, WineConsumption, db
 from app.utils.formatters import resolve_redirect
 
 

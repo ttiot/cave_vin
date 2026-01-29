@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Dict, Iterable, List
 
-from models import BottleFieldDefinition
+from app.models import BottleFieldDefinition
 
 
 # ---------------------------------------------------------------------------

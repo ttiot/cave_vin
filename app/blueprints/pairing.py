@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, flash, current_app, jsoni
 from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 
-from models import Wine, AlcoholSubcategory, db
+from app.models import Wine, AlcoholSubcategory, db
 from services.wine_pairing_service import WinePairingService
 
 pairing_bp = Blueprint("pairing", __name__, url_prefix="/conseils")

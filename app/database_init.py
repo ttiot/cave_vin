@@ -5,7 +5,7 @@ from typing import Iterable
 
 from sqlalchemy import func, inspect, text
 
-from models import (
+from app.models import (
     ActivityLog,
     AlcoholCategory,
     AlcoholFieldRequirement,

@@ -3,7 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 
-from models import Cellar, CellarCategory, CellarFloor, User, db
+from app.models import Cellar, CellarCategory, CellarFloor, User, db
 from services.push_notification_service import notify_cellar_created, notify_cellar_deleted
 
 
