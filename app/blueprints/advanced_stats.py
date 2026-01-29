@@ -12,7 +12,7 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func, extract
 
-from models import (
+from app.models import (
     AlcoholSubcategory,
     Wine,
     WineConsumption,

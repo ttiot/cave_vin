@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import current_app
 from sqlalchemy.exc import SQLAlchemyError
 
-from models import Wine, WineInsight, db
+from app.models import Wine, WineInsight, db
 from services.wine_info_service import EnrichmentResult, WineInfoService
 
 logger = logging.getLogger(__name__)

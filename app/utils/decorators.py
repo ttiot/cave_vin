@@ -11,7 +11,7 @@ from flask import request, redirect, url_for, current_app, abort, jsonify, g
 from flask_login import current_user
 from werkzeug.security import generate_password_hash
 
-from models import db, User, APIToken, APITokenUsage
+from app.models import db, User, APIToken, APITokenUsage
 from config import Config
 from app.database_init import initialize_database, apply_schema_updates
 

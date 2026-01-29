@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, request, g, render_template_string, curren
 
 from sqlalchemy.orm import selectinload
 
-from models import (
+from app.models import (
     AlcoholCategory,
     AlcoholSubcategory,
     Cellar,
@@ -1095,7 +1095,7 @@ def subscribe_push():
         - expirationTime: (optionnel) Temps d'expiration
     """
     from flask_login import current_user
-    from models import PushSubscription
+    from app.models import PushSubscription
     
     try:
         if not current_user.is_authenticated:
@@ -1186,7 +1186,7 @@ def unsubscribe_push():
         - endpoint: URL de l'endpoint à désabonner
     """
     from flask_login import current_user
-    from models import PushSubscription
+    from app.models import PushSubscription
     
     if not current_user.is_authenticated:
         return jsonify({"error": "Authentification requise"}), 401
@@ -1214,7 +1214,7 @@ def unsubscribe_push():
 def test_push():
     """Envoie une notification push de test à l'utilisateur connecté."""
     from flask_login import current_user
-    from models import PushSubscription
+    from app.models import PushSubscription
     import os
     
     if not current_user.is_authenticated:

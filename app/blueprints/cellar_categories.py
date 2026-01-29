@@ -3,7 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 
-from models import CellarCategory, Cellar, db
+from app.models import CellarCategory, Cellar, db
 from app.utils.decorators import admin_required
 
 

@@ -18,7 +18,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
-from models import APIToken, APITokenUsage, User, db
+from app.models import APIToken, APITokenUsage, User, db
 from app.utils.decorators import admin_required
 
 

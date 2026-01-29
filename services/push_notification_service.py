@@ -61,7 +61,7 @@ def send_push_to_user(
     Returns:
         dict: {"sent": int, "failed": int, "errors": list}
     """
-    from models import PushSubscription, db
+    from app.models import PushSubscription, db
     
     if not is_push_configured():
         return {"sent": 0, "failed": 0, "errors": ["Notifications push non configurées"]}
@@ -112,7 +112,7 @@ def send_push_to_users(
     Returns:
         dict: {"sent": int, "failed": int, "errors": list, "users_notified": int}
     """
-    from models import PushSubscription, db
+    from app.models import PushSubscription, db
     
     if not is_push_configured():
         return {"sent": 0, "failed": 0, "errors": ["Notifications push non configurées"], "users_notified": 0}
@@ -174,7 +174,7 @@ def send_push_to_account_family(
     Returns:
         dict: Résultat de l'envoi
     """
-    from models import User
+    from app.models import User
     
     user = User.query.get(user_id)
     if not user:
@@ -225,7 +225,7 @@ def send_push_to_all_users(
     Returns:
         dict: Résultat de l'envoi
     """
-    from models import User, PushSubscription
+    from app.models import User, PushSubscription
     
     query = User.query
     if exclude_admins:
@@ -246,7 +246,7 @@ def _send_to_subscriptions(subscriptions: list, payload: dict) -> dict[str, Any]
     Returns:
         dict: {"sent": int, "failed": int, "errors": list}
     """
-    from models import db
+    from app.models import db
     
     try:
         from pywebpush import webpush, WebPushException

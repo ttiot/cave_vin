@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from flask import render_template
 
 if TYPE_CHECKING:
-    from models import User
+    from app.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def get_wines_to_consume(user_id: int, days_ahead: int = 365) -> list[dict]:
     Returns:
         Liste de dictionnaires avec les informations des vins à consommer
     """
-    from models import Wine, User
+    from app.models import Wine, User
     
     user = User.query.get(user_id)
     if not user:
@@ -93,7 +93,7 @@ def get_recent_activity(user_id: int, days: int = 7) -> dict:
     Returns:
         Dictionnaire avec les entrées et sorties récentes
     """
-    from models import Wine, WineConsumption, User
+    from app.models import Wine, WineConsumption, User
     
     user = User.query.get(user_id)
     if not user:
@@ -167,7 +167,7 @@ def get_cellar_statistics(user_id: int) -> dict:
     Returns:
         Dictionnaire avec les statistiques des caves
     """
-    from models import Wine, Cellar, User
+    from app.models import Wine, Cellar, User
     from sqlalchemy import func
     
     user = User.query.get(user_id)
@@ -219,7 +219,7 @@ def build_weekly_report_data(user_id: int) -> dict:
     Returns:
         Dictionnaire avec toutes les données du rapport
     """
-    from models import User
+    from app.models import User
     
     user = User.query.get(user_id)
     if not user:
@@ -320,7 +320,7 @@ def send_weekly_report_to_user(user_id: int) -> dict:
     Returns:
         Résultat de l'envoi (success, error)
     """
-    from models import User
+    from app.models import User
     from services.email_service import send_email_to_user
     
     user = User.query.get(user_id)
@@ -362,7 +362,7 @@ def send_weekly_reports_to_all_users() -> dict:
     Returns:
         Résumé des envois (sent, failed, errors)
     """
-    from models import User
+    from app.models import User
     from services.email_service import is_email_configured
     
     if not is_email_configured():
@@ -407,7 +407,7 @@ def cleanup_old_email_logs(days: int = 90) -> int:
     Returns:
         Nombre de logs supprimés
     """
-    from models import EmailLog, db
+    from app.models import EmailLog, db
     
     cutoff_date = datetime.utcnow() - timedelta(days=days)
     
@@ -431,7 +431,7 @@ def cleanup_old_activity_logs(days: int = 180) -> int:
     Returns:
         Nombre de logs supprimés
     """
-    from models import ActivityLog, db
+    from app.models import ActivityLog, db
     
     cutoff_date = datetime.utcnow() - timedelta(days=days)
     
@@ -455,7 +455,7 @@ def cleanup_old_api_usage_logs(days: int = 30) -> int:
     Returns:
         Nombre de logs supprimés
     """
-    from models import APITokenUsage, db
+    from app.models import APITokenUsage, db
     
     cutoff_date = datetime.utcnow() - timedelta(days=days)
     

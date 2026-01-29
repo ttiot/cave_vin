@@ -8,7 +8,7 @@ from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 import logging
 
-from models import db, User
+from app.models import db, User
 from config import Config
 
 
