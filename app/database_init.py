@@ -123,6 +123,57 @@ def apply_schema_updates() -> None:
                 )
             """))
 
+    # Migration: Add openai_api_key_encrypted column to user table
+    if "user" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("user")}
+        if "openai_api_key_encrypted" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user ADD COLUMN openai_api_key_encrypted TEXT"))
+
+    # Migration: Create openai_config table if not exists
+    if "openai_config" not in inspector.get_table_names():
+        with engine.begin() as connection:
+            connection.execute(text("""
+                CREATE TABLE openai_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    api_key_encrypted TEXT,
+                    default_model VARCHAR(100) DEFAULT 'gpt-4o-mini',
+                    default_image_model VARCHAR(100),
+                    source_name VARCHAR(100) DEFAULT 'OpenAI',
+                    monthly_budget REAL,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_test_at DATETIME,
+                    last_test_success BOOLEAN
+                )
+            """))
+
+    # Migration: Create ai_call_log table if not exists
+    if "ai_call_log" not in inspector.get_table_names():
+        with engine.begin() as connection:
+            connection.execute(text("""
+                CREATE TABLE ai_call_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+                    call_type VARCHAR(50) NOT NULL,
+                    model VARCHAR(100),
+                    prompt TEXT,
+                    response TEXT,
+                    input_tokens INTEGER DEFAULT 0,
+                    output_tokens INTEGER DEFAULT 0,
+                    estimated_cost REAL DEFAULT 0,
+                    duration_ms INTEGER,
+                    success BOOLEAN DEFAULT 1,
+                    error_message TEXT,
+                    api_key_source VARCHAR(20) DEFAULT 'env',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            # Create index for faster queries
+            connection.execute(text("CREATE INDEX ix_ai_call_log_user_id ON ai_call_log(user_id)"))
+            connection.execute(text("CREATE INDEX ix_ai_call_log_created_at ON ai_call_log(created_at)"))
+
 
 ALCOHOL_CATEGORIES: list[dict[str, object]] = [
     {

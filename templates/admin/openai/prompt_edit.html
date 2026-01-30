@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .prompt-edit-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .prompt-edit-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .prompt-edit-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .prompt-edit-icon.enrichment {
+    background: linear-gradient(135deg, #10a37f, #1a7f64);
+  }
+  
+  .prompt-edit-icon.pairing {
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  }
+  
+  .prompt-edit-icon.detection {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+  }
+  
+  .prompt-edit-icon.label {
+    background: linear-gradient(135deg, #ec4899, #be185d);
+  }
+  
+  .prompt-edit-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .prompt-edit-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  
+  .prompt-edit-body {
+    padding: var(--spacing-lg);
+  }
+  
+  .form-section {
+    margin-bottom: var(--spacing-xl);
+  }
+  
+  .form-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .prompt-textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    min-height: 200px;
+    resize: vertical;
+  }
+  
+  .variable-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--bg-hover);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-family: monospace;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .variable-badge:hover {
+    background-color: var(--accent-primary);
+    color: #fff;
+  }
+  
+  .variable-badge i {
+    font-size: 0.7rem;
+  }
+  
+  .variables-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .default-value-hint {
+    background-color: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+  }
+  
+  .default-value-hint .hint-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-info);
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .default-value-hint .hint-content {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    max-height: 100px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: monospace;
+  }
+  
+  .btn-reset {
+    background-color: rgba(251, 191, 36, 0.15);
+    border: 1px solid var(--accent-warning);
+    color: var(--accent-warning);
+  }
+  
+  .btn-reset:hover {
+    background-color: var(--accent-warning);
+    color: #fff;
+  }
+  
+  .char-counter {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: 4px;
+  }
+  
+  .modified-indicator {
+    display: none;
+    color: var(--accent-warning);
+    font-size: 0.75rem;
+    margin-left: var(--spacing-sm);
+  }
+  
+  .modified-indicator.show {
+    display: inline;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.config') }}">OpenAI</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.prompts') }}">Prompts</a></li>
+        <li class="breadcrumb-item active">{{ prompt.display_name }}</li>
+      </ol>
+    </nav>
+    <h3 class="m-0">Modifier le prompt</h3>
+    <p class="text-muted mb-0">{{ prompt.description or 'Personnalisez ce prompt pour adapter le comportement de l\'IA' }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('openai_admin.prompts') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Retour
+    </a>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('openai_admin.edit_prompt', prompt_key=prompt.prompt_key) }}" id="prompt-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+  <input type="hidden" name="action" value="save" />
+  
+  <div class="prompt-edit-card">
+    <div class="prompt-edit-header">
+      <div class="prompt-edit-icon {% if prompt.prompt_key == 'wine_enrichment' %}enrichment{% elif prompt.prompt_key == 'wine_pairing' %}pairing{% elif prompt.prompt_key == 'bottle_detection' %}detection{% else %}label{% endif %}">
+        {% if prompt.prompt_key == 'wine_enrichment' %}
+        <i class="bi bi-stars"></i>
+        {% elif prompt.prompt_key == 'wine_pairing' %}
+        <i class="bi bi-cup-straw"></i>
+        {% elif prompt.prompt_key == 'bottle_detection' %}
+        <i class="bi bi-camera"></i>
+        {% else %}
+        <i class="bi bi-image"></i>
+        {% endif %}
+      </div>
+      <div class="flex-grow-1">
+        <h5 class="prompt-edit-title">{{ prompt.display_name }}</h5>
+        <p class="prompt-edit-subtitle">Clé : <code>{{ prompt.prompt_key }}</code></p>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+               {% if prompt.is_active %}checked{% endif %}>
+        <label class="form-check-label" for="is_active">Actif</label>
+      </div>
+    </div>
+    
+    <div class="prompt-edit-body">
+      <!-- Informations générales -->
+      <div class="form-section">
+        <h6 class="form-section-title">
+          <i class="bi bi-info-circle"></i> Informations générales
+        </h6>
+        
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="display_name" class="form-label">Nom affiché</label>
+            <input type="text" class="form-control" id="display_name" name="display_name" 
+                   value="{{ prompt.display_name }}" required>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label for="max_output_tokens" class="form-label">Tokens de sortie max</label>
+            <input type="number" class="form-control" id="max_output_tokens" name="max_output_tokens" 
+                   value="{{ prompt.parameters.max_output_tokens if prompt.parameters and prompt.parameters.max_output_tokens else '' }}"
+                   min="100" max="4000" step="100" placeholder="Ex: 900">
+            <div class="form-text">Limite le nombre de tokens dans la réponse de l'IA</div>
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label for="description" class="form-label">Description</label>
+          <textarea class="form-control" id="description" name="description" rows="2"
+                    placeholder="Description du prompt pour les administrateurs">{{ prompt.description or '' }}</textarea>
+        </div>
+      </div>
+      
+      <!-- Variables disponibles -->
+      {% if prompt.available_variables %}
+      <div class="form-section">
+        <h6 class="form-section-title">
+          <i class="bi bi-braces"></i> Variables disponibles
+          <small class="text-muted ms-2">(cliquez pour insérer)</small>
+        </h6>
+        
+        <div class="variables-container">
+          {% for var in prompt.available_variables %}
+          <span class="variable-badge" onclick="insertVariable('{{ var }}')">
+            <i class="bi bi-plus-circle"></i>
+            {{"{"}}{{ var }}{{"}"}}
+          </span>
+          {% endfor %}
+        </div>
+        
+        <div class="alert alert-light small mb-0">
+          <i class="bi bi-lightbulb me-1"></i>
+          Ces variables seront remplacées par les données réelles lors de l'exécution du prompt.
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Prompt système -->
+      <div class="form-section">
+        <h6 class="form-section-title">
+          <i class="bi bi-robot"></i> Prompt système
+          <span class="modified-indicator" id="system-modified">(modifié)</span>
+        </h6>
+        
+        <textarea class="form-control prompt-textarea" id="system_prompt" name="system_prompt" 
+                  rows="8" required data-original="{{ prompt.system_prompt }}">{{ prompt.system_prompt }}</textarea>
+        <div class="char-counter">
+          <span id="system-char-count">{{ prompt.system_prompt|length }}</span> caractères
+        </div>
+        
+        {% if default_values and default_values.system_prompt %}
+        <div class="default-value-hint">
+          <div class="hint-title">
+            <i class="bi bi-arrow-return-right me-1"></i> Valeur par défaut
+          </div>
+          <div class="hint-content">{{ default_values.system_prompt[:300] }}{% if default_values.system_prompt|length > 300 %}...{% endif %}</div>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Prompt utilisateur -->
+      <div class="form-section">
+        <h6 class="form-section-title">
+          <i class="bi bi-person"></i> Prompt utilisateur
+          <span class="modified-indicator" id="user-modified">(modifié)</span>
+        </h6>
+        
+        <textarea class="form-control prompt-textarea" id="user_prompt" name="user_prompt" 
+                  rows="10" required data-original="{{ prompt.user_prompt }}">{{ prompt.user_prompt }}</textarea>
+        <div class="char-counter">
+          <span id="user-char-count">{{ prompt.user_prompt|length }}</span> caractères
+        </div>
+        
+        {% if default_values and default_values.user_prompt %}
+        <div class="default-value-hint">
+          <div class="hint-title">
+            <i class="bi bi-arrow-return-right me-1"></i> Valeur par défaut
+          </div>
+          <div class="hint-content">{{ default_values.user_prompt[:300] }}{% if default_values.user_prompt|length > 300 %}...{% endif %}</div>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Actions -->
+      <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+        <div>
+          <button type="button" class="btn btn-reset" onclick="confirmReset()">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Réinitialiser aux valeurs par défaut
+          </button>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('openai_admin.prompts') }}" class="btn btn-outline-secondary">
+            Annuler
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i> Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Modal de confirmation de réinitialisation -->
+<div class="modal fade" id="resetModal" tabindex="-1" aria-labelledby="resetModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resetModalLabel">
+          <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+          Réinitialiser le prompt
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Êtes-vous sûr de vouloir réinitialiser ce prompt aux valeurs par défaut ?</p>
+        <p class="text-muted small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Cette action remplacera le prompt système et le prompt utilisateur par leurs valeurs d'origine.
+          Les modifications que vous avez apportées seront perdues.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <form method="POST" action="{{ url_for('openai_admin.reset_prompt', prompt_key=prompt.prompt_key) }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="btn btn-warning">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Réinitialiser
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Variable pour suivre le champ actif
+let activeTextarea = null;
+
+// Mettre à jour le compteur de caractères
+function updateCharCount(textarea, counterId) {
+  const counter = document.getElementById(counterId);
+  if (counter) {
+    counter.textContent = textarea.value.length;
+  }
+}
+
+// Vérifier si le contenu a été modifié
+function checkModified(textarea, indicatorId) {
+  const indicator = document.getElementById(indicatorId);
+  const original = textarea.dataset.original || '';
+  if (indicator) {
+    if (textarea.value !== original) {
+      indicator.classList.add('show');
+    } else {
+      indicator.classList.remove('show');
+    }
+  }
+}
+
+// Insérer une variable dans le textarea actif
+function insertVariable(varName) {
+  const textarea = activeTextarea || document.getElementById('user_prompt');
+  if (!textarea) return;
+  
+  const variable = '{' + varName + '}';
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  
+  textarea.value = text.substring(0, start) + variable + text.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+  textarea.focus();
+  
+  // Mettre à jour le compteur
+  if (textarea.id === 'system_prompt') {
+    updateCharCount(textarea, 'system-char-count');
+    checkModified(textarea, 'system-modified');
+  } else {
+    updateCharCount(textarea, 'user-char-count');
+    checkModified(textarea, 'user-modified');
+  }
+}
+
+// Confirmer la réinitialisation
+function confirmReset() {
+  const modal = new bootstrap.Modal(document.getElementById('resetModal'));
+  modal.show();
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+  const systemPrompt = document.getElementById('system_prompt');
+  const userPrompt = document.getElementById('user_prompt');
+  
+  // Suivre le textarea actif
+  [systemPrompt, userPrompt].forEach(textarea => {
+    if (textarea) {
+      textarea.addEventListener('focus', function() {
+        activeTextarea = this;
+      });
+      
+      textarea.addEventListener('input', function() {
+        if (this.id === 'system_prompt') {
+          updateCharCount(this, 'system-char-count');
+          checkModified(this, 'system-modified');
+        } else {
+          updateCharCount(this, 'user-char-count');
+          checkModified(this, 'user-modified');
+        }
+      });
+    }
+  });
+  
+  // Vérifier les modifications initiales
+  if (systemPrompt) checkModified(systemPrompt, 'system-modified');
+  if (userPrompt) checkModified(userPrompt, 'user-modified');
+  
+  // Avertir avant de quitter si des modifications non sauvegardées
+  let formModified = false;
+  document.getElementById('prompt-form').addEventListener('change', function() {
+    formModified = true;
+  });
+  
+  window.addEventListener('beforeunload', function(e) {
+    if (formModified) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+  
+  document.getElementById('prompt-form').addEventListener('submit', function() {
+    formModified = false;
+  });
+});
+</script>
+{% endblock %}

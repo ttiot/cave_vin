@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +14,24 @@ from typing import List, Optional
 from openai import OpenAI, OpenAIError
 
 logger = logging.getLogger(__name__)
+
+
+class TimedCall:
+    """Context manager pour mesurer le temps d'exécution."""
+    
+    def __init__(self):
+        self.start_time = None
+        self.end_time = None
+        self.duration_ms = 0
+    
+    def __enter__(self):
+        self.start_time = time.time()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_time = time.time()
+        self.duration_ms = int((self.end_time - self.start_time) * 1000)
+        return False
 
 
 @dataclass
@@ -116,10 +135,68 @@ class BottleDetectionService:
         openai_client: Optional[OpenAI] = None,
         openai_model: Optional[str] = None,
         log_requests: bool = False,
+        user_id: Optional[int] = None,
+        source_name: str = "OpenAI",
     ) -> None:
         self.openai_client = openai_client
         self.openai_model = openai_model or "gpt-4o"
         self.log_requests = log_requests
+        self.user_id = user_id
+        self.source_name = source_name
+
+    @classmethod
+    def for_user(cls, user_id: int) -> "BottleDetectionService":
+        """Factory qui initialise le service pour un utilisateur spécifique.
+        
+        Utilise la clé API personnelle de l'utilisateur si disponible,
+        sinon la clé globale configurée dans l'admin.
+        """
+        from flask import current_app
+        from services.openai_utils import get_openai_api_key_for_user
+        
+        logger.info("🔧 Initialisation de BottleDetectionService pour l'utilisateur %d", user_id)
+        
+        openai_client = None
+        openai_model = "gpt-4o"
+        source_name = "OpenAI"
+        
+        # Récupérer la clé API (utilisateur ou globale)
+        api_key, key_source = get_openai_api_key_for_user(user_id)
+        
+        if api_key:
+            # Récupérer la configuration globale pour les autres paramètres
+            from app.models import OpenAIConfig
+            config = OpenAIConfig.get_active()
+            
+            client_kwargs = {"api_key": api_key}
+            
+            if config:
+                if config.base_url:
+                    client_kwargs["base_url"] = config.base_url.rstrip("/")
+                # Utiliser un modèle vision (gpt-4o par défaut)
+                openai_model = config.default_model or "gpt-4o"
+                # Pour la vision, on préfère gpt-4o
+                if openai_model in ("gpt-4o-mini", "gpt-3.5-turbo"):
+                    openai_model = "gpt-4o"
+                source_name = config.source_name or "OpenAI"
+            
+            try:
+                openai_client = OpenAI(**client_kwargs)
+                logger.info("✅ Client OpenAI initialisé (source: %s)", key_source)
+            except OpenAIError as exc:
+                logger.warning("❌ Impossible d'initialiser le client OpenAI : %s", exc)
+        else:
+            logger.warning("⚠️ Aucune clé API OpenAI disponible")
+        
+        logger.info("📋 Modèle OpenAI Vision configuré: %s", openai_model)
+        
+        return cls(
+            openai_client=openai_client,
+            openai_model=openai_model,
+            log_requests=True,
+            user_id=user_id,
+            source_name=source_name,
+        )
 
     @classmethod
     def from_app(cls, app) -> "BottleDetectionService":
@@ -228,7 +305,18 @@ class BottleDetectionService:
                     categories_section += f"- {cat_name}\n"
             categories_section += "\nSi aucune catégorie ne correspond vraiment, tu peux en suggérer une nouvelle, mais PRIVILÉGIE les catégories existantes."
 
-        system_prompt = f"""Tu es un expert sommelier et caviste. Tu analyses des photos de bouteilles d'alcool (vins, spiritueux, bières, etc.).
+        # Récupérer le prompt configurable depuis la base de données
+        try:
+            from app.models import OpenAIPrompt
+            prompt_config = OpenAIPrompt.get_or_create_default("bottle_detection")
+            system_prompt = prompt_config.render_system_prompt(categories_section=categories_section)
+            user_prompt = prompt_config.render_user_prompt()
+            schema = prompt_config.response_schema
+            max_output_tokens = prompt_config.get_parameter("max_output_tokens", 2000)
+        except Exception as e:
+            logger.warning("⚠️ Impossible de charger le prompt configurable: %s. Utilisation des valeurs par défaut.", e)
+            # Fallback aux valeurs par défaut
+            system_prompt = f"""Tu es un expert sommelier et caviste. Tu analyses des photos de bouteilles d'alcool (vins, spiritueux, bières, etc.).
 
 Pour chaque bouteille visible sur l'image, tu dois identifier avec PRÉCISION:
 - Le nom COMPLET du produit incluant la marque ET la variante/gamme/couleur
@@ -255,7 +343,7 @@ RÈGLES IMPORTANTES:
 
 Réponds UNIQUEMENT en JSON valide selon le schéma demandé."""
 
-        user_prompt = """Analyse cette image et identifie TOUTES les bouteilles d'alcool visibles.
+            user_prompt = """Analyse cette image et identifie TOUTES les bouteilles d'alcool visibles.
 
 Pour chaque bouteille:
 1. Lis ATTENTIVEMENT l'étiquette pour extraire le nom COMPLET (marque + variante/couleur)
@@ -263,101 +351,106 @@ Pour chaque bouteille:
 3. Note toutes les informations visibles
 4. Regroupe les bouteilles identiques avec leur quantité"""
 
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "bottles": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Nom du produit (domaine, château, marque)",
+            schema = {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "bottles": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Nom du produit (domaine, château, marque)",
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "description": "Nombre de bouteilles identiques",
+                                },
+                                "year": {
+                                    "type": "integer",
+                                    "description": "Millésime ou année de production (0 si inconnu)",
+                                },
+                                "region": {
+                                    "type": "string",
+                                    "description": "Région d'origine (vide si inconnue)",
+                                },
+                                "grape": {
+                                    "type": "string",
+                                    "description": "Cépage principal (vide si inconnu)",
+                                },
+                                "volume_ml": {
+                                    "type": "integer",
+                                    "description": "Contenance en millilitres (0 si inconnue)",
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Brève description du produit",
+                                },
+                                "alcohol_type": {
+                                    "type": "string",
+                                    "description": "Type d'alcool (Vin rouge, Champagne, Rhum, etc.)",
+                                },
+                                "confidence": {
+                                    "type": "number",
+                                    "description": "Score de confiance de la détection (0-1)",
+                                },
                             },
-                            "quantity": {
-                                "type": "integer",
-                                "description": "Nombre de bouteilles identiques",
-                            },
-                            "year": {
-                                "type": "integer",
-                                "description": "Millésime ou année de production (0 si inconnu)",
-                            },
-                            "region": {
-                                "type": "string",
-                                "description": "Région d'origine (vide si inconnue)",
-                            },
-                            "grape": {
-                                "type": "string",
-                                "description": "Cépage principal (vide si inconnu)",
-                            },
-                            "volume_ml": {
-                                "type": "integer",
-                                "description": "Contenance en millilitres (0 si inconnue)",
-                            },
-                            "description": {
-                                "type": "string",
-                                "description": "Brève description du produit",
-                            },
-                            "alcohol_type": {
-                                "type": "string",
-                                "description": "Type d'alcool (Vin rouge, Champagne, Rhum, etc.)",
-                            },
-                            "confidence": {
-                                "type": "number",
-                                "description": "Score de confiance de la détection (0-1)",
-                            },
+                            "required": ["name", "quantity", "year", "region", "grape", "volume_ml", "description", "alcohol_type", "confidence"],
                         },
-                        "required": ["name", "quantity", "year", "region", "grape", "volume_ml", "description", "alcohol_type", "confidence"],
+                    },
+                    "total_bottles": {
+                        "type": "integer",
+                        "description": "Nombre total de bouteilles détectées",
                     },
                 },
-                "total_bottles": {
-                    "type": "integer",
-                    "description": "Nombre total de bouteilles détectées",
-                },
-            },
-            "required": ["bottles", "total_bottles"],
-        }
+                "required": ["bottles", "total_bottles"],
+            }
+            max_output_tokens = 2000
 
         # Construire l'URL de l'image en base64
         image_url = f"data:{mime_type};base64,{image_data}"
 
         logger.info("📤 Envoi de la requête à OpenAI Vision")
 
+        # Préparer le prompt complet pour le logging (sans l'image)
+        request_prompt = f"System: {system_prompt[:500]}...\n\nUser: {user_prompt}"
+
         try:
-            response = self.openai_client.responses.create(
-                model=self.openai_model,
-                input=[
-                    {
-                        "role": "system",
-                        "content": [{"type": "input_text", "text": system_prompt}],
+            with TimedCall() as timer:
+                response = self.openai_client.responses.create(
+                    model=self.openai_model,
+                    input=[
+                        {
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": system_prompt}],
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": user_prompt},
+                                {
+                                    "type": "input_image",
+                                    "image_url": image_url,
+                                },
+                            ],
+                        },
+                    ],
+                    text={
+                        "format": {
+                            "type": "json_schema",
+                            "name": "bottle_detection",
+                            "schema": schema,
+                        },
                     },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": user_prompt},
-                            {
-                                "type": "input_image",
-                                "image_url": image_url,
-                            },
-                        ],
-                    },
-                ],
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "name": "bottle_detection",
-                        "schema": schema,
-                    },
-                },
-                max_output_tokens=2000,
-            )
+                    max_output_tokens=max_output_tokens,
+                )
 
-            logger.info("✅ Réponse reçue de OpenAI Vision")
+            logger.info("✅ Réponse reçue de OpenAI Vision en %d ms", timer.duration_ms)
 
-            # Log de la requête si activé
+            # Log de la requête si activé (fichier)
             if self.log_requests:
                 self._log_request_response(
                     system_prompt=system_prompt,
@@ -368,6 +461,29 @@ Pour chaque bouteille:
 
             # Parser la réponse
             payload = self._parse_response(response)
+
+            # Extraire les tokens de la réponse
+            input_tokens = 0
+            output_tokens = 0
+            try:
+                usage = getattr(response, "usage", None)
+                if usage:
+                    input_tokens = getattr(usage, "input_tokens", 0) or 0
+                    output_tokens = getattr(usage, "output_tokens", 0) or 0
+            except Exception:
+                pass
+
+            # Logger l'appel dans la base de données
+            if self.user_id:
+                self._log_ai_call(
+                    call_type="bottle_detection",
+                    request_prompt=request_prompt,
+                    response_text=json.dumps(payload, ensure_ascii=False) if payload else None,
+                    response_status="success" if payload else "error",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    response_time_ms=timer.duration_ms,
+                )
 
             if not payload:
                 return DetectionResult(
@@ -389,6 +505,20 @@ Pour chaque bouteille:
 
         except OpenAIError as exc:
             logger.error("❌ Erreur OpenAI: %s", exc)
+            
+            # Logger l'erreur dans la base de données
+            if self.user_id:
+                self._log_ai_call(
+                    call_type="bottle_detection",
+                    request_prompt=request_prompt,
+                    response_text=None,
+                    response_status="error",
+                    error_message=str(exc),
+                    input_tokens=0,
+                    output_tokens=0,
+                    response_time_ms=0,
+                )
+            
             return DetectionResult(
                 error=f"Erreur de l'API OpenAI: {str(exc)}",
             )
@@ -470,3 +600,65 @@ Pour chaque bouteille:
 
         except Exception as exc:
             logger.error("❌ Erreur lors de l'enregistrement du log: %s", exc)
+
+    def _log_ai_call(
+        self,
+        call_type: str,
+        request_prompt: str,
+        response_text: Optional[str],
+        response_status: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        response_time_ms: int = 0,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """Enregistre l'appel IA dans la base de données."""
+        if not self.user_id:
+            return
+        
+        try:
+            from app.models import db, AICallLog
+            
+            # Déterminer la source de la clé API
+            api_key_source = "global"
+            try:
+                from app.models import User
+                user = User.query.get(self.user_id)
+                if user and user.get_openai_api_key():
+                    api_key_source = "user"
+            except Exception:
+                pass
+            
+            # Utiliser la méthode statique log_call qui gère le calcul du coût
+            log_entry = AICallLog.log_call(
+                user_id=self.user_id,
+                call_type=call_type,
+                model=self.openai_model,
+                api_key_source=api_key_source,
+                user_prompt=request_prompt[:5000] if request_prompt else None,  # Limiter la taille
+                response_text=response_text[:10000] if response_text else None,  # Limiter la taille
+                response_status=response_status,
+                error_message=error_message,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                duration_ms=response_time_ms,
+            )
+            
+            db.session.commit()
+            
+            logger.info(
+                "📊 Appel IA loggé: type=%s, user=%d, tokens=%d/%d, coût=$%.6f",
+                call_type,
+                self.user_id,
+                input_tokens,
+                output_tokens,
+                float(log_entry.estimated_cost_usd or 0),
+            )
+        
+        except Exception as exc:
+            logger.error("❌ Erreur lors du logging de l'appel IA: %s", exc)
+            # Ne pas faire échouer l'appel principal si le logging échoue
+            try:
+                db.session.rollback()
+            except Exception:
+                pass

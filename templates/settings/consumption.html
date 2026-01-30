@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}Ma consommation IA - Cave à Vin{% endblock %}
+
+{% block extra_head %}
+<style>
+  .consumption-card {
+    background: var(--card-bg, #fff);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  
+  .consumption-card-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color, #e9ecef);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .consumption-card-header h5 {
+    margin: 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .consumption-card-body {
+    padding: 1.5rem;
+  }
+  
+  /* Stats cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .stat-card {
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+  
+  .stat-card .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color, #6f42c1);
+  }
+  
+  .stat-card .stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted, #6c757d);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .stat-card.success .stat-value { color: #198754; }
+  .stat-card.info .stat-value { color: #0d6efd; }
+  .stat-card.warning .stat-value { color: #f59e0b; }
+  
+  /* Total cost highlight */
+  .total-cost-card {
+    background: linear-gradient(135deg, #10a37f, #1a7f64);
+    color: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .total-cost-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+  }
+  
+  .total-cost-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+  }
+  
+  .total-cost-period {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin-top: 0.5rem;
+  }
+  
+  /* Date filter form */
+  .date-filter-form {
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .date-filter-form .form-label {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  
+  /* Quick period buttons */
+  .quick-periods {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  
+  .quick-period-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color, #dee2e6);
+    background: var(--card-bg, #fff);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .quick-period-btn:hover {
+    background: var(--bg-hover, #e9ecef);
+    border-color: var(--primary-color, #6f42c1);
+  }
+  
+  /* Service breakdown table */
+  .service-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .service-table th,
+  .service-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, #e9ecef);
+  }
+  
+  .service-table th {
+    font-weight: 600;
+    color: var(--text-muted, #6c757d);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .service-table tbody tr:hover {
+    background-color: var(--bg-hover, #f8f9fa);
+  }
+  
+  .service-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  
+  .service-badge.wine_enrichment {
+    background-color: rgba(111, 66, 193, 0.15);
+    color: #6f42c1;
+  }
+  
+  .service-badge.wine_pairing {
+    background-color: rgba(13, 110, 253, 0.15);
+    color: #0d6efd;
+  }
+  
+  .service-badge.bottle_detection {
+    background-color: rgba(25, 135, 84, 0.15);
+    color: #198754;
+  }
+  
+  .service-badge.image_generation {
+    background-color: rgba(255, 193, 7, 0.15);
+    color: #d97706;
+  }
+  
+  /* Log item */
+  .log-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color, #e9ecef);
+    transition: background-color 0.2s;
+  }
+  
+  .log-item:last-child {
+    border-bottom: none;
+  }
+  
+  .log-item:hover {
+    background-color: var(--bg-hover, #f8f9fa);
+  }
+  
+  .log-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  
+  .log-item-icon.success {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #198754;
+  }
+  
+  .log-item-icon.error {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #dc3545;
+  }
+  
+  .log-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .log-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .log-item-model {
+    font-size: 0.8rem;
+    color: var(--text-muted, #6c757d);
+    background-color: var(--bg-hover, #e9ecef);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+  }
+  
+  .log-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted, #6c757d);
+    margin-top: 0.25rem;
+  }
+  
+  .log-item-cost {
+    font-weight: 600;
+    color: #198754;
+  }
+  
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted, #6c757d);
+  }
+  
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">
+      <i class="bi bi-graph-up me-2"></i>Ma consommation IA
+    </h2>
+    <p class="text-muted mb-0">Consultez votre utilisation des services d'intelligence artificielle</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('auth.export_my_consumption', start_date=start_date.isoformat(), end_date=end_date.isoformat()) }}" 
+       class="btn btn-outline-primary" target="_blank">
+      <i class="bi bi-download me-1"></i> Exporter JSON
+    </a>
+    <a href="{{ url_for('auth.openai_settings') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-gear me-1"></i> Paramètres OpenAI
+    </a>
+  </div>
+</div>
+
+<!-- Filtre de dates -->
+<div class="date-filter-form">
+  <form method="GET" action="{{ url_for('auth.my_consumption') }}">
+    <div class="row align-items-end">
+      <div class="col-12 mb-3">
+        <label class="form-label">Période rapide</label>
+        <div class="quick-periods">
+          {% set today = consumption.period_end %}
+          <button type="button" class="quick-period-btn" 
+                  onclick="setPeriod('{{ today.replace(day=1).isoformat() }}', '{{ today.isoformat() }}')">
+            Ce mois
+          </button>
+          {% set last_month = (today.replace(day=1) - timedelta(days=1)) %}
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ last_month.replace(day=1).isoformat() }}', '{{ last_month.isoformat() }}')">
+            Mois dernier
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ (today - timedelta(days=7)).isoformat() }}', '{{ today.isoformat() }}')">
+            7 derniers jours
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ (today - timedelta(days=30)).isoformat() }}', '{{ today.isoformat() }}')">
+            30 derniers jours
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ (today - timedelta(days=90)).isoformat() }}', '{{ today.isoformat() }}')">
+            90 derniers jours
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ today.replace(month=1, day=1).isoformat() }}', '{{ today.isoformat() }}')">
+            Cette année
+          </button>
+        </div>
+      </div>
+      <div class="col-md-4 col-lg-3 mb-3">
+        <label for="start_date" class="form-label">Date de début</label>
+        <input type="date" class="form-control" id="start_date" name="start_date" 
+               value="{{ start_date.isoformat() }}">
+      </div>
+      <div class="col-md-4 col-lg-3 mb-3">
+        <label for="end_date" class="form-label">Date de fin</label>
+        <input type="date" class="form-control" id="end_date" name="end_date" 
+               value="{{ end_date.isoformat() }}">
+      </div>
+      <div class="col-md-4 col-lg-3 mb-3">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-funnel me-1"></i> Filtrer
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Coût total -->
+<div class="total-cost-card">
+  <div class="total-cost-label">Coût total estimé</div>
+  <div class="total-cost-value">${{ "%.4f"|format(consumption.total_cost) }}</div>
+  <div class="total-cost-period">
+    Du {{ start_date.strftime('%d/%m/%Y') }} au {{ end_date.strftime('%d/%m/%Y') }}
+  </div>
+</div>
+
+<!-- Statistiques -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ consumption.total_calls }}</div>
+    <div class="stat-label">Appels total</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-value">{{ "{:,}".format(consumption.total_input_tokens).replace(",", " ") }}</div>
+    <div class="stat-label">Tokens entrée</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ "{:,}".format(consumption.total_output_tokens).replace(",", " ") }}</div>
+    <div class="stat-label">Tokens sortie</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-value">{{ "%.0f"|format(consumption.avg_duration_ms) }} ms</div>
+    <div class="stat-label">Durée moyenne</div>
+  </div>
+</div>
+
+<!-- Répartition par service -->
+{% if consumption.by_service %}
+<div class="consumption-card">
+  <div class="consumption-card-header">
+    <h5><i class="bi bi-pie-chart me-2"></i>Répartition par service</h5>
+  </div>
+  <div class="consumption-card-body p-0">
+    <table class="service-table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Nombre d'appels</th>
+          <th>Durée totale</th>
+          <th>Coût</th>
+          <th>% du total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for service in consumption.by_service %}
+        <tr>
+          <td>
+            <span class="service-badge {{ service.service }}">
+              {% if service.service == 'wine_enrichment' %}
+                <i class="bi bi-stars"></i> Enrichissement
+              {% elif service.service == 'wine_pairing' %}
+                <i class="bi bi-cup-straw"></i> Accords mets-vins
+              {% elif service.service == 'bottle_detection' %}
+                <i class="bi bi-camera"></i> Détection bouteilles
+              {% elif service.service == 'image_generation' %}
+                <i class="bi bi-image"></i> Génération image
+              {% else %}
+                <i class="bi bi-robot"></i> {{ service.service }}
+              {% endif %}
+            </span>
+          </td>
+          <td>{{ service.count }}</td>
+          <td>{{ "%.1f"|format(service.total_duration_ms / 1000) }} s</td>
+          <td class="log-item-cost">${{ "%.4f"|format(service.cost) }}</td>
+          <td>
+            {% if consumption.total_cost > 0 %}
+              {{ "%.1f"|format((service.cost / consumption.total_cost) * 100) }}%
+            {% else %}
+              0%
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Détail des appels -->
+<div class="consumption-card">
+  <div class="consumption-card-header">
+    <h5><i class="bi bi-list-ul me-2"></i>Détail des appels</h5>
+    <span class="badge bg-secondary ms-auto">{{ logs|length }} appel(s)</span>
+  </div>
+  
+  <div class="consumption-card-body p-0">
+    {% if logs %}
+      {% for log in logs %}
+      <div class="log-item">
+        <div class="log-item-icon {% if log.response_status == 'success' %}success{% else %}error{% endif %}">
+          <i class="bi bi-{% if log.response_status == 'success' %}check-lg{% else %}x-lg{% endif %}"></i>
+        </div>
+        <div class="log-item-info">
+          <div class="log-item-header">
+            <span class="service-badge {{ log.call_type }}">
+              {% if log.call_type == 'wine_enrichment' %}
+                <i class="bi bi-stars"></i> Enrichissement
+              {% elif log.call_type == 'wine_pairing' %}
+                <i class="bi bi-cup-straw"></i> Accords
+              {% elif log.call_type == 'bottle_detection' %}
+                <i class="bi bi-camera"></i> Détection
+              {% elif log.call_type == 'image_generation' %}
+                <i class="bi bi-image"></i> Image
+              {% else %}
+                {{ log.call_type }}
+              {% endif %}
+            </span>
+            <span class="log-item-model">{{ log.model }}</span>
+          </div>
+          <div class="log-item-meta">
+            <span><i class="bi bi-calendar me-1"></i>{{ log.created_at.strftime('%d/%m/%Y') }}</span>
+            <span><i class="bi bi-clock me-1"></i>{{ log.created_at.strftime('%H:%M:%S') }}</span>
+            {% if log.duration_ms %}
+            <span><i class="bi bi-stopwatch me-1"></i>{{ log.duration_ms }} ms</span>
+            {% endif %}
+            {% if log.total_tokens %}
+            <span><i class="bi bi-hash me-1"></i>{{ log.total_tokens }} tokens</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="text-end">
+          {% if log.estimated_cost_usd %}
+          <div class="log-item-cost">${{ "%.6f"|format(log.estimated_cost_usd) }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <h5>Aucun appel sur cette période</h5>
+        <p>Modifiez les dates pour voir d'autres résultats ou utilisez les fonctionnalités IA de l'application.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function setPeriod(startDate, endDate) {
+  document.getElementById('start_date').value = startDate;
+  document.getElementById('end_date').value = endDate;
+  document.querySelector('.date-filter-form form').submit();
+}
+</script>
+{% endblock %}

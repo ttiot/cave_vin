@@ -13,6 +13,12 @@ from openai import OpenAI, OpenAIError
 logger = logging.getLogger(__name__)
 
 
+# Import conditionnel pour éviter les imports circulaires
+def _get_openai_utils():
+    from services.openai_utils import get_openai_client_for_user, log_ai_call, extract_token_usage, TimedCall
+    return get_openai_client_for_user, log_ai_call, extract_token_usage, TimedCall
+
+
 @dataclass
 class WineRecommendation:
     """Représente une recommandation de vin."""
@@ -48,13 +54,54 @@ class WinePairingService:
         self,
         openai_client: Optional[OpenAI] = None,
         openai_model: Optional[str] = None,
+        user_id: Optional[int] = None,
+        api_key_source: str = "env",
     ) -> None:
         self.openai_client = openai_client
         self.openai_model = openai_model
+        self.user_id = user_id
+        self.api_key_source = api_key_source
+
+    @classmethod
+    def for_user(cls, user_id: int) -> "WinePairingService":
+        """Factory qui crée un service avec la clé API appropriée pour l'utilisateur.
+        
+        Priorité des clés :
+        1. Clé personnelle de l'utilisateur
+        2. Clé globale configurée en base de données
+        3. Clé de la variable d'environnement (fallback)
+        
+        Args:
+            user_id: ID de l'utilisateur
+            
+        Returns:
+            Instance de WinePairingService configurée pour l'utilisateur
+        """
+        logger.info("🔧 Initialisation de WinePairingService pour l'utilisateur %d", user_id)
+        
+        get_openai_client_for_user, _, _, _ = _get_openai_utils()
+        
+        client, api_key_source, config_info = get_openai_client_for_user(user_id)
+        
+        if client:
+            logger.info("✅ Client OpenAI initialisé (source: %s)", api_key_source)
+        else:
+            logger.warning("⚠️ Aucun client OpenAI disponible pour l'utilisateur %d", user_id)
+        
+        return cls(
+            openai_client=client,
+            openai_model=config_info.get("model") or "gpt-4o-mini",
+            user_id=user_id,
+            api_key_source=api_key_source,
+        )
 
     @classmethod
     def from_app(cls, app) -> "WinePairingService":
-        """Factory qui utilise la configuration Flask pour initialiser le service."""
+        """Factory qui utilise la configuration Flask pour initialiser le service.
+        
+        Note: Cette méthode est conservée pour la rétrocompatibilité.
+        Pour les nouveaux usages, préférez `for_user(user_id)`.
+        """
         logger.info("🔧 Initialisation de WinePairingService depuis l'application Flask")
 
         openai_client = None
@@ -85,6 +132,8 @@ class WinePairingService:
         return cls(
             openai_client=openai_client,
             openai_model=openai_model,
+            user_id=None,
+            api_key_source="env",
         )
 
     def get_recommendations(
@@ -115,8 +164,24 @@ class WinePairingService:
 
         # Préparer le JSON des vins (limité pour éviter les tokens excessifs)
         wines_json = json.dumps(wines_data[:100], ensure_ascii=False, indent=2)
+        current_year = datetime.now().year
 
-        system_prompt = """Tu es un sommelier expert spécialisé dans les accords mets-vins.
+        # Récupérer le prompt configurable depuis la base de données
+        try:
+            from app.models import OpenAIPrompt
+            prompt_config = OpenAIPrompt.get_or_create_default("wine_pairing")
+            system_prompt = prompt_config.render_system_prompt()
+            user_prompt = prompt_config.render_user_prompt(
+                dish=dish,
+                current_year=current_year,
+                wines_json=wines_json
+            )
+            schema = prompt_config.response_schema
+            max_output_tokens = prompt_config.get_parameter("max_output_tokens", 1500)
+        except Exception as e:
+            logger.warning("⚠️ Impossible de charger le prompt configurable: %s. Utilisation des valeurs par défaut.", e)
+            # Fallback aux valeurs par défaut
+            system_prompt = """Tu es un sommelier expert spécialisé dans les accords mets-vins.
 Tu dois analyser la liste des vins disponibles et recommander les meilleurs accords pour le plat indiqué.
 
 Tu dois fournir DEUX types de recommandations :
@@ -131,9 +196,7 @@ Pour chaque vin, tu dois :
 
 Réponds UNIQUEMENT en JSON selon le schéma demandé."""
 
-        current_year = datetime.now().year
-        
-        user_prompt = f"""Voici le plat prévu : {dish}
+            user_prompt = f"""Voici le plat prévu : {dish}
 
 Année actuelle : {current_year}
 
@@ -154,72 +217,122 @@ Pour déterminer si un vin est à consommer en priorité, considère :
 
 Fournis une explication générale sur les accords recommandés."""
 
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "priority_wines": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "wine_id": {"type": "integer"},
-                            "reason": {"type": "string"},
-                            "score": {"type": "integer"},
-                            "garde_info": {"type": "string"},
+            schema = {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "priority_wines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "wine_id": {"type": "integer"},
+                                "reason": {"type": "string"},
+                                "score": {"type": "integer"},
+                                "garde_info": {"type": "string"},
+                            },
+                            "required": ["wine_id", "reason", "score", "garde_info"],
                         },
-                        "required": ["wine_id", "reason", "score", "garde_info"],
                     },
-                },
-                "best_wines": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "wine_id": {"type": "integer"},
-                            "reason": {"type": "string"},
-                            "score": {"type": "integer"},
-                            "garde_info": {"type": "string"},
+                    "best_wines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "wine_id": {"type": "integer"},
+                                "reason": {"type": "string"},
+                                "score": {"type": "integer"},
+                                "garde_info": {"type": "string"},
+                            },
+                            "required": ["wine_id", "reason", "score", "garde_info"],
                         },
-                        "required": ["wine_id", "reason", "score", "garde_info"],
                     },
+                    "explanation": {"type": "string"},
                 },
-                "explanation": {"type": "string"},
-            },
-            "required": ["priority_wines", "best_wines", "explanation"],
-        }
+                "required": ["priority_wines", "best_wines", "explanation"],
+            }
+            max_output_tokens = 1500
 
+        # Import des utilitaires pour le logging en base de données
+        _, log_ai_call, extract_token_usage, TimedCall = _get_openai_utils()
+        
+        # Préparer le prompt complet pour le logging
+        full_prompt = f"[SYSTEM]\n{system_prompt}\n\n[USER]\n{user_prompt}"
+        
+        response = None
+        error_message = None
+        duration_ms = None
+        
         try:
-            response = self.openai_client.responses.create(
-                model=self.openai_model,
-                input=[
-                    {
-                        "role": "system",
-                        "content": [{"type": "input_text", "text": system_prompt.strip()}],
+            with TimedCall() as timer:
+                response = self.openai_client.responses.create(
+                    model=self.openai_model,
+                    input=[
+                        {
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": system_prompt.strip()}],
+                        },
+                        {
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": user_prompt.strip()}],
+                        },
+                    ],
+                    text={
+                        "format": {
+                            "type": "json_schema",
+                            "name": "wine_pairing",
+                            "schema": schema
+                        },
                     },
-                    {
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": user_prompt.strip()}],
-                    },
-                ],
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "name": "wine_pairing",
-                        "schema": schema
-                    },
-                },
-                max_output_tokens=1500,
-            )
-            logger.info("✅ Réponse OpenAI reçue pour les recommandations")
+                    max_output_tokens=max_output_tokens,
+                )
+            duration_ms = timer.duration_ms
+            logger.info("✅ Réponse OpenAI reçue pour les recommandations (durée: %dms)", duration_ms)
 
         except OpenAIError as exc:
+            error_message = str(exc)
             logger.warning("❌ Requête OpenAI échouée : %s", exc)
-            return None
         except Exception as exc:
+            error_message = f"Unexpected error: {exc}"
             logger.warning("❌ Erreur inattendue lors de l'appel OpenAI : %s", exc)
+        
+        # Logging en base de données si un user_id est défini
+        if self.user_id:
+            try:
+                # Extraire les informations de tokens
+                input_tokens, output_tokens = extract_token_usage(response) if response else (0, 0)
+                
+                # Préparer la réponse pour le log
+                response_text = None
+                if response:
+                    try:
+                        response_text = getattr(response, "output_text", None)
+                        if not response_text:
+                            response_text = json.dumps(response.model_dump(), ensure_ascii=False)
+                    except Exception:
+                        response_text = str(response)
+                
+                log_ai_call(
+                    user_id=self.user_id,
+                    call_type="wine_pairing",
+                    model=self.openai_model,
+                    prompt=full_prompt,
+                    response=response_text,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    duration_ms=duration_ms,
+                    success=error_message is None,
+                    error_message=error_message,
+                    api_key_source=self.api_key_source,
+                )
+                logger.debug("📊 Appel IA loggé en base de données")
+            except Exception as log_exc:
+                logger.warning("⚠️ Impossible de logger l'appel IA en base: %s", log_exc)
+        
+        # Si erreur, retourner None
+        if error_message:
             return None
 
         # Parser la réponse

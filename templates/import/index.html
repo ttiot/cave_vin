@@ -266,9 +266,17 @@
                           {% endfor %}
                         </select>
                         {% if bottle.alcohol_type and not bottle.matched_subcategory_id %}
-                        <div class="form-text text-warning">
-                          <i class="bi bi-exclamation-triangle me-1"></i>
-                          Type détecté "{{ bottle.alcohol_type }}" non reconnu
+                        <div class="form-text text-warning d-flex align-items-center justify-content-between">
+                          <span>
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Type détecté "{{ bottle.alcohol_type }}" non reconnu
+                          </span>
+                          <button type="button" class="btn btn-sm btn-outline-success create-subcategory-btn"
+                                  data-bottle-index="{{ bottle_idx }}"
+                                  data-suggested-name="{{ bottle.alcohol_type }}"
+                                  data-bs-toggle="modal" data-bs-target="#createSubcategoryModal">
+                            <i class="bi bi-plus-circle me-1"></i>Créer
+                          </button>
                         </div>
                         {% endif %}
                       </div>
@@ -363,8 +371,57 @@
       </div>
     </div>
   </form>
+  
+  <!-- Modal de création de sous-catégorie (doit être en dehors du formulaire principal) -->
+  <div class="modal fade" id="createSubcategoryModal" tabindex="-1" aria-labelledby="createSubcategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="createSubcategoryModalLabel">
+            <i class="bi bi-plus-circle me-2"></i>Créer une nouvelle catégorie
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3">
+            Le type d'alcool détecté n'existe pas encore. Vous pouvez le créer automatiquement.
+          </p>
+          
+          <div class="mb-3">
+            <label for="newSubcategoryName" class="form-label">Nom de la sous-catégorie <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="newSubcategoryName" placeholder="Ex: Vin orange, Bière trappiste...">
+            <div class="form-text">Ce nom sera utilisé pour classer vos bouteilles.</div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="newSubcategoryParent" class="form-label">Catégorie parente <span class="text-danger">*</span></label>
+            <select class="form-select" id="newSubcategoryParent">
+              <option value="">-- Sélectionner une catégorie --</option>
+              {% for category in categories %}
+              <option value="{{ category.id }}">{{ category.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Choisissez la catégorie principale à laquelle appartient ce type.</div>
+          </div>
+          
+          <div id="createSubcategoryError" class="alert alert-danger d-none"></div>
+          <div id="createSubcategorySuccess" class="alert alert-success d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="button" class="btn btn-success" id="confirmCreateSubcategory">
+            <i class="bi bi-check-lg me-1"></i>Créer la catégorie
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
 </div>
+
+<!-- Données pour le JavaScript (toujours disponibles) -->
+<input type="hidden" id="createSubcategoryUrl" value="{{ url_for('import.api_create_subcategory') }}">
+<input type="hidden" id="csrfTokenHidden" value="{{ csrf_token() }}">
 
 <!-- Loading overlay pour l'analyse -->
 <div class="loading-overlay" id="loading-overlay" style="display: none;">
@@ -685,6 +742,228 @@
       newAnalysisBtn.addEventListener('click', () => {
         clearForm.submit();
       });
+    }
+  }
+  
+  // Gestion de la création de sous-catégorie
+  let currentBottleIndex = null;
+  const createSubcategoryModal = document.getElementById('createSubcategoryModal');
+  const newSubcategoryName = document.getElementById('newSubcategoryName');
+  const newSubcategoryParent = document.getElementById('newSubcategoryParent');
+  const confirmCreateBtn = document.getElementById('confirmCreateSubcategory');
+  const createError = document.getElementById('createSubcategoryError');
+  const createSuccess = document.getElementById('createSubcategorySuccess');
+  
+  // Quand on clique sur un bouton "Créer", pré-remplir le modal
+  document.querySelectorAll('.create-subcategory-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      currentBottleIndex = e.currentTarget.dataset.bottleIndex;
+      const suggestedName = e.currentTarget.dataset.suggestedName;
+      
+      // Pré-remplir le nom suggéré
+      if (newSubcategoryName) {
+        newSubcategoryName.value = suggestedName || '';
+      }
+      
+      // Réinitialiser les messages
+      if (createError) {
+        createError.classList.add('d-none');
+        createError.textContent = '';
+      }
+      if (createSuccess) {
+        createSuccess.classList.add('d-none');
+        createSuccess.textContent = '';
+      }
+      
+      // Essayer de deviner la catégorie parente
+      if (newSubcategoryParent && suggestedName) {
+        const nameLower = suggestedName.toLowerCase();
+        const options = newSubcategoryParent.options;
+        
+        // Mappings simples pour deviner la catégorie
+        const categoryGuesses = {
+          'vin': ['vin', 'wine', 'rouge', 'blanc', 'rosé', 'champagne', 'crémant', 'mousseux'],
+          'bière': ['bière', 'beer', 'ale', 'lager', 'ipa', 'stout', 'porter', 'trappiste', 'blonde', 'brune', 'blanche'],
+          'spiritueux': ['rhum', 'rum', 'whisky', 'whiskey', 'vodka', 'gin', 'cognac', 'armagnac', 'brandy', 'tequila', 'mezcal', 'liqueur']
+        };
+        
+        for (let i = 0; i < options.length; i++) {
+          const optionText = options[i].text.toLowerCase();
+          const keywords = categoryGuesses[optionText] || [];
+          
+          if (keywords.some(kw => nameLower.includes(kw))) {
+            newSubcategoryParent.value = options[i].value;
+            break;
+          }
+        }
+      }
+    });
+  });
+  
+  // Confirmer la création
+  if (confirmCreateBtn) {
+    confirmCreateBtn.addEventListener('click', async () => {
+      const name = newSubcategoryName?.value?.trim();
+      const categoryId = newSubcategoryParent?.value;
+      
+      // Validation
+      if (!name) {
+        showCreateError('Veuillez entrer un nom pour la sous-catégorie.');
+        return;
+      }
+      if (!categoryId) {
+        showCreateError('Veuillez sélectionner une catégorie parente.');
+        return;
+      }
+      
+      // Désactiver le bouton pendant la requête
+      confirmCreateBtn.disabled = true;
+      confirmCreateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Création...';
+      
+      try {
+        const url = document.getElementById('createSubcategoryUrl')?.value;
+        const csrfToken = document.getElementById('csrfTokenHidden')?.value;
+        
+        console.log('URL:', url);
+        console.log('CSRF Token:', csrfToken ? 'présent' : 'absent');
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({
+            name: name,
+            category_id: parseInt(categoryId)
+          })
+        });
+        
+        console.log('Response status:', response.status);
+        
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (!response.ok) {
+          showCreateError(data.error || 'Erreur lors de la création.');
+          return;
+        }
+        
+        // Succès !
+        if (data.already_exists) {
+          showCreateSuccess(`La catégorie "${data.name}" existait déjà dans "${data.category_name}".`);
+        } else {
+          showCreateSuccess(`Catégorie "${data.name}" créée avec succès dans "${data.category_name}" !`);
+        }
+        
+        // Ajouter la nouvelle option à tous les sélecteurs de sous-catégorie ET sélectionner pour la bouteille concernée
+        try {
+          document.querySelectorAll('select[name$="_subcategory_id"]').forEach(select => {
+            // Trouver l'optgroup correspondant à la catégorie
+            const optgroups = select.querySelectorAll('optgroup');
+            
+            optgroups.forEach(optgroup => {
+              if (optgroup.label === data.category_name) {
+                // Vérifier si l'option n'existe pas déjà
+                const existingOptions = optgroup.querySelectorAll('option');
+                let found = false;
+                existingOptions.forEach(opt => {
+                  if (opt.value == data.id) found = true;
+                });
+                
+                if (!found) {
+                  const newOption = document.createElement('option');
+                  newOption.value = data.id;
+                  newOption.textContent = data.name;
+                  optgroup.appendChild(newOption);
+                  console.log('Option ajoutée à', select.name);
+                }
+              }
+            });
+            
+            // Si c'est le sélecteur de la bouteille concernée, sélectionner la nouvelle valeur
+            if (currentBottleIndex !== null && select.name === `bottle_${currentBottleIndex}_subcategory_id`) {
+              // Attendre un tick pour que le DOM soit mis à jour
+              setTimeout(() => {
+                select.value = String(data.id);
+                console.log('Valeur sélectionnée pour', select.name, ':', data.id, '- valeur actuelle:', select.value);
+              }, 10);
+            }
+          });
+          console.log('Options ajoutées aux sélecteurs');
+        } catch (domError) {
+          console.warn('Erreur lors de l\'ajout des options:', domError);
+        }
+        
+        // Masquer l'avertissement pour la bouteille concernée
+        try {
+          if (currentBottleIndex !== null) {
+            const bottleItem = document.querySelector(`.bottle-item[data-index="${currentBottleIndex}"]`);
+            if (bottleItem) {
+              const warningDiv = bottleItem.querySelector('.form-text.text-warning');
+              if (warningDiv) {
+                warningDiv.classList.add('d-none');
+                console.log('Avertissement masqué');
+              }
+            }
+          }
+        } catch (selectError) {
+          console.warn('Erreur lors du masquage de l\'avertissement:', selectError);
+        }
+        
+        // Fermer le modal après un court délai
+        setTimeout(() => {
+          try {
+            const modalEl = document.getElementById('createSubcategoryModal');
+            if (modalEl) {
+              const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+              if (modal) {
+                modal.hide();
+              }
+            }
+          } catch (modalError) {
+            console.warn('Erreur lors de la fermeture du modal:', modalError);
+            // Fallback: fermer manuellement
+            const modalEl = document.getElementById('createSubcategoryModal');
+            if (modalEl) {
+              modalEl.classList.remove('show');
+              modalEl.style.display = 'none';
+              document.body.classList.remove('modal-open');
+              const backdrop = document.querySelector('.modal-backdrop');
+              if (backdrop) backdrop.remove();
+            }
+          }
+        }, 1500);
+        
+      } catch (error) {
+        console.error('Erreur détaillée:', error);
+        console.error('Stack:', error.stack);
+        showCreateError(`Erreur: ${error.message || 'Erreur de connexion. Veuillez réessayer.'}`);
+      } finally {
+        // Réactiver le bouton
+        confirmCreateBtn.disabled = false;
+        confirmCreateBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Créer la catégorie';
+      }
+    });
+  }
+  
+  function showCreateError(message) {
+    if (createError) {
+      createError.textContent = message;
+      createError.classList.remove('d-none');
+    }
+    if (createSuccess) {
+      createSuccess.classList.add('d-none');
+    }
+  }
+  
+  function showCreateSuccess(message) {
+    if (createSuccess) {
+      createSuccess.textContent = message;
+      createSuccess.classList.remove('d-none');
+    }
+    if (createError) {
+      createError.classList.add('d-none');
     }
   }
 })();

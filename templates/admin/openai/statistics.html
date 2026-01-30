@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .stats-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .stats-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .stats-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #10a37f, #1a7f64);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .stats-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .stats-card-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  
+  .stats-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .stat-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    box-shadow: 0 2px 4px var(--shadow-color);
+  }
+  
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .stat-card.success .stat-value { color: var(--accent-success); }
+  .stat-card.danger .stat-value { color: var(--accent-danger); }
+  .stat-card.info .stat-value { color: var(--accent-info); }
+  .stat-card.warning .stat-value { color: var(--accent-warning); }
+  
+  /* Chart container */
+  .chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+  }
+  
+  /* Top users table */
+  .top-users-table {
+    width: 100%;
+  }
+  
+  .top-users-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+  }
+  
+  .top-users-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .top-users-table tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .rank-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  
+  .rank-badge.gold { background-color: #fbbf24; color: #78350f; }
+  .rank-badge.silver { background-color: #9ca3af; color: #1f2937; }
+  .rank-badge.bronze { background-color: #d97706; color: #fff; }
+  .rank-badge.default { background-color: var(--bg-hover); color: var(--text-muted); }
+  
+  /* Type breakdown */
+  .type-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .type-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .type-item-bar {
+    flex: 1;
+    height: 8px;
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  
+  .type-item-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-sm);
+  }
+  
+  .type-item-label {
+    width: 100px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  
+  .type-item-value {
+    width: 80px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <h3 class="m-0">Statistiques IA</h3>
+    <p class="text-muted mb-0">Analyse détaillée de l'utilisation de l'API OpenAI</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('openai_admin.config') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-gear me-1"></i> Configuration
+    </a>
+    <a href="{{ url_for('openai_admin.logs') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-list-ul me-1"></i> Logs
+    </a>
+  </div>
+</div>
+
+<!-- Statistiques du mois en cours -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ current_month_stats.total_calls }}</div>
+    <div class="stat-label">Appels ce mois</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-value">{{ "%.4f"|format(current_month_stats.total_cost) }} $</div>
+    <div class="stat-label">Coût estimé</div>
+  </div>
+  <div class="stat-card success">
+    <div class="stat-value">{{ current_month_stats.total_input_tokens|default(0) }}</div>
+    <div class="stat-label">Tokens entrée</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-value">{{ current_month_stats.total_output_tokens|default(0) }}</div>
+    <div class="stat-label">Tokens sortie</div>
+  </div>
+</div>
+
+<!-- Budget -->
+{% if config and config.monthly_budget %}
+<div class="stats-card">
+  <div class="stats-card-header">
+    <div class="stats-card-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+      <i class="bi bi-wallet2"></i>
+    </div>
+    <div>
+      <h5 class="stats-card-title">Budget mensuel</h5>
+      <p class="stats-card-subtitle">{{ "%.2f"|format(config.monthly_budget) }} $ alloués</p>
+    </div>
+  </div>
+  <div class="stats-card-body">
+    {% set used = current_month_stats.total_cost %}
+    {% set budget = config.monthly_budget|float %}
+    {% set percent = (used / budget * 100) if budget > 0 else 0 %}
+    <div class="progress mb-2" style="height: 20px;">
+      <div class="progress-bar {% if percent > 90 %}bg-danger{% elif percent > 70 %}bg-warning{% else %}bg-success{% endif %}" 
+           role="progressbar" 
+           style="width: {{ percent|min(100) }}%"
+           aria-valuenow="{{ percent }}" 
+           aria-valuemin="0" 
+           aria-valuemax="100">
+        {{ "%.1f"|format(percent) }}%
+      </div>
+    </div>
+    <div class="d-flex justify-content-between text-muted small">
+      <span>Utilisé : {{ "%.4f"|format(used) }} $</span>
+      <span>Restant : {{ "%.4f"|format((budget - used)|max(0)) }} $</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row">
+  <!-- Évolution mensuelle -->
+  <div class="col-lg-8">
+    <div class="stats-card">
+      <div class="stats-card-header">
+        <div class="stats-card-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+          <i class="bi bi-graph-up"></i>
+        </div>
+        <div>
+          <h5 class="stats-card-title">Évolution mensuelle</h5>
+          <p class="stats-card-subtitle">12 derniers mois</p>
+        </div>
+      </div>
+      <div class="stats-card-body">
+        <div class="chart-container">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Répartition par type -->
+  <div class="col-lg-4">
+    <div class="stats-card">
+      <div class="stats-card-header">
+        <div class="stats-card-icon" style="background: linear-gradient(135deg, #ec4899, #db2777);">
+          <i class="bi bi-pie-chart"></i>
+        </div>
+        <div>
+          <h5 class="stats-card-title">Par type d'appel</h5>
+          <p class="stats-card-subtitle">Ce mois</p>
+        </div>
+      </div>
+      <div class="stats-card-body">
+        {% if current_month_stats.by_type %}
+        <div class="type-breakdown">
+          {% set max_count = current_month_stats.by_type|map(attribute='count')|max %}
+          {% for item in current_month_stats.by_type %}
+          <div class="type-item">
+            <span class="type-item-label">{{ item.type }}</span>
+            <div class="type-item-bar">
+              <div class="type-item-bar-fill" 
+                   style="width: {{ (item.count / max_count * 100) if max_count > 0 else 0 }}%; background-color: {% if loop.index == 1 %}#10a37f{% elif loop.index == 2 %}#6366f1{% elif loop.index == 3 %}#f59e0b{% else %}#ec4899{% endif %};"></div>
+            </div>
+            <span class="type-item-value">{{ item.count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted text-center">Aucune donnée ce mois</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Top utilisateurs -->
+<div class="stats-card">
+  <div class="stats-card-header">
+    <div class="stats-card-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+      <i class="bi bi-trophy"></i>
+    </div>
+    <div>
+      <h5 class="stats-card-title">Top utilisateurs</h5>
+      <p class="stats-card-subtitle">Par coût total</p>
+    </div>
+  </div>
+  <div class="stats-card-body">
+    {% if top_users %}
+    <table class="top-users-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;">#</th>
+          <th>Utilisateur</th>
+          <th class="text-end">Appels</th>
+          <th class="text-end">Coût total</th>
+          <th style="width: 100px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in top_users %}
+        <tr>
+          <td>
+            <span class="rank-badge {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% else %}default{% endif %}">
+              {{ loop.index }}
+            </span>
+          </td>
+          <td>
+            {% if item.user %}
+            <strong>{{ item.user.username }}</strong>
+            {% if item.user.has_custom_openai_key() %}
+            <span class="badge bg-warning ms-1" title="Clé personnelle">🔑</span>
+            {% endif %}
+            {% else %}
+            <span class="text-muted">Utilisateur inconnu</span>
+            {% endif %}
+          </td>
+          <td class="text-end">{{ item.total_calls }}</td>
+          <td class="text-end">
+            <strong>{{ "%.4f"|format(item.total_cost) }} $</strong>
+          </td>
+          <td class="text-end">
+            {% if item.user %}
+            <a href="{{ url_for('openai_admin.user_logs', user_id=item.user.id) }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-eye"></i>
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center">Aucune donnée disponible</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Historique mensuel détaillé -->
+<div class="stats-card">
+  <div class="stats-card-header">
+    <div class="stats-card-icon" style="background: linear-gradient(135deg, #14b8a6, #0d9488);">
+      <i class="bi bi-calendar3"></i>
+    </div>
+    <div>
+      <h5 class="stats-card-title">Historique mensuel</h5>
+      <p class="stats-card-subtitle">Détail par mois</p>
+    </div>
+  </div>
+  <div class="stats-card-body">
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Mois</th>
+            <th class="text-end">Appels</th>
+            <th class="text-end">Tokens entrée</th>
+            <th class="text-end">Tokens sortie</th>
+            <th class="text-end">Coût</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stats in monthly_history|reverse %}
+          <tr>
+            <td>{{ stats.month_label }}</td>
+            <td class="text-end">{{ stats.total_calls }}</td>
+            <td class="text-end">{{ stats.total_input_tokens|default(0) }}</td>
+            <td class="text-end">{{ stats.total_output_tokens|default(0) }}</td>
+            <td class="text-end"><strong>{{ "%.4f"|format(stats.total_cost) }} $</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const ctx = document.getElementById('monthlyChart').getContext('2d');
+  
+  const monthlyData = {{ monthly_history | tojson }};
+  
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: monthlyData.map(d => d.month_label),
+      datasets: [
+        {
+          label: 'Appels',
+          data: monthlyData.map(d => d.total_calls),
+          backgroundColor: 'rgba(16, 163, 127, 0.7)',
+          borderColor: 'rgba(16, 163, 127, 1)',
+          borderWidth: 1,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Coût ($)',
+          data: monthlyData.map(d => d.total_cost),
+          type: 'line',
+          borderColor: 'rgba(99, 102, 241, 1)',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          yAxisID: 'y1',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Nombre d\'appels'
+          },
+          beginAtZero: true,
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Coût ($)'
+          },
+          beginAtZero: true,
+          grid: {
+            drawOnChartArea: false,
+          },
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+      }
+    }
+  });
+});
+</script>
+{% endblock %}
