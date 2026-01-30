@@ -111,7 +111,7 @@
           </a>
         </li>
         
-        <!-- API (dropdown) -->
+        <!-- API & Paramètres (dropdown) -->
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="bi bi-code-slash me-1"></i>API
@@ -122,6 +122,10 @@
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('api.swagger_ui') }}"><i class="bi bi-book me-2"></i>Documentation</a></li>
             <li><a class="dropdown-item" href="{{ url_for('api.openapi_spec') }}" target="_blank"><i class="bi bi-filetype-json me-2"></i>OpenAPI Spec</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.openai_settings') }}"><i class="bi bi-robot me-2"></i>Ma clé OpenAI</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.my_consumption') }}"><i class="bi bi-graph-up me-2"></i>Ma consommation IA</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-shield-lock me-2"></i>Mot de passe</a></li>
           </ul>
         </li>
         
@@ -143,6 +147,7 @@
             <li><a class="dropdown-item" href="{{ url_for('categories.list_categories') }}"><i class="bi bi-tags me-2"></i>Catégories</a></li>
             <li><a class="dropdown-item" href="{{ url_for('api_tokens.admin_list') }}"><i class="bi bi-key me-2"></i>Tokens API</a></li>
             <li><a class="dropdown-item" href="{{ url_for('smtp.index') }}"><i class="bi bi-envelope-at me-2"></i>Configuration SMTP</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('openai_admin.config') }}"><i class="bi bi-robot me-2"></i>Configuration OpenAI</a></li>
           </ul>
         </li>
         {% endif %}

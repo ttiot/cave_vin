@@ -8,7 +8,6 @@ from io import BytesIO
 
 from flask import (
     Blueprint,
-    current_app,
     flash,
     jsonify,
     redirect,
@@ -38,8 +37,8 @@ import_bp = Blueprint("import", __name__, url_prefix="/import")
 
 
 def _get_detection_service() -> BottleDetectionService:
-    """Récupère ou crée le service de détection de bouteilles."""
-    return BottleDetectionService.from_app(current_app)
+    """Récupère ou crée le service de détection de bouteilles pour l'utilisateur courant."""
+    return BottleDetectionService.for_user(current_user.id)
 
 
 def _process_uploaded_image(file) -> tuple[str, str, str]:
@@ -518,4 +517,83 @@ def api_analyze_image():
         
     except Exception as exc:
         logger.exception("Erreur API analyse: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@import_bp.route("/api/create-subcategory", methods=["POST"])
+@login_required
+def api_create_subcategory():
+    """
+    API endpoint pour créer une sous-catégorie à la volée.
+    
+    Permet de créer automatiquement une catégorie détectée par l'IA
+    qui n'existe pas encore dans le système.
+    
+    Returns:
+        JSON avec les informations de la sous-catégorie créée
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Données JSON requises"}), 400
+    
+    subcategory_name = (data.get("name") or "").strip()
+    category_id = data.get("category_id")
+    
+    if not subcategory_name:
+        return jsonify({"error": "Le nom de la sous-catégorie est requis"}), 400
+    
+    if not category_id:
+        return jsonify({"error": "L'ID de la catégorie parente est requis"}), 400
+    
+    try:
+        # Vérifier que la catégorie parente existe
+        category = AlcoholCategory.query.get(category_id)
+        if not category:
+            return jsonify({"error": "Catégorie parente non trouvée"}), 404
+        
+        # Vérifier si la sous-catégorie existe déjà
+        existing = AlcoholSubcategory.query.filter(
+            AlcoholSubcategory.category_id == category_id,
+            db.func.lower(AlcoholSubcategory.name) == subcategory_name.lower()
+        ).first()
+        
+        if existing:
+            return jsonify({
+                "id": existing.id,
+                "name": existing.name,
+                "category_id": existing.category_id,
+                "category_name": category.name,
+                "already_exists": True,
+            })
+        
+        # Calculer l'ordre d'affichage (à la fin)
+        max_order = db.session.query(db.func.max(AlcoholSubcategory.display_order)).filter(
+            AlcoholSubcategory.category_id == category_id
+        ).scalar() or 0
+        
+        # Créer la nouvelle sous-catégorie
+        new_subcategory = AlcoholSubcategory(
+            name=subcategory_name,
+            category_id=category_id,
+            display_order=max_order + 1,
+        )
+        db.session.add(new_subcategory)
+        db.session.commit()
+        
+        logger.info(
+            "Nouvelle sous-catégorie créée: %s (ID: %d) dans %s",
+            new_subcategory.name, new_subcategory.id, category.name
+        )
+        
+        return jsonify({
+            "id": new_subcategory.id,
+            "name": new_subcategory.name,
+            "category_id": new_subcategory.category_id,
+            "category_name": category.name,
+            "already_exists": False,
+        })
+        
+    except Exception as exc:
+        logger.exception("Erreur lors de la création de la sous-catégorie: %s", exc)
+        db.session.rollback()
         return jsonify({"error": str(exc)}), 500

@@ -17,6 +17,7 @@ from .alcohol import AlcoholCategory, AlcoholSubcategory
 from .wine import Wine, WineInsight, WineConsumption
 from .fields import BottleFieldDefinition, AlcoholFieldRequirement
 from .smtp import SMTPConfig, EmailLog
+from .openai_config import OpenAIConfig, AICallLog, OpenAIPrompt
 
 __all__ = [
     "db",
@@ -28,4 +29,5 @@ __all__ = [
     "Wine", "WineInsight", "WineConsumption",
     "BottleFieldDefinition", "AlcoholFieldRequirement",
     "SMTPConfig", "EmailLog",
+    "OpenAIConfig", "AICallLog", "OpenAIPrompt",
 ]

@@ -60,9 +60,9 @@ def wine_pairing():
                 # Convertir les vins en format JSON pour l'IA
                 wines_data = [_wine_to_dict(w) for w in wines]
 
-                # Initialiser le service et obtenir les recommandations
+                # Initialiser le service avec la clé appropriée pour l'utilisateur
                 try:
-                    service = WinePairingService.from_app(current_app)
+                    service = WinePairingService.for_user(current_user.id)
                     result = service.get_recommendations(dish, wines_data)
                     
                     if result is None:
@@ -107,9 +107,9 @@ def wine_pairing_api():
     # Convertir les vins en format JSON pour l'IA
     wines_data = [_wine_to_dict(w) for w in wines]
 
-    # Initialiser le service et obtenir les recommandations
+    # Initialiser le service avec la clé appropriée pour l'utilisateur
     try:
-        service = WinePairingService.from_app(current_app)
+        service = WinePairingService.for_user(current_user.id)
         result = service.get_recommendations(dish, wines_data)
         
         if result is None:

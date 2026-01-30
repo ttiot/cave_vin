@@ -19,6 +19,11 @@ from app.field_config import FIELD_STORAGE_MAP, iter_fields
 
 logger = logging.getLogger(__name__)
 
+# Import conditionnel pour éviter les imports circulaires
+def _get_openai_utils():
+    from services.openai_utils import get_openai_client_for_user, log_ai_call, extract_token_usage, TimedCall
+    return get_openai_client_for_user, log_ai_call, extract_token_usage, TimedCall
+
 
 @dataclass
 class InsightData:
@@ -56,6 +61,8 @@ class WineInfoService:
         openai_image_model: Optional[str] = None,
         openai_source_name: str = "OpenAI",
         log_openai_payloads: bool = False,
+        user_id: Optional[int] = None,
+        api_key_source: str = "env",
     ) -> None:
         self.session = session or requests.Session()
         self.openai_client = openai_client
@@ -63,10 +70,52 @@ class WineInfoService:
         self.openai_image_model = openai_image_model
         self.openai_source_name = openai_source_name
         self.log_openai_payloads = log_openai_payloads
+        self.user_id = user_id
+        self.api_key_source = api_key_source
+
+    @classmethod
+    def for_user(cls, user_id: int) -> "WineInfoService":
+        """Factory qui crée un service avec la clé API appropriée pour l'utilisateur.
+        
+        Priorité des clés :
+        1. Clé personnelle de l'utilisateur
+        2. Clé globale configurée en base de données
+        3. Clé de la variable d'environnement (fallback)
+        
+        Args:
+            user_id: ID de l'utilisateur
+            
+        Returns:
+            Instance de WineInfoService configurée pour l'utilisateur
+        """
+        logger.info("🔧 Initialisation de WineInfoService pour l'utilisateur %d", user_id)
+        
+        get_openai_client_for_user, _, _, _ = _get_openai_utils()
+        
+        client, api_key_source, config_info = get_openai_client_for_user(user_id)
+        
+        if client:
+            logger.info("✅ Client OpenAI initialisé (source: %s)", api_key_source)
+        else:
+            logger.warning("⚠️ Aucun client OpenAI disponible pour l'utilisateur %d", user_id)
+        
+        return cls(
+            openai_client=client,
+            openai_model=config_info.get("model") or "gpt-4o-mini",
+            openai_image_model=config_info.get("image_model"),
+            openai_source_name=config_info.get("source_name") or "OpenAI",
+            log_openai_payloads=False,  # Le logging se fait via AICallLog maintenant
+            user_id=user_id,
+            api_key_source=api_key_source,
+        )
 
     @classmethod
     def from_app(cls, app) -> "WineInfoService":
-        """Factory that uses the Flask app configuration to bootstrap providers."""
+        """Factory that uses the Flask app configuration to bootstrap providers.
+        
+        Note: Cette méthode est conservée pour la rétrocompatibilité.
+        Pour les nouveaux usages, préférez `for_user(user_id)`.
+        """
         logger.info("🔧 Initialisation de WineInfoService depuis l'application Flask")
 
         openai_client = None
@@ -114,6 +163,8 @@ class WineInfoService:
             openai_image_model=openai_image_model,
             openai_source_name=source_name,
             log_openai_payloads=bool(app.config.get("OPENAI_LOG_REQUESTS")),
+            user_id=None,
+            api_key_source="env",
         )
 
     # ------------------------------------------------------------------
@@ -236,45 +287,59 @@ class WineInfoService:
 
         logger.debug("📋 OpenAI: détails du vin collectés: %s", ", ".join(details))
 
-        system_prompt = (
-            "Tu es un assistant sommelier chargé d'enrichir la fiche d'un alcool. "
-            "Tu réponds exclusivement en français et fournis des informations fiables, "
-            "concis, adaptées à un public de passionnés."
-        )
+        # Récupérer le prompt configurable depuis la base de données
+        wine_details = "\n".join(f"- {line}" for line in details if line)
+        
+        try:
+            from app.models import OpenAIPrompt
+            prompt_config = OpenAIPrompt.get_or_create_default("wine_enrichment")
+            system_prompt = prompt_config.render_system_prompt()
+            user_prompt = prompt_config.render_user_prompt(wine_details=wine_details)
+            schema = prompt_config.response_schema
+            max_output_tokens = prompt_config.get_parameter("max_output_tokens", 900)
+        except Exception as e:
+            logger.warning("⚠️ Impossible de charger le prompt configurable: %s. Utilisation des valeurs par défaut.", e)
+            # Fallback aux valeurs par défaut
+            system_prompt = (
+                "Tu es un assistant sommelier chargé d'enrichir la fiche d'un alcool. "
+                "Tu réponds exclusivement en français et fournis des informations fiables, "
+                "concis, adaptées à un public de passionnés."
+            )
 
-        user_prompt = (
-            "Voici les informations connues sur l'alcool :\n"
-            + "\n".join(f"- {line}" for line in details if line)
-            + "\n\n"
-            "Complète avec 4 à 6 éclairages distincts (estimation du prix actuel, histoire du domaine, profil aromatique, accords mets et vins, potentiel de garde, etc.). "
-            "Chaque éclairage doit tenir en 2 à 4 phrases maximum."
-            "Structure ta réponse au format JSON selon le schéma demandé, sans texte additionnel."
-        )
+            user_prompt = (
+                "Voici les informations connues sur l'alcool :\n"
+                + wine_details
+                + "\n\n"
+                "Complète avec 4 à 6 éclairages distincts (estimation du prix actuel, histoire du domaine, profil aromatique, accords mets et vins, potentiel de garde, etc.). "
+                "Chaque éclairage doit tenir en 2 à 4 phrases maximum."
+                "Structure ta réponse au format JSON selon le schéma demandé, sans texte additionnel."
+            )
 
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "insights": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 5,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "category": {"type": "string"},
-                            "title": {"type": "string"},
-                            "content": {"type": "string"},
-                            "source": {"type": "string"},
-                            "weight": {"type": "integer"},
+            schema = {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "insights": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 5,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "category": {"type": "string"},
+                                "title": {"type": "string"},
+                                "content": {"type": "string"},
+                                "source": {"type": "string"},
+                                "weight": {"type": "integer"},
+                            },
+                            "required": ["category", "title", "content", "source", "weight"],
                         },
-                        "required": ["category", "title", "content", "source", "weight"],
-                    },
-                }
-            },
-            "required": ["insights"],
-        }
+                    }
+                },
+                "required": ["insights"],
+            }
+            max_output_tokens = 900
 
         logger.info("📤 OpenAI: envoi de la requête à l'API")
         logger.debug(
@@ -283,32 +348,44 @@ class WineInfoService:
             len(user_prompt),
         )
 
+        # Import des utilitaires pour le logging en base de données
+        _, log_ai_call, extract_token_usage, TimedCall = _get_openai_utils()
+        
+        # Préparer le prompt complet pour le logging
+        full_prompt = f"[SYSTEM]\n{system_prompt}\n\n[USER]\n{user_prompt}"
+        
+        response = None
+        error_message = None
+        duration_ms = None
+        
         try:
             # Utilisation de l'API Responses avec le type correct 'input_text'
-            response = self.openai_client.responses.create(
-                model=self.openai_model,
-                input=[
-                    {
-                        "role": "system",
-                        "content": [{"type": "input_text", "text": system_prompt.strip()}],
+            with TimedCall() as timer:
+                response = self.openai_client.responses.create(
+                    model=self.openai_model,
+                    input=[
+                        {
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": system_prompt.strip()}],
+                        },
+                        {
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": user_prompt.strip()}],
+                        },
+                    ],
+                    text={
+                        "format": {
+                            "type": "json_schema",
+                            "name": "wine_enrichment",
+                            "schema": schema
+                        },
                     },
-                    {
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": user_prompt.strip()}],
-                    },
-                ],
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "name": "wine_enrichment",
-                        "schema": schema
-                    },
-                },
-                max_output_tokens=900,
-            )
-            logger.info("✅ OpenAI: réponse reçue de l'API")
+                    max_output_tokens=max_output_tokens,
+                )
+            duration_ms = timer.duration_ms
+            logger.info("✅ OpenAI: réponse reçue de l'API (durée: %dms)", duration_ms)
 
-            # Enregistrement de la requête et de la réponse
+            # Enregistrement de la requête et de la réponse (fichier)
             self._log_openai_request_response(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -318,24 +395,61 @@ class WineInfoService:
             )
 
         except OpenAIError as exc:
+            error_message = str(exc)
             logger.warning("❌ Requête OpenAI échouée : %s", exc)
             self._log_openai_request_response(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 schema=schema,
                 response=None,
-                error=str(exc)
+                error=error_message
             )
-            return []
         except Exception as exc:  # pragma: no cover - defensive logging
+            error_message = f"Unexpected error: {exc}"
             logger.warning("❌ Erreur inattendue lors de l'appel OpenAI : %s", exc)
             self._log_openai_request_response(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 schema=schema,
                 response=None,
-                error=f"Unexpected error: {exc}"
+                error=error_message
             )
+        
+        # Logging en base de données si un user_id est défini
+        if self.user_id:
+            try:
+                # Extraire les informations de tokens
+                input_tokens, output_tokens = extract_token_usage(response) if response else (0, 0)
+                
+                # Préparer la réponse pour le log
+                response_text = None
+                if response:
+                    try:
+                        response_text = getattr(response, "output_text", None)
+                        if not response_text:
+                            response_text = json.dumps(response.model_dump(), ensure_ascii=False)
+                    except Exception:
+                        response_text = str(response)
+                
+                log_ai_call(
+                    user_id=self.user_id,
+                    call_type="wine_enrichment",
+                    model=self.openai_model,
+                    prompt=full_prompt,
+                    response=response_text,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    duration_ms=duration_ms,
+                    success=error_message is None,
+                    error_message=error_message,
+                    api_key_source=self.api_key_source,
+                )
+                logger.debug("📊 Appel IA loggé en base de données")
+            except Exception as log_exc:
+                logger.warning("⚠️ Impossible de logger l'appel IA en base: %s", log_exc)
+        
+        # Si erreur, retourner une liste vide
+        if error_message:
             return []
 
         logger.debug("🔍 OpenAI: parsing de la réponse")
@@ -391,18 +505,55 @@ class WineInfoService:
         if not prompt:
             return None
 
+        # Import des utilitaires pour le logging en base de données
+        _, log_ai_call, _, TimedCall = _get_openai_utils()
+        
+        response = None
+        error_message = None
+        duration_ms = None
+        
         try:
-            response = self.openai_client.images.generate(
-                model=self.openai_image_model,
-                prompt=prompt,
-                size="1024x1024",
-                n=1,
-            )
+            with TimedCall() as timer:
+                response = self.openai_client.images.generate(
+                    model=self.openai_image_model,
+                    prompt=prompt,
+                    size="1024x1024",
+                    n=1,
+                    response_format="b64_json",
+                )
+            duration_ms = timer.duration_ms
+            logger.info("✅ OpenAI: image générée (durée: %dms)", duration_ms)
         except OpenAIError as exc:
+            error_message = str(exc)
             logger.warning("❌ OpenAI image generation failed: %s", exc)
-            return None
         except Exception as exc:  # pragma: no cover - defensive logging
+            error_message = f"Unexpected error: {exc}"
             logger.warning("❌ Unexpected error during image generation: %s", exc)
+        
+        # Logging en base de données si un user_id est défini
+        if self.user_id:
+            try:
+                # Pour les images, on estime les tokens différemment
+                # DALL-E n'utilise pas de tokens mais un coût fixe par image
+                log_ai_call(
+                    user_id=self.user_id,
+                    call_type="image_generation",
+                    model=self.openai_image_model,
+                    prompt=prompt,
+                    response="[IMAGE_GENERATED]" if response and not error_message else None,
+                    input_tokens=0,  # Les images n'utilisent pas de tokens input
+                    output_tokens=0,  # Les images n'utilisent pas de tokens output
+                    duration_ms=duration_ms,
+                    success=error_message is None,
+                    error_message=error_message,
+                    api_key_source=self.api_key_source,
+                )
+                logger.debug("📊 Appel génération d'image loggé en base de données")
+            except Exception as log_exc:
+                logger.warning("⚠️ Impossible de logger l'appel image en base: %s", log_exc)
+        
+        # Si erreur, retourner None
+        if error_message:
             return None
 
         payload = getattr(response, "data", None) or []
