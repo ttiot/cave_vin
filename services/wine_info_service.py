@@ -211,13 +211,14 @@ class WineInfoService:
         deduplicated = self._deduplicate(insights)
         logger.info("✅ Récupération terminée: %d insights uniques", len(deduplicated))
 
-        if self.openai_client and self.openai_image_model:
-            logger.info("🖼️ Tentative de génération d'une étiquette stylisée")
-            label_image_data = self._openai_label_image(wine, query)
-            if label_image_data:
-                logger.info("🖼️ Étiquette générée avec succès (%d caractères)", len(label_image_data))
-            else:
-                logger.info("⚠️ Aucune étiquette générée pour ce vin")
+        # Génération d'étiquette automatique désactivée
+        # if self.openai_client and self.openai_image_model:
+        #     logger.info("🖼️ Tentative de génération d'une étiquette stylisée")
+        #     label_image_data = self._openai_label_image(wine, query)
+        #     if label_image_data:
+        #         logger.info("🖼️ Étiquette générée avec succès (%d caractères)", len(label_image_data))
+        #     else:
+        #         logger.info("⚠️ Aucune étiquette générée pour ce vin")
 
         logger.info("=" * 80)
 
@@ -435,14 +436,15 @@ class WineInfoService:
                     user_id=self.user_id,
                     call_type="wine_enrichment",
                     model=self.openai_model,
-                    prompt=full_prompt,
-                    response=response_text,
+                    api_key_source=self.api_key_source,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    response_text=response_text,
+                    response_status="success" if error_message is None else "error",
+                    error_message=error_message,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     duration_ms=duration_ms,
-                    success=error_message is None,
-                    error_message=error_message,
-                    api_key_source=self.api_key_source,
                 )
                 logger.debug("📊 Appel IA loggé en base de données")
             except Exception as log_exc:
@@ -539,14 +541,14 @@ class WineInfoService:
                     user_id=self.user_id,
                     call_type="image_generation",
                     model=self.openai_image_model,
-                    prompt=prompt,
-                    response="[IMAGE_GENERATED]" if response and not error_message else None,
+                    api_key_source=self.api_key_source,
+                    user_prompt=prompt,
+                    response_text="[IMAGE_GENERATED]" if response and not error_message else None,
+                    response_status="success" if error_message is None else "error",
+                    error_message=error_message,
                     input_tokens=0,  # Les images n'utilisent pas de tokens input
                     output_tokens=0,  # Les images n'utilisent pas de tokens output
                     duration_ms=duration_ms,
-                    success=error_message is None,
-                    error_message=error_message,
-                    api_key_source=self.api_key_source,
                 )
                 logger.debug("📊 Appel génération d'image loggé en base de données")
             except Exception as log_exc:
