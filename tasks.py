@@ -15,14 +15,18 @@ logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wine-info")
 
-def schedule_wine_enrichment(wine_id: int) -> None:
-    """Launch an asynchronous job that fetches contextual data for a wine."""
+def schedule_wine_enrichment(wine_id: int, user_id: int = None) -> None:
+    """Launch an asynchronous job that fetches contextual data for a wine.
     
+    Args:
+        wine_id: ID du vin à enrichir
+        user_id: ID de l'utilisateur (pour utiliser sa clé API si configurée)
+    """
     app = current_app._get_current_object()
-    _executor.submit(_run_enrichment, app, wine_id)
+    _executor.submit(_run_enrichment, app, wine_id, user_id)
 
 
-def _run_enrichment(app, wine_id: int) -> None:
+def _run_enrichment(app, wine_id: int, user_id: int = None) -> None:
     with app.app_context():
         wine = Wine.query.get(wine_id)
         if not wine:
@@ -31,7 +35,11 @@ def _run_enrichment(app, wine_id: int) -> None:
 
         logger.info("Starting enrichment for wine %s", wine.name)
 
-        service = WineInfoService.from_app(app)
+        # Utiliser l'ID utilisateur fourni ou celui du propriétaire du vin
+        effective_user_id = user_id or wine.user_id
+        
+        # Utiliser for_user pour bénéficier de la clé API appropriée et du logging
+        service = WineInfoService.for_user(effective_user_id)
         enrichment = service.fetch(wine)
         if not enrichment.has_payload():
             logger.info("No enrichment data available for wine %s", wine.name)

@@ -22,6 +22,9 @@ class User(UserMixin, db.Model):
     default_cellar_id = db.Column(db.Integer, db.ForeignKey("cellar.id", ondelete="SET NULL"), nullable=True)
     parent_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
+    
+    # Clé API OpenAI personnelle (optionnelle, surcharge la clé globale)
+    openai_api_key_encrypted = db.Column(db.Text, nullable=True)
 
     # Relation vers le compte parent (si sous-compte)
     parent = db.relationship(
@@ -75,6 +78,57 @@ class User(UserMixin, db.Model):
         Pour un compte principal, c'est lui-même.
         """
         return self.parent if self.parent is not None else self
+
+    def set_openai_api_key(self, api_key: str) -> None:
+        """Chiffre et stocke la clé API OpenAI personnelle.
+        
+        Utilise Fernet pour le chiffrement symétrique.
+        La clé de chiffrement doit être définie dans la configuration de l'application.
+        """
+        if not api_key:
+            self.openai_api_key_encrypted = None
+            return
+        
+        from cryptography.fernet import Fernet
+        from flask import current_app
+        
+        key = current_app.config.get("SMTP_ENCRYPTION_KEY")
+        if not key:
+            current_app.logger.warning(
+                "SMTP_ENCRYPTION_KEY non définie. La clé API ne peut pas être chiffrée."
+            )
+            return
+        
+        if isinstance(key, str):
+            key = key.encode()
+        
+        f = Fernet(key)
+        self.openai_api_key_encrypted = f.encrypt(api_key.encode()).decode()
+
+    def get_openai_api_key(self) -> str | None:
+        """Déchiffre et retourne la clé API OpenAI personnelle."""
+        if not self.openai_api_key_encrypted:
+            return None
+        
+        from cryptography.fernet import Fernet
+        from flask import current_app
+        
+        key = current_app.config.get("SMTP_ENCRYPTION_KEY")
+        if not key:
+            return None
+        
+        if isinstance(key, str):
+            key = key.encode()
+        
+        try:
+            f = Fernet(key)
+            return f.decrypt(self.openai_api_key_encrypted.encode()).decode()
+        except Exception:
+            return None
+
+    def has_custom_openai_key(self) -> bool:
+        """Retourne True si l'utilisateur a une clé API OpenAI personnelle."""
+        return bool(self.openai_api_key_encrypted)
 
 
 class UserSettings(db.Model):

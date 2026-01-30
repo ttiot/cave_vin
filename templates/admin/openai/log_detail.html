@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .detail-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .detail-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .detail-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .detail-card-icon.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+  }
+  
+  .detail-card-icon.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+  }
+  
+  .detail-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .detail-card-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  
+  .detail-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  /* Info grid */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .info-item {
+    padding: var(--spacing-md);
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-md);
+  }
+  
+  .info-item-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .info-item-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  /* Prompt display */
+  .prompt-section {
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .prompt-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .prompt-content {
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    color: var(--text-secondary);
+  }
+  
+  .prompt-content.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--accent-danger);
+  }
+  
+  /* Badges */
+  .badge-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+  }
+  
+  .badge-status.success {
+    background-color: var(--accent-success);
+    color: #fff;
+  }
+  
+  .badge-status.error {
+    background-color: var(--accent-danger);
+    color: #fff;
+  }
+  
+  .badge-source {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+  }
+  
+  .badge-source.global {
+    background-color: var(--accent-info);
+    color: #fff;
+  }
+  
+  .badge-source.user {
+    background-color: var(--accent-warning);
+    color: #fff;
+  }
+  
+  /* Context display */
+  .context-json {
+    background-color: var(--bg-hover);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.config') }}">OpenAI</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.logs') }}">Logs</a></li>
+        <li class="breadcrumb-item active">Détail #{{ log.id }}</li>
+      </ol>
+    </nav>
+    <h3 class="m-0">Détail de l'appel IA #{{ log.id }}</h3>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('openai_admin.logs') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Retour aux logs
+    </a>
+    {% if user %}
+    <a href="{{ url_for('openai_admin.user_logs', user_id=user.id) }}" class="btn btn-outline-primary">
+      <i class="bi bi-person me-1"></i> Logs de {{ user.username }}
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Informations générales -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon {% if log.response_status == 'success' %}success{% else %}error{% endif %}">
+      <i class="bi bi-{% if log.response_status == 'success' %}check-lg{% else %}x-lg{% endif %}"></i>
+    </div>
+    <div class="flex-grow-1">
+      <h5 class="detail-card-title">{{ log.call_type }}</h5>
+      <p class="detail-card-subtitle">{{ log.created_at.strftime('%d/%m/%Y à %H:%M:%S') }}</p>
+    </div>
+    <div class="d-flex gap-2">
+      <span class="badge-status {% if log.response_status == 'success' %}success{% else %}error{% endif %}">
+        {{ log.response_status }}
+      </span>
+      <span class="badge-source {{ log.api_key_source }}">
+        Clé {{ log.api_key_source }}
+      </span>
+    </div>
+  </div>
+  
+  <div class="detail-card-body">
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-item-label">Utilisateur</div>
+        <div class="info-item-value">
+          {% if user %}
+          <a href="{{ url_for('openai_admin.user_logs', user_id=user.id) }}">{{ user.username }}</a>
+          {% else %}
+          Utilisateur inconnu
+          {% endif %}
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Modèle</div>
+        <div class="info-item-value">{{ log.model }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Tokens entrée</div>
+        <div class="info-item-value">{{ log.input_tokens or '-' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Tokens sortie</div>
+        <div class="info-item-value">{{ log.output_tokens or '-' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Total tokens</div>
+        <div class="info-item-value">{{ log.total_tokens or '-' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Coût estimé</div>
+        <div class="info-item-value">
+          {% if log.estimated_cost_usd %}
+          ${{ "%.6f"|format(log.estimated_cost_usd) }}
+          {% else %}
+          -
+          {% endif %}
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Durée</div>
+        <div class="info-item-value">
+          {% if log.duration_ms %}
+          {{ log.duration_ms }} ms
+          {% else %}
+          -
+          {% endif %}
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-item-label">Source clé API</div>
+        <div class="info-item-value">{{ log.api_key_source }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Contexte -->
+{% if log.context %}
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+      <i class="bi bi-braces"></i>
+    </div>
+    <div>
+      <h5 class="detail-card-title">Contexte</h5>
+      <p class="detail-card-subtitle">Données associées à l'appel</p>
+    </div>
+  </div>
+  <div class="detail-card-body">
+    <pre class="context-json">{{ log.context | tojson(indent=2) }}</pre>
+  </div>
+</div>
+{% endif %}
+
+<!-- Prompts -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon" style="background: linear-gradient(135deg, #10a37f, #1a7f64);">
+      <i class="bi bi-chat-left-text"></i>
+    </div>
+    <div>
+      <h5 class="detail-card-title">Requête</h5>
+      <p class="detail-card-subtitle">Prompts envoyés à l'API</p>
+    </div>
+  </div>
+  <div class="detail-card-body">
+    {% if log.system_prompt %}
+    <div class="prompt-section">
+      <div class="prompt-section-title">
+        <i class="bi bi-gear"></i> System Prompt
+      </div>
+      <div class="prompt-content">{{ log.system_prompt }}</div>
+    </div>
+    {% endif %}
+    
+    {% if log.user_prompt %}
+    <div class="prompt-section">
+      <div class="prompt-section-title">
+        <i class="bi bi-person"></i> User Prompt
+      </div>
+      <div class="prompt-content">{{ log.user_prompt }}</div>
+    </div>
+    {% endif %}
+    
+    {% if not log.system_prompt and not log.user_prompt %}
+    <p class="text-muted">Aucun prompt enregistré pour cet appel.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Réponse -->
+<div class="detail-card">
+  <div class="detail-card-header">
+    <div class="detail-card-icon {% if log.response_status == 'success' %}success{% else %}error{% endif %}">
+      <i class="bi bi-{% if log.response_status == 'success' %}chat-right-text{% else %}exclamation-triangle{% endif %}"></i>
+    </div>
+    <div>
+      <h5 class="detail-card-title">Réponse</h5>
+      <p class="detail-card-subtitle">
+        {% if log.response_status == 'success' %}
+        Réponse de l'API
+        {% else %}
+        Erreur retournée
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <div class="detail-card-body">
+    {% if log.response_status == 'error' and log.error_message %}
+    <div class="prompt-section">
+      <div class="prompt-section-title text-danger">
+        <i class="bi bi-exclamation-triangle"></i> Message d'erreur
+      </div>
+      <div class="prompt-content error">{{ log.error_message }}</div>
+    </div>
+    {% elif log.response_text %}
+    <div class="prompt-section">
+      <div class="prompt-section-title">
+        <i class="bi bi-robot"></i> Réponse
+      </div>
+      <div class="prompt-content">{{ log.response_text }}</div>
+    </div>
+    {% else %}
+    <p class="text-muted">Aucune réponse enregistrée pour cet appel.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

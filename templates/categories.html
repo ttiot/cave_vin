@@ -21,6 +21,7 @@
         <a href="{{ url_for('categories.add_subcategory', category_id=category.id) }}" class="btn btn-sm btn-outline-primary">+ Sous-catégorie</a>
         <a href="{{ url_for('categories.edit_category', category_id=category.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a>
         <form method="POST" action="{{ url_for('categories.delete_category', category_id=category.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
           <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
         </form>
       </div>
@@ -47,6 +48,7 @@
             <div class="btn-group btn-group-sm">
               <a href="{{ url_for('categories.edit_subcategory', subcategory_id=subcategory.id) }}" class="btn btn-outline-secondary">Modifier</a>
               <form method="POST" action="{{ url_for('categories.delete_subcategory', subcategory_id=subcategory.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette sous-catégorie ?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn btn-outline-danger">Supprimer</button>
               </form>
             </div>

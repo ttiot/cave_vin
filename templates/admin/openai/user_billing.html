@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .billing-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .billing-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .billing-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .billing-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .billing-card-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  
+  .billing-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  /* Stats cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .stat-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    box-shadow: 0 2px 4px var(--shadow-color);
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .stat-card.primary .stat-value { color: var(--accent-primary); }
+  .stat-card.success .stat-value { color: var(--accent-success); }
+  .stat-card.danger .stat-value { color: var(--accent-danger); }
+  .stat-card.info .stat-value { color: var(--accent-info); }
+  .stat-card.warning .stat-value { color: #f59e0b; }
+  
+  /* Date filter form */
+  .date-filter-form {
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .date-filter-form .form-label {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  
+  /* Service breakdown table */
+  .service-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .service-table th,
+  .service-table td {
+    padding: var(--spacing-md);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .service-table th {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .service-table tbody tr:hover {
+    background-color: var(--bg-hover);
+  }
+  
+  .service-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  
+  .service-badge.wine_enrichment {
+    background-color: rgba(111, 66, 193, 0.15);
+    color: #6f42c1;
+  }
+  
+  .service-badge.wine_pairing {
+    background-color: rgba(13, 110, 253, 0.15);
+    color: #0d6efd;
+  }
+  
+  .service-badge.bottle_detection {
+    background-color: rgba(25, 135, 84, 0.15);
+    color: #198754;
+  }
+  
+  .service-badge.image_generation {
+    background-color: rgba(255, 193, 7, 0.15);
+    color: #d97706;
+  }
+  
+  /* Log item */
+  .log-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color var(--transition-fast);
+  }
+  
+  .log-item:last-child {
+    border-bottom: none;
+  }
+  
+  .log-item:hover {
+    background-color: var(--bg-hover);
+  }
+  
+  .log-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  
+  .log-item-icon.success {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: var(--accent-success);
+  }
+  
+  .log-item-icon.error {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: var(--accent-danger);
+  }
+  
+  .log-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .log-item-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+  }
+  
+  .log-item-type {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .log-item-model {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background-color: var(--bg-hover);
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+  }
+  
+  .log-item-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .log-item-cost {
+    font-weight: 600;
+    color: var(--accent-success);
+  }
+  
+  /* Total cost highlight */
+  .total-cost-card {
+    background: linear-gradient(135deg, #10a37f, #1a7f64);
+    color: #fff;
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .total-cost-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .total-cost-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+  }
+  
+  .total-cost-period {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin-top: var(--spacing-sm);
+  }
+  
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+  }
+  
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+  }
+  
+  /* Quick period buttons */
+  .quick-periods {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .quick-period-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  
+  .quick-period-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+  }
+  
+  .quick-period-btn.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.config') }}">OpenAI</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.logs') }}">Logs</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('openai_admin.user_logs', user_id=user.id) }}">{{ user.username }}</a></li>
+        <li class="breadcrumb-item active">Facturation</li>
+      </ol>
+    </nav>
+    <h3 class="m-0"><i class="bi bi-receipt me-2"></i>Facturation de {{ user.username }}</h3>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('openai_admin.export_user_billing', user_id=user.id, start_date=start_date.isoformat(), end_date=end_date.isoformat()) }}" 
+       class="btn btn-outline-primary" target="_blank">
+      <i class="bi bi-download me-1"></i> Exporter JSON
+    </a>
+    <a href="{{ url_for('openai_admin.user_logs', user_id=user.id) }}" class="btn btn-outline-secondary">
+      <i class="bi bi-list-ul me-1"></i> Tous les logs
+    </a>
+  </div>
+</div>
+
+<!-- Filtre de dates -->
+<div class="date-filter-form">
+  <form method="GET" action="{{ url_for('openai_admin.user_billing', user_id=user.id) }}">
+    <div class="row align-items-end">
+      <div class="col-12 mb-3">
+        <label class="form-label">Période rapide</label>
+        <div class="quick-periods">
+          {% set today = billing.period_end %}
+          <button type="button" class="quick-period-btn" 
+                  onclick="setPeriod('{{ today.replace(day=1).isoformat() }}', '{{ today.isoformat() }}')">
+            Ce mois
+          </button>
+          {% set last_month = (today.replace(day=1) - timedelta(days=1)) %}
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ last_month.replace(day=1).isoformat() }}', '{{ last_month.isoformat() }}')">
+            Mois dernier
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ (today - timedelta(days=7)).isoformat() }}', '{{ today.isoformat() }}')">
+            7 derniers jours
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ (today - timedelta(days=30)).isoformat() }}', '{{ today.isoformat() }}')">
+            30 derniers jours
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ (today - timedelta(days=90)).isoformat() }}', '{{ today.isoformat() }}')">
+            90 derniers jours
+          </button>
+          <button type="button" class="quick-period-btn"
+                  onclick="setPeriod('{{ today.replace(month=1, day=1).isoformat() }}', '{{ today.isoformat() }}')">
+            Cette année
+          </button>
+        </div>
+      </div>
+      <div class="col-md-4 col-lg-3 mb-3">
+        <label for="start_date" class="form-label">Date de début</label>
+        <input type="date" class="form-control" id="start_date" name="start_date" 
+               value="{{ start_date.isoformat() }}">
+      </div>
+      <div class="col-md-4 col-lg-3 mb-3">
+        <label for="end_date" class="form-label">Date de fin</label>
+        <input type="date" class="form-control" id="end_date" name="end_date" 
+               value="{{ end_date.isoformat() }}">
+      </div>
+      <div class="col-md-4 col-lg-3 mb-3">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-funnel me-1"></i> Filtrer
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Coût total -->
+<div class="total-cost-card">
+  <div class="total-cost-label">Coût total estimé</div>
+  <div class="total-cost-value">${{ "%.4f"|format(billing.total_cost) }}</div>
+  <div class="total-cost-period">
+    Du {{ start_date.strftime('%d/%m/%Y') }} au {{ end_date.strftime('%d/%m/%Y') }}
+  </div>
+</div>
+
+<!-- Statistiques -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ billing.total_calls }}</div>
+    <div class="stat-label">Appels total</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-value">{{ "{:,}".format(billing.total_input_tokens).replace(",", " ") }}</div>
+    <div class="stat-label">Tokens entrée</div>
+  </div>
+  <div class="stat-card primary">
+    <div class="stat-value">{{ "{:,}".format(billing.total_output_tokens).replace(",", " ") }}</div>
+    <div class="stat-label">Tokens sortie</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-value">{{ "%.0f"|format(billing.avg_duration_ms) }} ms</div>
+    <div class="stat-label">Durée moyenne</div>
+  </div>
+</div>
+
+<!-- Répartition par service -->
+{% if billing.by_service %}
+<div class="billing-card">
+  <div class="billing-card-header">
+    <div class="billing-card-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+      <i class="bi bi-pie-chart"></i>
+    </div>
+    <div>
+      <h5 class="billing-card-title">Répartition par service</h5>
+      <p class="billing-card-subtitle">Détail des coûts par type d'appel</p>
+    </div>
+  </div>
+  <div class="billing-card-body p-0">
+    <table class="service-table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Nombre d'appels</th>
+          <th>Durée totale</th>
+          <th>Coût</th>
+          <th>% du total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for service in billing.by_service %}
+        <tr>
+          <td>
+            <span class="service-badge {{ service.service }}">
+              {% if service.service == 'wine_enrichment' %}
+                <i class="bi bi-stars"></i> Enrichissement
+              {% elif service.service == 'wine_pairing' %}
+                <i class="bi bi-cup-straw"></i> Accords mets-vins
+              {% elif service.service == 'bottle_detection' %}
+                <i class="bi bi-camera"></i> Détection bouteilles
+              {% elif service.service == 'image_generation' %}
+                <i class="bi bi-image"></i> Génération image
+              {% else %}
+                <i class="bi bi-robot"></i> {{ service.service }}
+              {% endif %}
+            </span>
+          </td>
+          <td>{{ service.count }}</td>
+          <td>{{ "%.1f"|format(service.total_duration_ms / 1000) }} s</td>
+          <td class="log-item-cost">${{ "%.4f"|format(service.cost) }}</td>
+          <td>
+            {% if billing.total_cost > 0 %}
+              {{ "%.1f"|format((service.cost / billing.total_cost) * 100) }}%
+            {% else %}
+              0%
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Détail des appels -->
+<div class="billing-card">
+  <div class="billing-card-header">
+    <div class="billing-card-icon" style="background: linear-gradient(135deg, #10a37f, #1a7f64);">
+      <i class="bi bi-list-ul"></i>
+    </div>
+    <div>
+      <h5 class="billing-card-title">Détail des appels</h5>
+      <p class="billing-card-subtitle">{{ logs|length }} appel(s) sur la période</p>
+    </div>
+  </div>
+  
+  <div class="billing-card-body p-0">
+    {% if logs %}
+      {% for log in logs %}
+      <div class="log-item">
+        <div class="log-item-icon {% if log.response_status == 'success' %}success{% else %}error{% endif %}">
+          <i class="bi bi-{% if log.response_status == 'success' %}check-lg{% else %}x-lg{% endif %}"></i>
+        </div>
+        <div class="log-item-info">
+          <div class="log-item-header">
+            <span class="service-badge {{ log.call_type }}">
+              {% if log.call_type == 'wine_enrichment' %}
+                <i class="bi bi-stars"></i> Enrichissement
+              {% elif log.call_type == 'wine_pairing' %}
+                <i class="bi bi-cup-straw"></i> Accords
+              {% elif log.call_type == 'bottle_detection' %}
+                <i class="bi bi-camera"></i> Détection
+              {% elif log.call_type == 'image_generation' %}
+                <i class="bi bi-image"></i> Image
+              {% else %}
+                {{ log.call_type }}
+              {% endif %}
+            </span>
+            <span class="log-item-model">{{ log.model }}</span>
+          </div>
+          <div class="log-item-meta">
+            <span><i class="bi bi-calendar me-1"></i>{{ log.created_at.strftime('%d/%m/%Y') }}</span>
+            <span><i class="bi bi-clock me-1"></i>{{ log.created_at.strftime('%H:%M:%S') }}</span>
+            {% if log.duration_ms %}
+            <span><i class="bi bi-stopwatch me-1"></i>{{ log.duration_ms }} ms</span>
+            {% endif %}
+            {% if log.total_tokens %}
+            <span><i class="bi bi-hash me-1"></i>{{ log.total_tokens }} tokens</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="text-end">
+          {% if log.estimated_cost_usd %}
+          <div class="log-item-cost">${{ "%.6f"|format(log.estimated_cost_usd) }}</div>
+          {% endif %}
+          <a href="{{ url_for('openai_admin.log_detail', log_id=log.id) }}" class="btn btn-sm btn-outline-secondary mt-1">
+            <i class="bi bi-eye"></i>
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <h5>Aucun appel sur cette période</h5>
+        <p>Modifiez les dates pour voir d'autres résultats.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function setPeriod(startDate, endDate) {
+  document.getElementById('start_date').value = startDate;
+  document.getElementById('end_date').value = endDate;
+  document.querySelector('.date-filter-form form').submit();
+}
+</script>
+{% endblock %}

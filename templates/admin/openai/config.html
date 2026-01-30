@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .openai-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .openai-card-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .openai-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #10a37f, #1a7f64);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  
+  .openai-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .openai-card-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  
+  .openai-card-body {
+    padding: var(--spacing-lg);
+  }
+  
+  /* Stats cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .stat-card {
+    background-color: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    box-shadow: 0 2px 4px var(--shadow-color);
+  }
+  
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  .stat-card.success .stat-value { color: var(--accent-success); }
+  .stat-card.danger .stat-value { color: var(--accent-danger); }
+  .stat-card.info .stat-value { color: var(--accent-info); }
+  .stat-card.warning .stat-value { color: var(--accent-warning); }
+  
+  /* Alert banner */
+  .alert-banner {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+  
+  .alert-banner.warning {
+    background-color: rgba(251, 191, 36, 0.15);
+    border: 1px solid var(--accent-warning);
+    color: var(--accent-warning);
+  }
+  
+  .alert-banner.success {
+    background-color: rgba(34, 197, 94, 0.15);
+    border: 1px solid var(--accent-success);
+    color: var(--accent-success);
+  }
+  
+  .alert-banner.info {
+    background-color: rgba(59, 130, 246, 0.15);
+    border: 1px solid var(--accent-info);
+    color: var(--accent-info);
+  }
+  
+  /* Budget progress */
+  .budget-progress {
+    margin-top: var(--spacing-md);
+  }
+  
+  .budget-progress .progress {
+    height: 10px;
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-hover);
+  }
+  
+  .budget-progress .progress-bar {
+    border-radius: var(--radius-sm);
+  }
+  
+  .budget-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+  }
+  
+  /* Form styling */
+  .form-section {
+    margin-bottom: var(--spacing-xl);
+  }
+  
+  .form-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .api-key-field {
+    position: relative;
+  }
+  
+  .api-key-field .toggle-visibility {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  
+  .key-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .key-status.configured {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: var(--accent-success);
+  }
+  
+  .key-status.not-configured {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: var(--accent-danger);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+  <div>
+    <h3 class="m-0">Configuration OpenAI</h3>
+    <p class="text-muted mb-0">Gérez la clé API et les paramètres d'intelligence artificielle</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('openai_admin.prompts') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-chat-square-text me-1"></i> Prompts
+    </a>
+    <a href="{{ url_for('openai_admin.logs') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-list-ul me-1"></i> Logs d'appels IA
+    </a>
+    <a href="{{ url_for('openai_admin.statistics') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-graph-up me-1"></i> Statistiques
+    </a>
+  </div>
+</div>
+
+{% if not config.api_key_encrypted %}
+<div class="alert-banner warning">
+  <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+  <div>
+    <strong>Clé API OpenAI non configurée</strong>
+    <p class="mb-0 small">Les fonctionnalités d'IA ne sont pas disponibles. Configurez une clé API pour activer l'enrichissement automatique et les recommandations.</p>
+  </div>
+</div>
+{% elif not config.is_active %}
+<div class="alert-banner warning">
+  <i class="bi bi-pause-circle-fill fs-4"></i>
+  <div>
+    <strong>Configuration OpenAI désactivée</strong>
+    <p class="mb-0 small">La clé API est configurée mais les fonctionnalités IA sont désactivées.</p>
+  </div>
+</div>
+{% else %}
+<div class="alert-banner success">
+  <i class="bi bi-check-circle-fill fs-4"></i>
+  <div>
+    <strong>OpenAI configuré et actif</strong>
+    <p class="mb-0 small">Les fonctionnalités d'IA sont disponibles pour tous les utilisateurs.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Statistiques du mois -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ monthly_stats.total_calls }}</div>
+    <div class="stat-label">Appels ce mois</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-value">{{ "%.4f"|format(monthly_stats.total_cost) }} $</div>
+    <div class="stat-label">Coût estimé</div>
+  </div>
+  <div class="stat-card success">
+    <div class="stat-value">{{ monthly_stats.total_input_tokens|default(0) }}</div>
+    <div class="stat-label">Tokens entrée</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-value">{{ monthly_stats.total_output_tokens|default(0) }}</div>
+    <div class="stat-label">Tokens sortie</div>
+  </div>
+</div>
+
+<!-- Budget local -->
+{% if config.monthly_budget and budget_info %}
+<div class="openai-card">
+  <div class="openai-card-header">
+    <div class="openai-card-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+      <i class="bi bi-wallet2"></i>
+    </div>
+    <div>
+      <h5 class="openai-card-title">Budget mensuel local</h5>
+      <p class="openai-card-subtitle">Suivi de la consommation (calculé localement)</p>
+    </div>
+  </div>
+  <div class="openai-card-body">
+    <div class="budget-progress">
+      {% set percent = budget_info.budget_percent_used|default(0) %}
+      <div class="progress">
+        <div class="progress-bar {% if percent > 90 %}bg-danger{% elif percent > 70 %}bg-warning{% else %}bg-success{% endif %}"
+             role="progressbar"
+             style="width: {{ percent }}%"
+             aria-valuenow="{{ percent }}"
+             aria-valuemin="0"
+             aria-valuemax="100">
+        </div>
+      </div>
+      <div class="budget-info">
+        <span>Utilisé : {{ "%.4f"|format(budget_info.monthly_usage) }} $</span>
+        <span>Budget : {{ "%.2f"|format(config.monthly_budget) }} $</span>
+      </div>
+      {% if budget_info.budget_remaining is not none %}
+      <div class="text-center mt-2">
+        <span class="badge {% if budget_info.budget_remaining < 1 %}bg-danger{% elif budget_info.budget_remaining < 5 %}bg-warning{% else %}bg-success{% endif %}">
+          Restant : {{ "%.2f"|format(budget_info.budget_remaining) }} $
+        </span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Configuration -->
+<div class="openai-card">
+  <div class="openai-card-header">
+    <div class="openai-card-icon">
+      <i class="bi bi-gear"></i>
+    </div>
+    <div>
+      <h5 class="openai-card-title">Paramètres</h5>
+      <p class="openai-card-subtitle">Configuration de l'API OpenAI</p>
+    </div>
+  </div>
+  <div class="openai-card-body">
+    <form method="POST" action="{{ url_for('openai_admin.config') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="action" value="save" />
+      
+      <!-- Clé API -->
+      <div class="form-section">
+        <h6 class="form-section-title"><i class="bi bi-key me-2"></i>Clé API</h6>
+        
+        {% if config.api_key_encrypted %}
+        <div class="key-status configured">
+          <i class="bi bi-check-circle-fill"></i>
+          <span>Clé API configurée</span>
+          <form method="POST" action="{{ url_for('openai_admin.config') }}" class="d-inline ms-auto">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="action" value="delete_key" />
+            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer la clé API ?')">
+              <i class="bi bi-trash me-1"></i> Supprimer
+            </button>
+          </form>
+        </div>
+        {% else %}
+        <div class="key-status not-configured">
+          <i class="bi bi-x-circle-fill"></i>
+          <span>Aucune clé API configurée</span>
+        </div>
+        {% endif %}
+        
+        <div class="mb-3">
+          <label for="api_key" class="form-label">
+            {% if config.api_key_encrypted %}Nouvelle clé API (laisser vide pour conserver l'actuelle){% else %}Clé API OpenAI{% endif %}
+          </label>
+          <div class="api-key-field">
+            <input type="password" class="form-control" id="api_key" name="api_key" 
+                   placeholder="sk-..." autocomplete="new-password">
+            <button type="button" class="toggle-visibility" onclick="toggleApiKeyVisibility()">
+              <i class="bi bi-eye" id="toggle-icon"></i>
+            </button>
+          </div>
+          <div class="form-text">
+            La clé API est chiffrée avant d'être stockée en base de données.
+            <a href="https://platform.openai.com/api-keys" target="_blank">Obtenir une clé API</a>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Paramètres de connexion -->
+      <div class="form-section">
+        <h6 class="form-section-title"><i class="bi bi-link-45deg me-2"></i>Connexion</h6>
+        
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="base_url" class="form-label">URL de base</label>
+            <input type="url" class="form-control" id="base_url" name="base_url" 
+                   value="{{ config.base_url or 'https://api.openai.com/v1' }}"
+                   placeholder="https://api.openai.com/v1">
+            <div class="form-text">URL de l'API OpenAI (ou compatible)</div>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label for="source_name" class="form-label">Nom de la source</label>
+            <input type="text" class="form-control" id="source_name" name="source_name" 
+                   value="{{ config.source_name or 'OpenAI' }}"
+                   placeholder="OpenAI">
+            <div class="form-text">Nom affiché pour les insights générés</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Modèles -->
+      <div class="form-section">
+        <h6 class="form-section-title"><i class="bi bi-cpu me-2"></i>Modèles</h6>
+        
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="default_model" class="form-label">Modèle par défaut</label>
+            <select class="form-select" id="default_model" name="default_model">
+              <option value="gpt-4o-mini" {% if config.default_model == 'gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini (économique)</option>
+              <option value="gpt-4o" {% if config.default_model == 'gpt-4o' %}selected{% endif %}>GPT-4o (performant)</option>
+              <option value="gpt-4-turbo" {% if config.default_model == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
+              <option value="gpt-3.5-turbo" {% if config.default_model == 'gpt-3.5-turbo' %}selected{% endif %}>GPT-3.5 Turbo</option>
+            </select>
+            <div class="form-text">Modèle utilisé pour l'enrichissement et les recommandations</div>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label for="image_model" class="form-label">Modèle d'images</label>
+            <select class="form-select" id="image_model" name="image_model">
+              <option value="" {% if not config.image_model %}selected{% endif %}>Désactivé</option>
+              <option value="dall-e-2" {% if config.image_model == 'dall-e-2' %}selected{% endif %}>DALL-E 2</option>
+              <option value="dall-e-3" {% if config.image_model == 'dall-e-3' %}selected{% endif %}>DALL-E 3</option>
+            </select>
+            <div class="form-text">Modèle pour la génération d'étiquettes (optionnel)</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Budget et activation -->
+      <div class="form-section">
+        <h6 class="form-section-title"><i class="bi bi-sliders me-2"></i>Options</h6>
+        
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="monthly_budget" class="form-label">Budget mensuel (USD)</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" id="monthly_budget" name="monthly_budget" 
+                     value="{{ config.monthly_budget or '' }}"
+                     step="0.01" min="0" placeholder="10.00">
+            </div>
+            <div class="form-text">Laisser vide pour un budget illimité</div>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label d-block">État</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                     {% if config.is_active %}checked{% endif %}>
+              <label class="form-check-label" for="is_active">
+                Configuration active
+              </label>
+            </div>
+            <div class="form-text">Désactiver pour suspendre temporairement les appels IA</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Actions -->
+      <div class="d-flex gap-2 justify-content-between">
+        <div>
+          {% if config.api_key_encrypted %}
+          <button type="submit" name="action" value="test" class="btn btn-outline-info">
+            <i class="bi bi-lightning me-1"></i> Tester la connexion
+          </button>
+          {% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i> Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Informations sur les tarifs -->
+<div class="openai-card">
+  <div class="openai-card-header">
+    <div class="openai-card-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+      <i class="bi bi-info-circle"></i>
+    </div>
+    <div>
+      <h5 class="openai-card-title">Tarification OpenAI</h5>
+      <p class="openai-card-subtitle">Coûts estimés par modèle (pour 1000 tokens)</p>
+    </div>
+  </div>
+  <div class="openai-card-body">
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Modèle</th>
+            <th>Entrée</th>
+            <th>Sortie</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>gpt-4o-mini</code></td>
+            <td>$0.00015</td>
+            <td>$0.0006</td>
+            <td><span class="badge bg-success">Recommandé</span></td>
+          </tr>
+          <tr>
+            <td><code>gpt-4o</code></td>
+            <td>$0.0025</td>
+            <td>$0.01</td>
+            <td>Plus performant</td>
+          </tr>
+          <tr>
+            <td><code>gpt-4-turbo</code></td>
+            <td>$0.01</td>
+            <td>$0.03</td>
+            <td>Vision disponible</td>
+          </tr>
+          <tr>
+            <td><code>dall-e-2</code></td>
+            <td colspan="2">$0.02 / image</td>
+            <td>Génération d'images</td>
+          </tr>
+          <tr>
+            <td><code>dall-e-3</code></td>
+            <td colspan="2">$0.04 / image</td>
+            <td>Meilleure qualité</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted small mb-0">
+      <i class="bi bi-info-circle me-1"></i>
+      Les coûts sont des estimations basées sur les tarifs publics d'OpenAI. 
+      Consultez <a href="https://openai.com/pricing" target="_blank">openai.com/pricing</a> pour les tarifs actuels.
+    </p>
+  </div>
+</div>
+
+<script>
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('api_key');
+  const icon = document.getElementById('toggle-icon');
+  
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.remove('bi-eye');
+    icon.classList.add('bi-eye-slash');
+  } else {
+    input.type = 'password';
+    icon.classList.remove('bi-eye-slash');
+    icon.classList.add('bi-eye');
+  }
+}
+</script>
+{% endblock %}

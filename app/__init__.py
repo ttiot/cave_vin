@@ -130,6 +130,7 @@ def create_app(config_class=Config):
     from app.blueprints.smtp import smtp_bp
     from app.blueprints.pairing import pairing_bp
     from app.blueprints.import_bottles import import_bp
+    from app.blueprints.openai_admin import openai_admin_bp
 
     # Exempter tout le blueprint API du CSRF (appelé via fetch/js)
     csrf.exempt(api_bp)
@@ -149,5 +150,6 @@ def create_app(config_class=Config):
     flask_app.register_blueprint(smtp_bp)
     flask_app.register_blueprint(pairing_bp)
     flask_app.register_blueprint(import_bp)
+    flask_app.register_blueprint(openai_admin_bp)
 
     return flask_app
