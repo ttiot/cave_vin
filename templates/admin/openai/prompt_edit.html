@@ -167,6 +167,47 @@
   .modified-indicator.show {
     display: inline;
   }
+  
+  /* Styles pour le schéma JSON */
+  .schema-textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    min-height: 300px;
+    resize: vertical;
+    background-color: var(--bg-hover);
+  }
+  
+  .schema-textarea.is-invalid {
+    border-color: var(--accent-danger);
+    background-color: rgba(239, 68, 68, 0.05);
+  }
+  
+  .schema-textarea.is-valid {
+    border-color: var(--accent-success);
+  }
+  
+  .schema-validation {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    font-size: 0.85rem;
+  }
+  
+  .schema-validation.valid {
+    color: var(--accent-success);
+  }
+  
+  .schema-validation.invalid {
+    color: var(--accent-danger);
+  }
+  
+  .schema-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+  }
 </style>
 {% endblock %}
 
@@ -270,6 +311,54 @@
         </div>
       </div>
       {% endif %}
+      
+      <!-- Schéma JSON de réponse -->
+      <div class="form-section">
+        <h6 class="form-section-title">
+          <i class="bi bi-filetype-json"></i> Schéma JSON de réponse
+          <span class="modified-indicator" id="schema-modified">(modifié)</span>
+        </h6>
+        
+        <div class="alert alert-info small mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          Ce schéma définit la structure JSON que l'IA doit respecter dans sa réponse. Il est utilisé pour la validation et le parsing automatique des réponses.
+          <strong>Attention :</strong> un schéma invalide peut causer des erreurs lors des appels IA.
+        </div>
+        
+        <textarea class="form-control schema-textarea" id="response_schema" name="response_schema"
+                  rows="12"
+                  data-original="{{ prompt.response_schema | tojson(indent=2) if prompt.response_schema else '' }}"
+                  data-default="{{ default_values.response_schema | tojson(indent=2) if default_values and default_values.response_schema else '' }}"
+                  placeholder="Laissez vide pour désactiver le schéma de réponse structurée">{{ prompt.response_schema | tojson(indent=2) if prompt.response_schema else '' }}</textarea>
+        
+        <div class="schema-validation" id="schema-validation">
+          <i class="bi bi-check-circle"></i>
+          <span id="schema-validation-message">JSON valide</span>
+        </div>
+        
+        <div class="schema-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatSchema()">
+            <i class="bi bi-code-slash me-1"></i> Formater
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copySchema()">
+            <i class="bi bi-clipboard me-1"></i> Copier
+          </button>
+          {% if default_values and default_values.response_schema %}
+          <button type="button" class="btn btn-sm btn-outline-info" onclick="resetSchemaToDefault()">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Valeur par défaut
+          </button>
+          {% endif %}
+        </div>
+        
+        {% if default_values and default_values.response_schema %}
+        <div class="default-value-hint mt-3">
+          <div class="hint-title">
+            <i class="bi bi-arrow-return-right me-1"></i> Schéma par défaut (aperçu)
+          </div>
+          <div class="hint-content">{{ default_values.response_schema | tojson | truncate(300) }}</div>
+        </div>
+        {% endif %}
+      </div>
       
       <!-- Prompt système -->
       <div class="form-section">
@@ -424,10 +513,117 @@ function confirmReset() {
   modal.show();
 }
 
+// Copier le schéma JSON dans le presse-papiers
+function copySchema() {
+  const schemaTextarea = document.getElementById('response_schema');
+  if (!schemaTextarea) return;
+  
+  const schemaText = schemaTextarea.value;
+  
+  navigator.clipboard.writeText(schemaText).then(function() {
+    // Afficher un feedback visuel
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check me-1"></i> Copié !';
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-success');
+    
+    setTimeout(function() {
+      btn.innerHTML = originalHtml;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-outline-secondary');
+    }, 2000);
+  }).catch(function(err) {
+    console.error('Erreur lors de la copie:', err);
+    alert('Impossible de copier le schéma. Veuillez le sélectionner manuellement.');
+  });
+}
+
+// Valider le JSON du schéma
+function validateSchema() {
+  const schemaTextarea = document.getElementById('response_schema');
+  const validationDiv = document.getElementById('schema-validation');
+  const validationMessage = document.getElementById('schema-validation-message');
+  
+  if (!schemaTextarea || !validationDiv) return true;
+  
+  const schemaText = schemaTextarea.value.trim();
+  
+  // Si vide, c'est valide (schéma optionnel)
+  if (!schemaText) {
+    schemaTextarea.classList.remove('is-invalid', 'is-valid');
+    validationDiv.classList.remove('valid', 'invalid');
+    validationDiv.style.display = 'none';
+    return true;
+  }
+  
+  try {
+    const parsed = JSON.parse(schemaText);
+    
+    // Vérification basique de la structure JSON Schema
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('Le schéma doit être un objet JSON');
+    }
+    
+    schemaTextarea.classList.remove('is-invalid');
+    schemaTextarea.classList.add('is-valid');
+    validationDiv.classList.remove('invalid');
+    validationDiv.classList.add('valid');
+    validationDiv.style.display = 'flex';
+    validationMessage.innerHTML = '<i class="bi bi-check-circle me-1"></i> JSON valide';
+    
+    return true;
+  } catch (e) {
+    schemaTextarea.classList.remove('is-valid');
+    schemaTextarea.classList.add('is-invalid');
+    validationDiv.classList.remove('valid');
+    validationDiv.classList.add('invalid');
+    validationDiv.style.display = 'flex';
+    validationMessage.innerHTML = '<i class="bi bi-x-circle me-1"></i> ' + e.message;
+    
+    return false;
+  }
+}
+
+// Formater le JSON du schéma
+function formatSchema() {
+  const schemaTextarea = document.getElementById('response_schema');
+  if (!schemaTextarea) return;
+  
+  const schemaText = schemaTextarea.value.trim();
+  if (!schemaText) return;
+  
+  try {
+    const parsed = JSON.parse(schemaText);
+    schemaTextarea.value = JSON.stringify(parsed, null, 2);
+    validateSchema();
+    checkModified(schemaTextarea, 'schema-modified');
+  } catch (e) {
+    alert('Impossible de formater : le JSON est invalide.\n' + e.message);
+  }
+}
+
+// Réinitialiser le schéma aux valeurs par défaut
+function resetSchemaToDefault() {
+  const schemaTextarea = document.getElementById('response_schema');
+  if (!schemaTextarea) return;
+  
+  const defaultSchema = schemaTextarea.dataset.default;
+  
+  if (defaultSchema) {
+    if (confirm('Voulez-vous réinitialiser le schéma à sa valeur par défaut ?')) {
+      schemaTextarea.value = defaultSchema;
+      validateSchema();
+      checkModified(schemaTextarea, 'schema-modified');
+    }
+  }
+}
+
 // Initialisation
 document.addEventListener('DOMContentLoaded', function() {
   const systemPrompt = document.getElementById('system_prompt');
   const userPrompt = document.getElementById('user_prompt');
+  const schemaTextarea = document.getElementById('response_schema');
   
   // Suivre le textarea actif
   [systemPrompt, userPrompt].forEach(textarea => {
@@ -448,6 +644,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
+  // Initialiser le schéma JSON
+  if (schemaTextarea) {
+    // Valider à chaque modification
+    schemaTextarea.addEventListener('input', function() {
+      validateSchema();
+      checkModified(this, 'schema-modified');
+    });
+    
+    // Valider au chargement
+    validateSchema();
+    checkModified(schemaTextarea, 'schema-modified');
+  }
+  
   // Vérifier les modifications initiales
   if (systemPrompt) checkModified(systemPrompt, 'system-modified');
   if (userPrompt) checkModified(userPrompt, 'user-modified');
@@ -465,7 +674,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  document.getElementById('prompt-form').addEventListener('submit', function() {
+  // Validation avant soumission
+  document.getElementById('prompt-form').addEventListener('submit', function(e) {
+    // Valider le schéma JSON avant soumission
+    if (!validateSchema()) {
+      e.preventDefault();
+      alert('Le schéma JSON est invalide. Veuillez corriger les erreurs avant d\'enregistrer.');
+      return false;
+    }
     formModified = false;
   });
 });

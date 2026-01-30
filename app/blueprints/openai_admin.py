@@ -347,6 +347,23 @@ def edit_prompt(prompt_key: str):
                     flash("Nombre de tokens invalide.", "error")
                     return redirect(url_for("openai_admin.edit_prompt", prompt_key=prompt_key))
             
+            # Mettre à jour le schéma JSON de réponse
+            response_schema_str = request.form.get("response_schema", "").strip()
+            if response_schema_str:
+                try:
+                    import json
+                    response_schema = json.loads(response_schema_str)
+                    # Vérification basique que c'est un objet
+                    if not isinstance(response_schema, dict):
+                        raise ValueError("Le schéma doit être un objet JSON")
+                    prompt.response_schema = response_schema
+                except (json.JSONDecodeError, ValueError) as e:
+                    flash(f"Schéma JSON invalide : {str(e)}", "error")
+                    return redirect(url_for("openai_admin.edit_prompt", prompt_key=prompt_key))
+            else:
+                # Si vide, on met à None (désactive le schéma structuré)
+                prompt.response_schema = None
+            
             db.session.commit()
             flash(f"Prompt '{prompt.display_name}' mis à jour avec succès.", "success")
             return redirect(url_for("openai_admin.prompts"))

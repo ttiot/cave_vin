@@ -160,6 +160,10 @@ class AICallLog(db.Model):
     # Prix par 1000 tokens (approximatifs, à mettre à jour selon les tarifs OpenAI)
     # Ces valeurs sont des estimations et peuvent être configurées
     TOKEN_PRICES = {
+        "gpt-5.2": {"input": 0.005, "output": 0.02},
+        "gpt-5.1": {"input": 0.004, "output": 0.016},
+        "gpt-5": {"input": 0.003, "output": 0.012},
+        "gpt-5-mini": {"input": 0.0003, "output": 0.0012},
         "gpt-4o": {"input": 0.0025, "output": 0.01},
         "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
         "gpt-4-turbo": {"input": 0.01, "output": 0.03},
