@@ -1,4 +1,4 @@
-name: Generate Changelog
+name: Generate Changelog and Release
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   changelog:
-    name: Generate changelog
+    name: Generate changelog and create release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,9 +23,17 @@ jobs:
           curl -sSfL https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
           sudo mv git-cliff-2.7.0/git-cliff /usr/local/bin/
 
-      - name: Generate changelog
+      - name: Generate full changelog
         run: |
           git-cliff --config cliff.toml -o CHANGELOG.md --verbose
+
+      - name: Generate release notes for this version
+        id: release_notes
+        run: |
+          # Générer les notes uniquement pour ce tag
+          git-cliff --config cliff.toml --latest --strip header > RELEASE_NOTES.md
+          echo "Release notes generated:"
+          cat RELEASE_NOTES.md
 
       - name: Commit and push changelog
         run: |
@@ -35,11 +43,20 @@ jobs:
           # Vérifier s'il y a des changements
           if git diff --quiet CHANGELOG.md; then
             echo "No changes to CHANGELOG.md"
-            exit 0
+          else
+            git add CHANGELOG.md
+            git commit -m "docs: update changelog for ${{ github.ref_name }}"
+            
+            # Push vers la branche par défaut
+            git push origin HEAD:main || git push origin HEAD:master || echo "Could not push changelog"
           fi
-          
-          git add CHANGELOG.md
-          git commit -m "docs: update changelog for ${{ github.ref_name }}"
-          
-          # Push vers la branche par défaut
-          git push origin HEAD:main || git push origin HEAD:master
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
