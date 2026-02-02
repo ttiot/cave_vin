@@ -3,6 +3,10 @@ import secrets
 from datetime import timedelta
 
 class Config:
+    # Informations de l'application
+    APP_NAME = "Ma Cave"
+    APP_VERSION = os.environ.get('APP_VERSION', 'dev')
+    
     # Génération automatique d'une SECRET_KEY sécurisée si non définie
     SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///wines.db')

@@ -125,6 +125,14 @@ def create_app(config_class=Config):
         session.permanent = True
         session.modified = True
 
+    @flask_app.context_processor
+    def inject_app_info():
+        """Injecte les informations de l'application dans tous les templates."""
+        return {
+            'app_name': flask_app.config.get('APP_NAME', 'Ma Cave'),
+            'app_version': flask_app.config.get('APP_VERSION', 'dev')
+        }
+
     # Enregistrer les blueprints
     from app.blueprints.auth import auth_bp
     from app.blueprints.wines import wines_bp
