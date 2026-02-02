@@ -1694,3 +1694,479 @@ h1, h2, h3, h4, h5, h6 {
 .wine-card-modern.animate-in:nth-child(4) { animation-delay: 0.2s; }
 .wine-card-modern.animate-in:nth-child(5) { animation-delay: 0.25s; }
 .wine-card-modern.animate-in:nth-child(6) { animation-delay: 0.3s; }
+
+/* ============================================================================
+   Cartes de vin compactes - Design condensé pour afficher plus de bouteilles
+   ============================================================================ */
+
+/* Grille de cartes compactes - 4 colonnes sur desktop */
+.wine-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 1200px) {
+  .wine-grid-compact {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1600px) {
+  .wine-grid-compact {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Carte de vin compacte */
+.wine-card-compact {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+.wine-card-compact:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px var(--shadow-hover);
+}
+
+/* Header de la carte avec image */
+.wine-card-compact .card-header-img {
+  position: relative;
+  height: 120px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(114, 47, 55, 0.15), rgba(114, 47, 55, 0.05));
+}
+
+.wine-card-compact .card-header-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: var(--spacing-sm);
+  transition: transform var(--transition-normal);
+}
+
+.wine-card-compact:hover .card-header-img img {
+  transform: scale(1.05);
+}
+
+.wine-card-compact .card-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Badges sur l'image */
+.wine-card-compact .card-badges {
+  position: absolute;
+  top: var(--spacing-xs);
+  left: var(--spacing-xs);
+  right: var(--spacing-xs);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.wine-card-compact .badge-urgency {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.badge-urgency.urgent { background-color: var(--accent-danger); color: #fff; }
+.badge-urgency.priority { background-color: var(--accent-warning); color: #1d1d1f; }
+.badge-urgency.optimal { background-color: var(--accent-success); color: #fff; }
+.badge-urgency.patience { background-color: var(--text-muted); color: #fff; }
+.badge-urgency.consumed { background-color: var(--text-muted); color: #fff; }
+
+.wine-card-compact .badge-quantity {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  box-shadow: 0 1px 4px var(--shadow-color);
+}
+
+/* Corps de la carte */
+.wine-card-compact .card-body-compact {
+  padding: var(--spacing-sm) var(--spacing-md);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.wine-card-compact .wine-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.wine-card-compact .wine-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.wine-card-compact .wine-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.wine-card-compact .wine-meta-item i {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Badge de catégorie */
+.wine-card-compact .wine-category {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 500;
+  width: fit-content;
+}
+
+/* Barre de progression compacte */
+.wine-card-compact .progress-compact {
+  margin-top: auto;
+  padding-top: var(--spacing-xs);
+}
+
+.wine-card-compact .progress-bar-compact {
+  height: 4px;
+  background-color: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.wine-card-compact .progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width var(--transition-normal);
+}
+
+.wine-card-compact .progress-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Footer avec actions */
+.wine-card-compact .card-footer-compact {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--bg-hover);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.wine-card-compact .btn-action-compact {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.wine-card-compact .btn-action-compact:hover {
+  background-color: var(--bg-hover);
+}
+
+.wine-card-compact .btn-action-compact.btn-consume {
+  border-color: var(--accent-success);
+  color: var(--accent-success);
+}
+
+.wine-card-compact .btn-action-compact.btn-consume:hover {
+  background-color: var(--accent-success);
+  color: #fff;
+}
+
+.wine-card-compact .btn-action-compact.btn-detail {
+  border-color: var(--accent-info);
+  color: var(--accent-info);
+}
+
+.wine-card-compact .btn-action-compact.btn-detail:hover {
+  background-color: var(--accent-info);
+  color: #fff;
+}
+
+.wine-card-compact .btn-action-compact.btn-refresh {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.wine-card-compact .btn-action-compact.btn-refresh:hover {
+  background-color: var(--accent-primary);
+  color: #fff;
+}
+
+.wine-card-compact .btn-action-compact.btn-delete {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
+}
+
+.wine-card-compact .btn-action-compact.btn-delete:hover {
+  background-color: var(--accent-danger);
+  color: #fff;
+}
+
+.wine-card-compact .btn-action-compact.btn-info {
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+
+.wine-card-compact .btn-action-compact.btn-info:hover {
+  background-color: var(--text-muted);
+  color: #fff;
+}
+
+/* Insights dans la carte compacte */
+.wine-card-compact .wine-insights-compact {
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+}
+
+.wine-card-compact .wine-insights-compact .insights-title {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.wine-card-compact .wine-insights-compact .insights-content {
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* Animation d'entrée pour les cartes compactes */
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wine-card-compact {
+  animation: cardSlideIn 0.3s ease forwards;
+}
+
+.wine-card-compact:nth-child(1) { animation-delay: 0.02s; }
+.wine-card-compact:nth-child(2) { animation-delay: 0.04s; }
+.wine-card-compact:nth-child(3) { animation-delay: 0.06s; }
+.wine-card-compact:nth-child(4) { animation-delay: 0.08s; }
+.wine-card-compact:nth-child(5) { animation-delay: 0.1s; }
+.wine-card-compact:nth-child(6) { animation-delay: 0.12s; }
+.wine-card-compact:nth-child(7) { animation-delay: 0.14s; }
+.wine-card-compact:nth-child(8) { animation-delay: 0.16s; }
+
+/* Responsive pour cartes compactes */
+@media (max-width: 576px) {
+  .wine-grid-compact {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+  
+  .wine-card-compact .card-header-img {
+    height: 100px;
+  }
+  
+  .wine-card-compact .wine-name {
+    font-size: 0.8rem;
+  }
+  
+  .wine-card-compact .card-footer-compact {
+    flex-direction: column;
+  }
+}
+
+/* ============================================================================
+   Modal d'informations enrichies - Style moderne
+   ============================================================================ */
+
+.wine-info-modal .modal-content {
+  border: none;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.wine-info-modal .modal-header {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-dark));
+  color: #fff;
+  border: none;
+  padding: var(--spacing-lg);
+}
+
+.wine-info-modal .modal-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.wine-info-modal .btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.8;
+}
+
+.wine-info-modal .btn-close:hover {
+  opacity: 1;
+}
+
+.wine-info-modal .modal-body {
+  padding: var(--spacing-lg);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.wine-info-modal .info-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.wine-info-modal .info-section:last-child {
+  margin-bottom: 0;
+}
+
+.wine-info-modal .info-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 2px solid var(--accent-primary);
+}
+
+.wine-info-modal .info-section-title i {
+  color: var(--accent-primary);
+}
+
+.wine-info-modal .info-content {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.wine-info-modal .info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.wine-info-modal .info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wine-info-modal .info-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.wine-info-modal .info-value {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.wine-info-modal .garde-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-sm);
+}
+
+.wine-info-modal .garde-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.wine-info-modal .garde-icon.urgent { background-color: var(--accent-danger); color: #fff; }
+.wine-info-modal .garde-icon.priority { background-color: var(--accent-warning); color: #1d1d1f; }
+.wine-info-modal .garde-icon.optimal { background-color: var(--accent-success); color: #fff; }
+.wine-info-modal .garde-icon.patience { background-color: var(--text-muted); color: #fff; }
+
+.wine-info-modal .garde-text {
+  flex: 1;
+}
+
+.wine-info-modal .garde-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.wine-info-modal .garde-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.wine-info-modal .modal-footer {
+  border-top: 1px solid var(--border-color);
+  padding: var(--spacing-md) var(--spacing-lg);
+  gap: var(--spacing-sm);
+}
