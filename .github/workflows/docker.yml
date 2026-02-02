@@ -40,15 +40,18 @@ jobs:
         run: |
           echo "📦 Taille originale JS: $(wc -c < static/js/main.js) bytes"
           terser static/js/main.js \
-            --compress \
-            --mangle \
+            --compress "drop_console=true,drop_debugger=true,passes=3" \
+            --mangle "toplevel=true" \
             --output static/js/main.js
           echo "✅ Taille minifiée JS: $(wc -c < static/js/main.js) bytes"
 
       - name: Minify CSS
         run: |
           echo "📦 Taille originale CSS: $(wc -c < static/css/styles.css) bytes"
-          cleancss -o static/css/styles.css static/css/styles.css
+          cleancss \
+            --level 2 \
+            --output static/css/styles.css \
+            static/css/styles.css
           echo "✅ Taille minifiée CSS: $(wc -c < static/css/styles.css) bytes"
 
       - name: Set up QEMU
