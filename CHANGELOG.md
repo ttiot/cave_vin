@@ -5,6 +5,21 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.11] - 2026-02-02
+
+
+### 🐛 Corrigé
+
+
+- Add build arguments for Docker image versioning
+- Update Docker build arguments to use short SHA for versioning
+
+
+### 📚 Documentation
+
+
+- Update changelog for v2.4.10
+
 ## [2.4.10] - 2026-02-02
 
 
