@@ -5,6 +5,21 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.10] - 2026-02-02
+
+
+### 📚 Documentation
+
+
+- Update changelog for v2.4.9
+
+
+### 🚀 Ajouté
+
+
+- Enhance changelog workflow to include release notes generation
+- Enhance cellar metrics display and update functionality
+
 ## [2.4.9] - 2026-02-02
 
 
