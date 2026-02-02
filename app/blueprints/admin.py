@@ -294,6 +294,32 @@ def update_email(user_id: int):
     return redirect(url_for("admin.manage_users"))
 
 
+@admin_bp.route("/users/<int:user_id>/update-password", methods=["POST"])
+@login_required
+@admin_required
+def update_password(user_id: int):
+    """Modifier le mot de passe d'un utilisateur (admin uniquement)."""
+
+    user = User.query.get_or_404(user_id)
+    new_password = (request.form.get("new_password") or "").strip()
+    is_temporary = bool(request.form.get("temporary"))
+
+    if not new_password:
+        flash("Le nouveau mot de passe est obligatoire.")
+        return redirect(url_for("admin.manage_users"))
+
+    if len(new_password) < 6:
+        flash("Le mot de passe doit contenir au moins 6 caractères.")
+        return redirect(url_for("admin.manage_users"))
+
+    user.password = generate_password_hash(new_password)
+    user.has_temporary_password = is_temporary
+    db.session.commit()
+
+    flash(f"Le mot de passe de {user.username} a été modifié avec succès.")
+    return redirect(url_for("admin.manage_users"))
+
+
 # ============================================================================
 # Logs d'activité
 # ============================================================================

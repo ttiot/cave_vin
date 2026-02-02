@@ -440,6 +440,10 @@
                 <i class="bi bi-envelope"></i> Email
               </button>
               
+              <button type="button" class="btn-user-action" data-bs-toggle="modal" data-bs-target="#passwordModal{{ user.id }}">
+                <i class="bi bi-key"></i> Mot de passe
+              </button>
+              
               {% if not user.is_sub_account %}
               <form method="POST" action="{{ url_for('admin.update_role', user_id=user.id) }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -500,6 +504,44 @@
                   <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
                   <button type="submit" class="btn btn-primary">
                     <i class="bi bi-check-lg me-1"></i> Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal pour modifier le mot de passe -->
+        <div class="modal fade" id="passwordModal{{ user.id }}" tabindex="-1" aria-labelledby="passwordModalLabel{{ user.id }}" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="passwordModalLabel{{ user.id }}">
+                  <i class="bi bi-key me-2"></i>Mot de passe de {{ user.username }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+              </div>
+              <form method="POST" action="{{ url_for('admin.update_password', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Nouveau mot de passe</label>
+                    <input type="password" class="form-control" name="new_password" minlength="6" required placeholder="Minimum 6 caractères" />
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="temporary_{{ user.id }}" name="temporary" value="1" />
+                    <label class="form-check-label" for="temporary_{{ user.id }}">
+                      <i class="bi bi-clock me-1"></i> Mot de passe temporaire
+                    </label>
+                  </div>
+                  <div class="form-text mt-2">
+                    Si coché, l'utilisateur devra changer son mot de passe lors de sa prochaine connexion.
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Modifier le mot de passe
                   </button>
                 </div>
               </form>

@@ -3,7 +3,7 @@
 import os
 
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask import Flask
+from flask import Flask, session
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 import logging
@@ -114,6 +114,16 @@ def create_app(config_class=Config):
     from app.utils.decorators import check_temporary_password, ensure_db
     flask_app.before_request(ensure_db)
     flask_app.before_request(check_temporary_password)
+
+    @flask_app.before_request
+    def refresh_session():
+        """Rafraîchit la session à chaque requête pour prolonger sa validité.
+        
+        Cela permet de maintenir l'utilisateur connecté tant qu'il utilise
+        l'application, avec une expiration de 7 jours après la dernière activité.
+        """
+        session.permanent = True
+        session.modified = True
 
     # Enregistrer les blueprints
     from app.blueprints.auth import auth_bp

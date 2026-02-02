@@ -209,3 +209,25 @@
 {% endif %}
 
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Gestionnaire de clic sur les cartes de vin pour naviguer vers le détail
+  document.querySelectorAll('.wine-card-modern[data-detail-url]').forEach(card => {
+    card.addEventListener('click', function(e) {
+      // Ne pas naviguer si on clique sur un élément interactif (bouton, input, formulaire)
+      const target = e.target;
+      const isInteractive = target.closest('button, input, form, a, .wine-card-actions');
+      
+      if (!isInteractive) {
+        const detailUrl = this.dataset.detailUrl;
+        if (detailUrl) {
+          window.location.href = detailUrl;
+        }
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

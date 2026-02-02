@@ -386,9 +386,7 @@ function urlBase64ToUint8Array(base64String) {
 
 function normalizePushSubscription(subscription) {
     const subscriptionData =
-        typeof subscription.toJSON === "function"
-            ? subscription.toJSON()
-            : {};
+        typeof subscription.toJSON === "function" ? subscription.toJSON() : {};
 
     if (!subscriptionData.endpoint && subscription.endpoint) {
         subscriptionData.endpoint = subscription.endpoint;
@@ -778,7 +776,7 @@ function initBarcodeScanner() {
 }
 
 function initWineCards() {
-    const cards = document.querySelectorAll(".wine-card");
+    const cards = document.querySelectorAll(".wine-card, .wine-card-modern");
     if (!cards.length || typeof bootstrap === "undefined") {
         return;
     }
@@ -804,10 +802,7 @@ function initWineCards() {
                 }
             }
         } catch (err) {
-            warnDebug(
-                "Impossible de parser les informations enrichies",
-                err,
-            );
+            warnDebug("Impossible de parser les informations enrichies", err);
         }
 
         const popover = new bootstrap.Popover(card, {
