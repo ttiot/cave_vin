@@ -90,6 +90,8 @@ jobs:
           push: true
           tags: ${{ steps.meta_branch.outputs.tags }}
           labels: ${{ steps.meta_branch.outputs.labels }}
+          build-args: |
+            APP_VERSION=unstable
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -122,5 +124,7 @@ jobs:
           push: true
           tags: ${{ steps.meta_tag.outputs.tags }}
           labels: ${{ steps.meta_tag.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta_tag.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
