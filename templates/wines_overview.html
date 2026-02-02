@@ -35,8 +35,8 @@
   .cellar-metric {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: 1rem 1.25rem;
-    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
+    padding: 0.75rem 1rem;
+    box-shadow: 0 2px 8px var(--shadow-color);
     height: 100%;
     transition: var(--transition-theme);
   }
@@ -44,17 +44,21 @@
   .cellar-metric .metric-label {
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-secondary);
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
   }
 
   .cellar-metric .metric-value {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-primary);
     display: block;
+  }
+
+  .cellar-metric small {
+    font-size: 0.7rem;
   }
 
   .cellar-tabs .nav-link {
@@ -70,8 +74,8 @@
     background: rgba(114, 47, 55, 0.1);
     color: var(--accent-primary);
     border-radius: 999px;
-    padding: 0.35rem 0.9rem;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
@@ -107,6 +111,7 @@
     cursor: pointer;
     transition: all 0.2s ease-in-out;
     border: 2px solid transparent !important;
+    font-size: 0.7rem;
   }
 
   .origin-chip:hover {
@@ -126,8 +131,8 @@
   }
 
   .filter-reset-btn {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
     border-radius: 0.5rem;
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
@@ -152,17 +157,17 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-2 mb-3">
   <div>
     <h3 class="m-0">Panorama des alcools</h3>
-    <p class="text-muted mb-0">Parcourez vos bouteilles par cave, avec une mise en page moderne et immersive.</p>
+    <p class="text-muted small mb-0">Parcourez vos bouteilles par cave.</p>
   </div>
   <div class="d-flex flex-wrap gap-2">
-    <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary">
-      <i class="bi bi-search me-1"></i> Recherche avancée
+    <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-search me-1"></i>Recherche
     </a>
-    <a href="{{ url_for('wines.add_wine') }}" class="btn btn-dark">
-      <i class="bi bi-plus-lg me-1"></i> Ajouter une bouteille
+    <a href="{{ url_for('wines.add_wine') }}" class="btn btn-dark btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Ajouter
     </a>
   </div>
 </div>
@@ -173,20 +178,7 @@
     pour commencer à organiser vos alcools.
   </div>
 {% else %}
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-3">
-      <div>
-        <h5 class="mb-1">Votre collection</h5>
-        <p class="text-muted mb-0">{{ total_wine_count }} référence{% if total_wine_count > 1 %}s{% endif %} suivie{% if total_wine_count > 1 %}s{% endif %} dans l'application.</p>
-      </div>
-      <div class="d-flex flex-wrap gap-2">
-        <span class="badge text-bg-dark">Vue interactive par cave</span>
-        <span class="badge text-bg-light text-dark">Mises à jour en temps réel</span>
-      </div>
-    </div>
-  </div>
-
-  <ul class="nav nav-pills cellar-tabs mb-4" id="cellarTab" role="tablist">
+  <ul class="nav nav-pills cellar-tabs mb-3" id="cellarTab" role="tablist">
     {% for panel in cellar_panels %}
       <li class="nav-item" role="presentation">
         <button class="nav-link{% if loop.first %} active{% endif %}" id="cellar-{{ panel.cellar.id }}-tab"
@@ -198,7 +190,7 @@
             <i class="bi bi-star-fill text-warning ms-1" title="Cave par défaut"></i>
             {% endif %}
           </span>
-          <small>{{ panel.total_quantity }} bouteille{% if panel.total_quantity > 1 %}s{% endif %} · {{ panel.wines|length }} référence{% if panel.wines|length > 1 %}s{% endif %}</small>
+          <small>{{ panel.total_quantity }} btl · {{ panel.wines|length }} réf.</small>
         </button>
       </li>
     {% endfor %}
@@ -208,48 +200,47 @@
     {% for panel in cellar_panels %}
       <div class="tab-pane fade{% if loop.first %} show active{% endif %}" id="cellar-{{ panel.cellar.id }}" role="tabpanel"
            aria-labelledby="cellar-{{ panel.cellar.id }}-tab">
-        <div class="row g-3 mb-4">
-          <div class="col-sm-6 col-xl-3">
+        
+        <!-- Métriques compactes -->
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-3">
             <div class="cellar-metric">
-              <span class="metric-label">Bouteilles en stock</span>
+              <span class="metric-label">Bouteilles</span>
               <span class="metric-value">{{ panel.total_quantity }}</span>
-              <small class="text-muted">Quantité totale disponible</small>
             </div>
           </div>
-          <div class="col-sm-6 col-xl-3">
+          <div class="col-6 col-md-3">
             <div class="cellar-metric">
-              <span class="metric-label">Références suivies</span>
+              <span class="metric-label">Références</span>
               <span class="metric-value">{{ panel.wines|length }}</span>
-              <small class="text-muted">Fiches individuelles</small>
             </div>
           </div>
-          <div class="col-sm-6 col-xl-3">
+          <div class="col-6 col-md-3">
             <div class="cellar-metric">
-              <span class="metric-label">Styles représentés</span>
+              <span class="metric-label">Styles</span>
               <span class="metric-value">{{ panel.subcategory_labels|length }}</span>
-              <small class="text-muted">Catégories et sous-catégories</small>
             </div>
           </div>
           {% if panel.vintage_range %}
-          <div class="col-sm-6 col-xl-3">
+          <div class="col-6 col-md-3">
             <div class="cellar-metric">
               <span class="metric-label">Millésimes</span>
-              <span class="metric-value">{{ panel.vintage_range[0] }} – {{ panel.vintage_range[1] }}</span>
-              <small class="text-muted">Amplitude des années</small>
+              <span class="metric-value">{{ panel.vintage_range[0] }}–{{ panel.vintage_range[1] }}</span>
             </div>
           </div>
           {% endif %}
         </div>
 
+        <!-- Filtres compacts -->
         {% if panel.subcategory_labels %}
-        <div class="mb-3 filter-section" data-cellar-id="{{ panel.cellar.id }}">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="text-uppercase text-muted small">Styles en cave</span>
+        <div class="mb-2 filter-section" data-cellar-id="{{ panel.cellar.id }}">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="text-uppercase text-muted" style="font-size: 0.65rem;">Styles</span>
             <button type="button" class="btn btn-sm btn-outline-secondary filter-reset-btn" data-filter-type="style" data-cellar-id="{{ panel.cellar.id }}">
-              <i class="bi bi-x-lg me-1"></i>Réinitialiser
+              <i class="bi bi-x-lg"></i>
             </button>
           </div>
-          <div class="d-flex flex-wrap gap-2 style-filters" data-cellar-id="{{ panel.cellar.id }}">
+          <div class="d-flex flex-wrap gap-1 style-filters" data-cellar-id="{{ panel.cellar.id }}">
             {% for label in panel.subcategory_labels %}
             <span class="wine-highlight-chip" data-filter-style="{{ label }}" data-cellar-id="{{ panel.cellar.id }}">{{ label }}</span>
             {% endfor %}
@@ -258,14 +249,14 @@
         {% endif %}
 
         {% if panel.region_labels %}
-        <div class="mb-4 filter-section" data-cellar-id="{{ panel.cellar.id }}">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="text-uppercase text-muted small">Origines</span>
+        <div class="mb-3 filter-section" data-cellar-id="{{ panel.cellar.id }}">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="text-uppercase text-muted" style="font-size: 0.65rem;">Origines</span>
             <button type="button" class="btn btn-sm btn-outline-secondary filter-reset-btn" data-filter-type="origin" data-cellar-id="{{ panel.cellar.id }}">
-              <i class="bi bi-x-lg me-1"></i>Réinitialiser
+              <i class="bi bi-x-lg"></i>
             </button>
           </div>
-          <div class="d-flex flex-wrap gap-2 origin-filters" data-cellar-id="{{ panel.cellar.id }}">
+          <div class="d-flex flex-wrap gap-1 origin-filters" data-cellar-id="{{ panel.cellar.id }}">
             {% for label in panel.region_labels %}
             <span class="badge rounded-pill text-bg-light text-dark border origin-chip" data-filter-origin="{{ label }}" data-cellar-id="{{ panel.cellar.id }}">{{ label }}</span>
             {% endfor %}
@@ -274,107 +265,93 @@
         {% endif %}
 
         {% if panel.wines %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 wine-cards-container" data-cellar-id="{{ panel.cellar.id }}">
+        <!-- Grille de cartes compactes -->
+        <div class="wine-grid-compact wine-cards-container" data-cellar-id="{{ panel.cellar.id }}">
           {% for wine in panel.wines %}
           {% set extras = wine.extra_attributes or {} %}
-          <div class="col wine-card-col"
+          <div class="wine-card-compact wine-card-col"
                data-wine-style="{{ wine.subcategory.name if wine.subcategory else '' }}"
                data-wine-origin="{{ extras.region or '' }}"
-               data-cellar-id="{{ panel.cellar.id }}">
-            <div class="wine-card-modern animate-in"
-                 data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
-                 data-wine-preview='{{ wine.preview_insights()|tojson }}'>
+               data-cellar-id="{{ panel.cellar.id }}"
+               data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
+               data-wine-name="{{ wine.name }}"
+               data-wine-year="{{ extras.get('year', '') }}"
+               data-wine-region="{{ extras.get('region', '') }}"
+               data-wine-grape="{{ extras.get('grape', '') }}"
+               data-wine-volume="{{ extras.get('volume_ml', '') }}"
+               data-wine-cellar="{{ panel.cellar.name }}"
+               data-wine-category="{{ wine.subcategory.name if wine.subcategory else 'Non catégorisé' }}"
+               data-wine-barcode="{{ wine.barcode or '' }}"
+               data-wine-insights="{{ (wine.insights | map(attribute='content') | list | join('|||')) if wine.insights else '' }}">
+            
+            <!-- Image avec badges -->
+            <div class="card-header-img">
+              {% if wine.label_image_data %}
+              <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="{{ wine.name }}">
+              {% elif wine.image_url %}
+              <img src="{{ wine.image_url }}" alt="{{ wine.name }}">
+              {% else %}
+              <div class="card-placeholder">{{ wine.name[:1] }}</div>
+              {% endif %}
               
-              <!-- Image -->
-              <div class="wine-card-image">
-                {% if wine.label_image_data %}
-                <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="Étiquette de {{ wine.name }}">
-                {% elif wine.image_url %}
-                <img src="{{ wine.image_url }}" alt="{{ wine.name }}">
-                {% else %}
-                <div class="wine-card-placeholder" aria-hidden="true">{{ wine.name[:1] }}</div>
+              <div class="card-badges">
+                {% if wine.quantity == 0 %}
+                <span class="badge-urgency consumed">Épuisé</span>
                 {% endif %}
-                <span class="wine-card-quantity">×{{ wine.quantity }}</span>
+                <span class="badge-quantity">×{{ wine.quantity }}</span>
               </div>
+            </div>
+            
+            <!-- Corps -->
+            <div class="card-body-compact">
+              <h6 class="wine-name">{{ wine.name }}</h6>
               
-              <!-- Corps -->
-              <div class="wine-card-body">
-                <h5 class="wine-card-title">{{ wine.name }}</h5>
-                <p class="wine-card-subtitle">
-                  {% if extras.year %}
-                    Millésime {{ extras.year }}
-                  {% elif extras.get('aging_potential') %}
-                    {{ extras.get('aging_potential') }}
-                  {% else %}
-                    Millésime non renseigné
-                  {% endif %}
-                </p>
-                
-                {% if wine.subcategory %}
-                <span class="wine-card-category" style="{{ wine.subcategory|subcategory_badge_style }}">
-                  {{ wine.subcategory.name }}
-                </span>
-                {% else %}
-                <span class="wine-card-category" style="background-color: var(--text-muted); color: #fff;">
-                  Non catégorisé
+              <div class="wine-meta">
+                {% if extras.year %}
+                <span class="wine-meta-item">
+                  <i class="bi bi-calendar3"></i>
+                  {{ extras.year }}
                 </span>
                 {% endif %}
-                
-                <div class="wine-card-info">
-                  <div class="wine-card-info-item">
-                    <i class="bi bi-geo-alt"></i>
-                    <span>{{ extras.region or 'Région inconnue' }}</span>
-                  </div>
-                  {% if extras.get('grape') %}
-                  <div class="wine-card-info-item">
-                    <i class="bi bi-flower2"></i>
-                    <span>{{ extras.get('grape') }}</span>
-                  </div>
-                  {% endif %}
-                  {% if extras.get('volume_ml') %}
-                  <div class="wine-card-info-item">
-                    <i class="bi bi-droplet-half"></i>
-                    <span>{{ extras.get('volume_ml') }} mL</span>
-                  </div>
-                  {% endif %}
-                </div>
-                
-                {% if wine.barcode %}
-                <span class="wine-card-ean">
-                  <i class="bi bi-upc"></i> {{ wine.barcode }}
+                {% if extras.region %}
+                <span class="wine-meta-item">
+                  <i class="bi bi-geo-alt"></i>
+                  {{ extras.region[:12] }}{% if extras.region|length > 12 %}…{% endif %}
                 </span>
                 {% endif %}
               </div>
               
-              <!-- Actions -->
-              <div class="wine-card-actions">
-                <div class="wine-card-actions-grid with-comment">
-                  <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="wine-action-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                    <input type="hidden" name="redirect" value="{{ request.path }}">
-                    <input type="text" name="comment" class="wine-card-comment-input" placeholder="Commentaire (optionnel)">
-                    <div class="wine-card-action-buttons">
-                      <button type="submit" class="btn-wine-action btn-consume">
-                        <i class="bi bi-cup-straw me-1"></i>Consommer
-                      </button>
-                  </form>
-                  <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="wine-action-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                    <input type="hidden" name="redirect" value="{{ request.path }}">
-                    <button type="submit" class="btn-wine-action btn-refresh">
-                      <i class="bi bi-arrow-clockwise me-1"></i>Rafraîchir
-                    </button>
-                  </form>
-                  <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                    <input type="hidden" name="redirect" value="{{ request.path }}">
-                    <button type="submit" class="btn-wine-action btn-delete">
-                      <i class="bi bi-trash me-1"></i>Supprimer
-                    </button>
-                  </form>
-                    </div>
-                </div>
-              </div>
+              {% if wine.subcategory %}
+              <span class="wine-category" style="{{ wine.subcategory|subcategory_badge_style }}">
+                {{ wine.subcategory.name }}
+              </span>
+              {% endif %}
+            </div>
+            
+            <!-- Actions -->
+            <div class="card-footer-compact">
+              <button type="button" class="btn-action-compact btn-info btn-info-modal" title="Informations">
+                <i class="bi bi-info-circle"></i>
+              </button>
+              <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="btn-action-compact btn-detail" onclick="event.stopPropagation();">
+                <i class="bi bi-eye"></i>
+              </a>
+              {% if wine.quantity > 0 %}
+              <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill" onclick="event.stopPropagation();">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="redirect" value="{{ request.path }}">
+                <button type="submit" class="btn-action-compact btn-consume w-100">
+                  <i class="bi bi-cup-straw"></i>
+                </button>
+              </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" onclick="event.stopPropagation();" onsubmit="return confirm('Supprimer ce vin ?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="redirect" value="{{ request.path }}">
+                <button type="submit" class="btn-action-compact btn-delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
             </div>
           </div>
           {% endfor %}
@@ -382,27 +359,50 @@
         {% else %}
         <div class="alert alert-light border shadow-sm">
           Cette cave est prête à accueillir de nouvelles bouteilles. <a href="{{ url_for('wines.add_wine') }}" class="alert-link">Ajoutez un premier alcool</a>
-          pour remplir cette section.
         </div>
         {% endif %}
       </div>
     {% endfor %}
   </div>
 {% endif %}
+
+<!-- Modal d'informations enrichies -->
+<div class="modal fade wine-info-modal" id="wineInfoModal" tabindex="-1" aria-labelledby="wineInfoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="wineInfoModalLabel">
+          <i class="bi bi-info-circle me-2"></i>
+          <span id="modalWineName">Informations du vin</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body" id="modalWineContent">
+        <!-- Contenu dynamique -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+        <a href="#" class="btn btn-primary btn-sm" id="modalDetailLink">
+          <i class="bi bi-eye me-1"></i>Fiche complète
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // État des filtres par cave - utilise des Sets pour permettre la sélection multiple
+  // État des filtres par cave
   const filterState = {};
   
   // Initialiser l'état pour chaque cave
   document.querySelectorAll('.wine-cards-container').forEach(container => {
     const cellarId = container.dataset.cellarId;
     filterState[cellarId] = {
-      styles: new Set(),  // Plusieurs styles possibles
-      origins: new Set()  // Plusieurs origines possibles
+      styles: new Set(),
+      origins: new Set()
     };
   });
   
@@ -415,16 +415,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const cards = container.querySelectorAll('.wine-card-col');
     const originFilters = document.querySelector(`.origin-filters[data-cellar-id="${cellarId}"]`);
     
-    // Collecter les origines visibles basées sur les filtres de style actifs
     const visibleOrigins = new Set();
     
     cards.forEach(card => {
       const cardStyle = card.dataset.wineStyle || '';
       const cardOrigin = card.dataset.wineOrigin || '';
       
-      // Vérifier si la carte correspond aux filtres
-      // Si aucun style sélectionné, tous les styles passent
-      // Si des styles sont sélectionnés, le style de la carte doit être dans la liste
       const matchesStyle = state.styles.size === 0 || state.styles.has(cardStyle);
       const matchesOrigin = state.origins.size === 0 || state.origins.has(cardOrigin);
       
@@ -434,20 +430,17 @@ document.addEventListener('DOMContentLoaded', function() {
         card.classList.add('wine-card-hidden');
       }
       
-      // Collecter les origines des cartes qui correspondent aux filtres de style
       if (matchesStyle && cardOrigin) {
         visibleOrigins.add(cardOrigin);
       }
     });
     
-    // Mettre à jour la visibilité des chips d'origine basée sur les filtres de style
     if (originFilters && state.styles.size > 0) {
       originFilters.querySelectorAll('.origin-chip').forEach(chip => {
         const origin = chip.dataset.filterOrigin;
         if (visibleOrigins.has(origin)) {
           chip.style.display = '';
         } else {
-          // Masquer le chip mais aussi le désélectionner s'il était actif
           chip.style.display = 'none';
           if (state.origins.has(origin)) {
             state.origins.delete(origin);
@@ -456,13 +449,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
     } else if (originFilters) {
-      // Réafficher tous les chips d'origine si pas de filtre de style
       originFilters.querySelectorAll('.origin-chip').forEach(chip => {
         chip.style.display = '';
       });
     }
     
-    // Mettre à jour les boutons de réinitialisation
     const styleResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="style"][data-cellar-id="${cellarId}"]`);
     const originResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="origin"][data-cellar-id="${cellarId}"]`);
     
@@ -472,37 +463,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (originResetBtn) {
       originResetBtn.classList.toggle('visible', state.origins.size > 0);
     }
-    
-    // Mettre à jour le compteur de filtres actifs (optionnel, pour feedback visuel)
-    updateFilterCount(cellarId, state);
   }
   
-  // Fonction pour mettre à jour le compteur de filtres (feedback visuel)
-  function updateFilterCount(cellarId, state) {
-    const styleResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="style"][data-cellar-id="${cellarId}"]`);
-    const originResetBtn = document.querySelector(`.filter-reset-btn[data-filter-type="origin"][data-cellar-id="${cellarId}"]`);
-    
-    if (styleResetBtn && state.styles.size > 0) {
-      styleResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser (${state.styles.size})`;
-    } else if (styleResetBtn) {
-      styleResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser`;
-    }
-    
-    if (originResetBtn && state.origins.size > 0) {
-      originResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser (${state.origins.size})`;
-    } else if (originResetBtn) {
-      originResetBtn.innerHTML = `<i class="bi bi-x-lg me-1"></i>Réinitialiser`;
-    }
-  }
-  
-  // Gestionnaire de clic sur les filtres de style (sélection multiple)
+  // Gestionnaire de clic sur les filtres de style
   document.querySelectorAll('.wine-highlight-chip[data-filter-style]').forEach(chip => {
     chip.addEventListener('click', function() {
       const cellarId = this.dataset.cellarId;
       const style = this.dataset.filterStyle;
       const state = filterState[cellarId];
       
-      // Toggle le filtre dans le Set
       if (state.styles.has(style)) {
         state.styles.delete(style);
         this.classList.remove('active');
@@ -515,14 +484,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
-  // Gestionnaire de clic sur les filtres d'origine (sélection multiple)
+  // Gestionnaire de clic sur les filtres d'origine
   document.querySelectorAll('.origin-chip[data-filter-origin]').forEach(chip => {
     chip.addEventListener('click', function() {
       const cellarId = this.dataset.cellarId;
       const origin = this.dataset.filterOrigin;
       const state = filterState[cellarId];
       
-      // Toggle le filtre dans le Set
       if (state.origins.has(origin)) {
         state.origins.delete(origin);
         this.classList.remove('active');
@@ -573,6 +541,128 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+  
+  // Modal d'informations
+  const modal = document.getElementById('wineInfoModal');
+  if (modal) {
+    const bsModal = new bootstrap.Modal(modal);
+    const modalTitle = document.getElementById('modalWineName');
+    const modalContent = document.getElementById('modalWineContent');
+    const modalDetailLink = document.getElementById('modalDetailLink');
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+    
+    document.querySelectorAll('.btn-info-modal').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const card = this.closest('.wine-card-compact');
+        const detailUrl = card.dataset.detailUrl;
+        
+        const wineInfo = {
+          name: card.dataset.wineName || '',
+          year: card.dataset.wineYear || '',
+          region: card.dataset.wineRegion || '',
+          grape: card.dataset.wineGrape || '',
+          volume: card.dataset.wineVolume || '',
+          cellar: card.dataset.wineCellar || '',
+          category: card.dataset.wineCategory || '',
+          barcode: card.dataset.wineBarcode || '',
+          insights: card.dataset.wineInsights ? card.dataset.wineInsights.split('|||').filter(i => i.trim()) : []
+        };
+        
+        modalTitle.textContent = wineInfo.name;
+        modalDetailLink.href = detailUrl;
+        
+        let content = `
+          <div class="info-section">
+            <div class="info-section-title">
+              <i class="bi bi-wine"></i>
+              Informations générales
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Millésime</span>
+                <span class="info-value">${escapeHtml(wineInfo.year) || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Région</span>
+                <span class="info-value">${escapeHtml(wineInfo.region) || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Cépage</span>
+                <span class="info-value">${escapeHtml(wineInfo.grape) || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Volume</span>
+                <span class="info-value">${wineInfo.volume ? escapeHtml(wineInfo.volume) + ' mL' : 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Cave</span>
+                <span class="info-value">${escapeHtml(wineInfo.cellar) || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Catégorie</span>
+                <span class="info-value">${escapeHtml(wineInfo.category)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        if (wineInfo.barcode) {
+          content += `
+            <div class="info-section">
+              <div class="info-section-title">
+                <i class="bi bi-upc"></i>
+                Code-barres
+              </div>
+              <div class="info-content">
+                <code>${escapeHtml(wineInfo.barcode)}</code>
+              </div>
+            </div>
+          `;
+        }
+        
+        if (wineInfo.insights && wineInfo.insights.length > 0) {
+          const insightsHtml = wineInfo.insights
+            .slice(0, 3)
+            .map(i => `<p class="mb-2">${escapeHtml(i)}</p>`)
+            .join('');
+          
+          content += `
+            <div class="info-section">
+              <div class="info-section-title">
+                <i class="bi bi-chat-quote"></i>
+                Notes enrichies
+              </div>
+              <div class="info-content">
+                ${insightsHtml}
+              </div>
+            </div>
+          `;
+        }
+        
+        modalContent.innerHTML = content;
+        bsModal.show();
+      });
+    });
+    
+    // Clic sur la carte pour aller aux détails
+    document.querySelectorAll('.wine-card-compact').forEach(card => {
+      card.addEventListener('click', function(e) {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('form')) {
+          return;
+        }
+        const url = this.dataset.detailUrl;
+        if (url) {
+          window.location.href = url;
+        }
+      });
+    });
+  }
 });
 </script>
 {% endblock %}

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="mb-4">
+<div class="mb-3">
   <h3>Recherche multi-critères</h3>
-  <p class="text-muted">Recherchez vos bouteilles par nom, type d'alcool et/ou par accord mets-vins</p>
+  <p class="text-muted small mb-0">Recherchez vos bouteilles par nom, type d'alcool et/ou par accord mets-vins</p>
 </div>
 
 <div class="card mb-4">
@@ -13,13 +13,12 @@
           <label for="wine_name" class="form-label">Nom du vin</label>
           <input type="text" class="form-control" id="wine_name" name="wine_name" 
                  value="{{ wine_name }}" placeholder="Ex: Château Margaux, Côtes du Rhône...">
-          <div class="form-text">Recherche par nom ou partie du nom de la bouteille</div>
         </div>
         
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label for="subcategory_id" class="form-label">Type d'alcool</label>
           <select class="form-select" id="subcategory_id" name="subcategory_id">
-            <option value="">-- Tous les types --</option>
+            <option value="">-- Tous --</option>
             {% for category in categories %}
               <optgroup label="{{ category.name }}">
                 {% for subcategory in category.subcategories %}
@@ -30,36 +29,30 @@
               </optgroup>
             {% endfor %}
           </select>
-          <div class="form-text">Filtrer par catégorie d'alcool (vin rouge, whisky, etc.)</div>
         </div>
         
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label for="food_pairing" class="form-label">Accord mets-vins</label>
           <input type="text" class="form-control" id="food_pairing" name="food_pairing"
-                 value="{{ food_pairing }}" placeholder="Ex: viande, poisson, fromage...">
-          <div class="form-text">Recherche dans les informations enrichies (insights)</div>
+                 value="{{ food_pairing }}" placeholder="Ex: viande, poisson...">
         </div>
         
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label for="stock_filter" class="form-label">Statut</label>
           <select class="form-select" id="stock_filter" name="stock_filter">
-            <option value="all" {% if stock_filter == 'all' %}selected{% endif %}>Toutes les bouteilles</option>
-            <option value="in_stock" {% if stock_filter == 'in_stock' %}selected{% endif %}>En stock uniquement</option>
-            <option value="consumed" {% if stock_filter == 'consumed' %}selected{% endif %}>Consommées uniquement</option>
+            <option value="all" {% if stock_filter == 'all' %}selected{% endif %}>Toutes</option>
+            <option value="in_stock" {% if stock_filter == 'in_stock' %}selected{% endif %}>En stock</option>
+            <option value="consumed" {% if stock_filter == 'consumed' %}selected{% endif %}>Consommées</option>
           </select>
-          <div class="form-text">Filtrer par disponibilité</div>
         </div>
       </div>
       
       <div class="mt-3">
-        <button type="submit" class="btn btn-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-          </svg>
-          Rechercher
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-search me-1"></i>Rechercher
         </button>
         {% if subcategory_id or food_pairing or wine_name %}
-        <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary">Réinitialiser</a>
+        <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary btn-sm">Réinitialiser</a>
         {% endif %}
       </div>
     </form>
@@ -68,9 +61,9 @@
 
 {% if subcategory_id or food_pairing or wine_name %}
 <div class="mb-3">
-  <h4>Résultats de la recherche</h4>
+  <h4>Résultats</h4>
   {% if wines %}
-    <p class="text-muted">{{ wines|length }} bouteille(s) trouvée(s)</p>
+    <p class="text-muted small">{{ wines|length }} bouteille(s) trouvée(s)</p>
   {% else %}
     <div class="alert alert-info">
       Aucune bouteille ne correspond à vos critères de recherche.
@@ -79,135 +72,271 @@
 </div>
 
 {% if wines %}
-<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+<!-- Grille de cartes compactes -->
+<div class="wine-grid-compact">
   {% for wine in wines %}
   {% set extras = wine.extra_attributes or {} %}
-  <div class="col">
-    <div class="wine-card-modern animate-in"
-         data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
-         data-wine-preview='{{ wine.preview_insights()|tojson }}'>
+  <div class="wine-card-compact"
+       data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
+       data-wine-name="{{ wine.name }}"
+       data-wine-year="{{ extras.get('year', '') }}"
+       data-wine-region="{{ extras.get('region', '') }}"
+       data-wine-grape="{{ extras.get('grape', '') }}"
+       data-wine-volume="{{ extras.get('volume_ml', '') }}"
+       data-wine-cellar="{{ wine.cellar.name if wine.cellar else '' }}"
+       data-wine-category="{{ wine.subcategory.name if wine.subcategory else 'Non catégorisé' }}"
+       data-wine-barcode="{{ wine.barcode or '' }}"
+       data-wine-insights="{{ (wine.insights | map(attribute='content') | list | join('|||')) if wine.insights else '' }}">
+    
+    <!-- Image avec badges -->
+    <div class="card-header-img">
+      {% if wine.label_image_data %}
+      <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="{{ wine.name }}">
+      {% elif wine.image_url %}
+      <img src="{{ wine.image_url }}" alt="{{ wine.name }}">
+      {% else %}
+      <div class="card-placeholder">{{ wine.name[:1] }}</div>
+      {% endif %}
       
-      <!-- Image -->
-      <div class="wine-card-image">
-        {% if wine.label_image_data %}
-        <img src="data:image/png;base64,{{ wine.label_image_data }}" alt="Étiquette de {{ wine.name }}">
-        {% elif wine.image_url %}
-        <img src="{{ wine.image_url }}" alt="{{ wine.name }}">
-        {% else %}
-        <div class="wine-card-placeholder" aria-hidden="true">{{ wine.name[:1] }}</div>
-        {% endif %}
-        <span class="wine-card-quantity">×{{ wine.quantity }}</span>
+      <div class="card-badges">
         {% if wine.quantity == 0 %}
-        <span class="wine-card-urgency patience">Consommée</span>
+        <span class="badge-urgency consumed">Consommée</span>
+        {% endif %}
+        <span class="badge-quantity">×{{ wine.quantity }}</span>
+      </div>
+    </div>
+    
+    <!-- Corps -->
+    <div class="card-body-compact">
+      <h6 class="wine-name">{{ wine.name }}</h6>
+      
+      <div class="wine-meta">
+        {% if extras.year %}
+        <span class="wine-meta-item">
+          <i class="bi bi-calendar3"></i>
+          {{ extras.year }}
+        </span>
+        {% endif %}
+        {% if extras.region %}
+        <span class="wine-meta-item">
+          <i class="bi bi-geo-alt"></i>
+          {{ extras.region[:12] }}{% if extras.region|length > 12 %}…{% endif %}
+        </span>
         {% endif %}
       </div>
       
-      <!-- Corps -->
-      <div class="wine-card-body">
-        <h5 class="wine-card-title">{{ wine.name }}</h5>
-        <p class="wine-card-subtitle">
-          {% if extras.year %}
-            {{ extras.region or 'Région inconnue' }} — {{ extras.year }}
-          {% else %}
-            {{ extras.region or 'Région inconnue' }}
-          {% endif %}
-        </p>
-        
-        {% if wine.subcategory %}
-        <span class="wine-card-category" style="{{ wine.subcategory|subcategory_badge_style }}">
-          {{ wine.subcategory.name }}
-        </span>
-        {% else %}
-        <span class="wine-card-category" style="background-color: var(--text-muted); color: #fff;">
-          Non catégorisé
-        </span>
-        {% endif %}
-        
-        <div class="wine-card-info">
-          {% if extras.get('volume_ml') %}
-          <div class="wine-card-info-item">
-            <i class="bi bi-droplet-half"></i>
-            <span>{{ extras.get('volume_ml') }} mL</span>
-          </div>
-          {% endif %}
-          {% if extras.get('grape') %}
-          <div class="wine-card-info-item">
-            <i class="bi bi-flower2"></i>
-            <span>{{ extras.get('grape') }}</span>
-          </div>
-          {% endif %}
-        </div>
-        
-        {% if wine.barcode %}
-        <span class="wine-card-ean">
-          <i class="bi bi-upc"></i> {{ wine.barcode }}
-        </span>
-        {% endif %}
-        
-        {% if food_pairing %}
-        <div class="wine-card-insights">
-          <div class="wine-card-insights-title">Insights correspondants</div>
-          {% for insight in wine.insights %}
-            {% if food_pairing.lower() in insight.content.lower() or
-                  (insight.title and food_pairing.lower() in insight.title.lower()) or
-                  (insight.category and food_pairing.lower() in insight.category.lower()) %}
-              <div class="wine-card-insights-content">
-                {% if insight.title %}<strong>{{ insight.title }}:</strong> {% endif %}
-                {{ insight.content[:100] }}{% if insight.content|length > 100 %}...{% endif %}
-              </div>
-            {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
+      {% if wine.subcategory %}
+      <span class="wine-category" style="{{ wine.subcategory|subcategory_badge_style }}">
+        {{ wine.subcategory.name }}
+      </span>
+      {% endif %}
       
-      <!-- Footer -->
-      <div class="wine-card-footer">
-        <div class="wine-card-footer-info">
-          <span><i class="bi bi-box-seam me-1"></i>Cave : {{ wine.cellar.name }}</span>
-        </div>
-      </div>
-      
-      <!-- Actions -->
-      <div class="wine-card-actions">
-        <div class="wine-card-actions-grid with-comment">
-          {% if wine.quantity > 0 %}
-          <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="wine-action-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="redirect" value="{{ request.full_path }}">
-            <input type="text" name="comment" class="wine-card-comment-input" placeholder="Commentaire (optionnel)">
-            <div class="wine-card-action-buttons">
-              <button type="submit" class="btn-wine-action btn-consume">
-                <i class="bi bi-cup-straw me-1"></i>Consommer
-              </button>
-          </form>
-          {% else %}
-          <div class="wine-card-action-buttons">
+      {% if food_pairing %}
+      <div class="wine-insights-compact">
+        <div class="insights-title">Correspondances</div>
+        {% set ns = namespace(found=false) %}
+        {% for insight in wine.insights %}
+          {% if not ns.found and (food_pairing.lower() in insight.content.lower() or
+                (insight.title and food_pairing.lower() in insight.title.lower()) or
+                (insight.category and food_pairing.lower() in insight.category.lower())) %}
+            <div class="insights-content">
+              {{ insight.content[:80] }}{% if insight.content|length > 80 %}...{% endif %}
+            </div>
+            {% set ns.found = true %}
           {% endif %}
-          <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" class="wine-action-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="redirect" value="{{ request.full_path }}">
-            <button type="submit" class="btn-wine-action btn-refresh">
-              <i class="bi bi-arrow-clockwise me-1"></i>Rafraîchir
-            </button>
-          </form>
-          <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" class="wine-action-form" data-confirm="Supprimer définitivement ce vin ?">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="redirect" value="{{ request.full_path }}">
-            <button type="submit" class="btn-wine-action btn-delete">
-              <i class="bi bi-trash me-1"></i>Supprimer
-            </button>
-          </form>
-          </div>
-        </div>
+        {% endfor %}
       </div>
+      {% endif %}
+    </div>
+    
+    <!-- Actions -->
+    <div class="card-footer-compact">
+      <button type="button" class="btn-action-compact btn-info btn-info-modal" title="Informations">
+        <i class="bi bi-info-circle"></i>
+      </button>
+      <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="btn-action-compact btn-detail" onclick="event.stopPropagation();">
+        <i class="bi bi-eye"></i>
+      </a>
+      {% if wine.quantity > 0 %}
+      <form method="post" action="{{ url_for('wines.consume_wine', wine_id=wine.id) }}" class="flex-fill" onclick="event.stopPropagation();">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="redirect" value="{{ request.full_path }}">
+        <button type="submit" class="btn-action-compact btn-consume w-100">
+          <i class="bi bi-cup-straw"></i>
+        </button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('wines.refresh_wine', wine_id=wine.id) }}" onclick="event.stopPropagation();">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="redirect" value="{{ request.full_path }}">
+        <button type="submit" class="btn-action-compact btn-refresh">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('wines.delete_wine', wine_id=wine.id) }}" onclick="event.stopPropagation();" onsubmit="return confirm('Supprimer ce vin ?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="redirect" value="{{ request.full_path }}">
+        <button type="submit" class="btn-action-compact btn-delete">
+          <i class="bi bi-trash"></i>
+        </button>
+      </form>
     </div>
   </div>
   {% endfor %}
 </div>
-{% endif %}
-{% endif %}
 
+<!-- Modal d'informations enrichies -->
+<div class="modal fade wine-info-modal" id="wineInfoModal" tabindex="-1" aria-labelledby="wineInfoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="wineInfoModalLabel">
+          <i class="bi bi-info-circle me-2"></i>
+          <span id="modalWineName">Informations du vin</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body" id="modalWineContent">
+        <!-- Contenu dynamique -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+        <a href="#" class="btn btn-primary btn-sm" id="modalDetailLink">
+          <i class="bi bi-eye me-1"></i>Fiche complète
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('wineInfoModal');
+  if (!modal) return;
+  
+  const bsModal = new bootstrap.Modal(modal);
+  const modalTitle = document.getElementById('modalWineName');
+  const modalContent = document.getElementById('modalWineContent');
+  const modalDetailLink = document.getElementById('modalDetailLink');
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+  }
+  
+  document.querySelectorAll('.btn-info-modal').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const card = this.closest('.wine-card-compact');
+      const detailUrl = card.dataset.detailUrl;
+      
+      const wineInfo = {
+        name: card.dataset.wineName || '',
+        year: card.dataset.wineYear || '',
+        region: card.dataset.wineRegion || '',
+        grape: card.dataset.wineGrape || '',
+        volume: card.dataset.wineVolume || '',
+        cellar: card.dataset.wineCellar || '',
+        category: card.dataset.wineCategory || '',
+        barcode: card.dataset.wineBarcode || '',
+        insights: card.dataset.wineInsights ? card.dataset.wineInsights.split('|||').filter(i => i.trim()) : []
+      };
+      
+      modalTitle.textContent = wineInfo.name;
+      modalDetailLink.href = detailUrl;
+      
+      let content = `
+        <div class="info-section">
+          <div class="info-section-title">
+            <i class="bi bi-wine"></i>
+            Informations générales
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Millésime</span>
+              <span class="info-value">${escapeHtml(wineInfo.year) || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Région</span>
+              <span class="info-value">${escapeHtml(wineInfo.region) || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Cépage</span>
+              <span class="info-value">${escapeHtml(wineInfo.grape) || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Volume</span>
+              <span class="info-value">${wineInfo.volume ? escapeHtml(wineInfo.volume) + ' mL' : 'N/A'}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Cave</span>
+              <span class="info-value">${escapeHtml(wineInfo.cellar) || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Catégorie</span>
+              <span class="info-value">${escapeHtml(wineInfo.category)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      if (wineInfo.barcode) {
+        content += `
+          <div class="info-section">
+            <div class="info-section-title">
+              <i class="bi bi-upc"></i>
+              Code-barres
+            </div>
+            <div class="info-content">
+              <code>${escapeHtml(wineInfo.barcode)}</code>
+            </div>
+          </div>
+        `;
+      }
+      
+      if (wineInfo.insights && wineInfo.insights.length > 0) {
+        const insightsHtml = wineInfo.insights
+          .slice(0, 3)
+          .map(i => `<p class="mb-2">${escapeHtml(i)}</p>`)
+          .join('');
+        
+        content += `
+          <div class="info-section">
+            <div class="info-section-title">
+              <i class="bi bi-chat-quote"></i>
+              Notes enrichies
+            </div>
+            <div class="info-content">
+              ${insightsHtml}
+            </div>
+          </div>
+        `;
+      }
+      
+      modalContent.innerHTML = content;
+      bsModal.show();
+    });
+  });
+  
+  // Clic sur la carte pour aller aux détails
+  document.querySelectorAll('.wine-card-compact').forEach(card => {
+    card.addEventListener('click', function(e) {
+      if (e.target.closest('button') || e.target.closest('a') || e.target.closest('form')) {
+        return;
+      }
+      const url = this.dataset.detailUrl;
+      if (url) {
+        window.location.href = url;
+      }
+    });
+  });
+});
+</script>
 {% endblock %}
 
 {% block extra_scripts %}
