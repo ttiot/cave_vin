@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initWineCards();
     initWineActions();
     initMobileSearch();
+    initMobileSidebar();
     initPushNotifications();
     initTutorial();
     initOfflineIndicator();
@@ -888,6 +889,260 @@ function initMobileSearch() {
             }
         }
     });
+}
+
+/**
+ * Gestion du menu mobile sidebar (hamburger menu)
+ */
+function initMobileSidebar() {
+    const sidebar = document.getElementById("mobileSidebar");
+    const overlay = document.getElementById("mobileMenuOverlay");
+    const openBtn = document.getElementById("openMobileSidebar");
+    const closeBtn = document.getElementById("closeMobileSidebar");
+
+    logDebug("[MobileSidebar] Initialisation", {
+        sidebar: !!sidebar,
+        overlay: !!overlay,
+        openBtn: !!openBtn,
+        closeBtn: !!closeBtn,
+    });
+
+    if (!sidebar || !overlay || !openBtn) {
+        logDebug("[MobileSidebar] Éléments manquants, abandon");
+        return;
+    }
+
+    // Fonction pour ouvrir le menu
+    function openSidebar() {
+        sidebar.classList.add("active");
+        overlay.classList.add("active");
+        document.body.classList.add("mobile-menu-open");
+
+        // Focus sur le premier élément interactif pour l'accessibilité
+        const firstFocusable = sidebar.querySelector("a, button, input");
+        if (firstFocusable) {
+            setTimeout(() => firstFocusable.focus(), 100);
+        }
+    }
+
+    // Fonction pour fermer le menu
+    function closeSidebar() {
+        sidebar.classList.remove("active");
+        overlay.classList.remove("active");
+        document.body.classList.remove("mobile-menu-open");
+
+        // Remettre le focus sur le bouton hamburger
+        openBtn.focus();
+    }
+
+    // Ouvrir le menu au clic sur le bouton hamburger
+    openBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        openSidebar();
+    });
+
+    // Fermer le menu au clic sur le bouton de fermeture
+    if (closeBtn) {
+        closeBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            closeSidebar();
+        });
+    }
+
+    // Fermer le menu au clic sur l'overlay
+    overlay.addEventListener("click", closeSidebar);
+
+    // Fermer le menu avec la touche Escape
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && sidebar.classList.contains("active")) {
+            closeSidebar();
+        }
+    });
+
+    // Gestion des sections dépliables (accordéon)
+    const sectionToggles = sidebar.querySelectorAll(
+        ".mobile-nav-section-toggle",
+    );
+    sectionToggles.forEach((toggle) => {
+        toggle.addEventListener("click", (e) => {
+            e.preventDefault();
+            const section = toggle.closest(".mobile-nav-section");
+            const sectionName = toggle.dataset.section;
+            const content = document.getElementById(`section-${sectionName}`);
+
+            if (!section || !content) return;
+
+            // Fermer les autres sections ouvertes (comportement accordéon)
+            const allSections = sidebar.querySelectorAll(".mobile-nav-section");
+            allSections.forEach((otherSection) => {
+                if (
+                    otherSection !== section &&
+                    otherSection.classList.contains("open")
+                ) {
+                    otherSection.classList.remove("open");
+                }
+            });
+
+            // Basculer l'état de la section actuelle
+            section.classList.toggle("open");
+        });
+    });
+
+    // Fermer le menu quand on clique sur un lien (sauf les toggles de section)
+    const navLinks = sidebar.querySelectorAll(
+        ".mobile-nav-item, .mobile-nav-subitem",
+    );
+    navLinks.forEach((link) => {
+        link.addEventListener("click", () => {
+            // Petit délai pour permettre la navigation
+            setTimeout(closeSidebar, 100);
+        });
+    });
+
+    // Synchroniser les boutons de thème et notifications entre navbar et sidebar
+    initMobileSidebarSync();
+}
+
+/**
+ * Synchroniser les boutons du sidebar mobile avec ceux de la navbar
+ */
+function initMobileSidebarSync() {
+    // Synchronisation du thème
+    const themeToggleMobile = document.getElementById("themeToggleMobile");
+    const themeIconMobile = document.getElementById("themeIconMobile");
+    const themeToggle = document.getElementById("themeToggle");
+    const themeIcon = document.getElementById("themeIcon");
+
+    if (themeToggleMobile && themeIconMobile) {
+        // Mettre à jour l'icône mobile selon le thème actuel
+        function updateMobileThemeIcon() {
+            const currentTheme =
+                document.documentElement.getAttribute("data-theme");
+            if (currentTheme === "dark") {
+                themeIconMobile.classList.remove("bi-moon-fill");
+                themeIconMobile.classList.add("bi-sun-fill");
+                themeToggleMobile.title = "Passer en mode clair";
+            } else {
+                themeIconMobile.classList.remove("bi-sun-fill");
+                themeIconMobile.classList.add("bi-moon-fill");
+                themeToggleMobile.title = "Passer en mode sombre";
+            }
+        }
+
+        // Initialiser l'icône
+        updateMobileThemeIcon();
+
+        // Basculer le thème au clic
+        themeToggleMobile.addEventListener("click", () => {
+            const currentTheme =
+                document.documentElement.getAttribute("data-theme");
+            const newTheme = currentTheme === "dark" ? "light" : "dark";
+
+            document.documentElement.setAttribute("data-theme", newTheme);
+            localStorage.setItem("theme", newTheme);
+            updateMobileThemeIcon();
+
+            // Mettre à jour aussi l'icône de la navbar
+            if (themeIcon) {
+                if (newTheme === "dark") {
+                    themeIcon.classList.remove("bi-moon-fill");
+                    themeIcon.classList.add("bi-sun-fill");
+                } else {
+                    themeIcon.classList.remove("bi-sun-fill");
+                    themeIcon.classList.add("bi-moon-fill");
+                }
+            }
+
+            // Émettre un événement personnalisé
+            window.dispatchEvent(
+                new CustomEvent("themechange", { detail: { theme: newTheme } }),
+            );
+        });
+
+        // Écouter les changements de thème depuis la navbar
+        window.addEventListener("themechange", updateMobileThemeIcon);
+    }
+
+    // Synchronisation des notifications
+    const enableNotificationsMobile = document.getElementById(
+        "enableNotificationsMobile",
+    );
+    const notificationIconMobile = document.getElementById(
+        "notificationIconMobile",
+    );
+
+    if (enableNotificationsMobile && notificationIconMobile) {
+        // Mettre à jour l'état du bouton mobile
+        function updateMobileNotificationButton() {
+            if (
+                !("Notification" in window) ||
+                !("serviceWorker" in navigator)
+            ) {
+                enableNotificationsMobile.disabled = true;
+                notificationIconMobile.className = "bi bi-bell-slash";
+                enableNotificationsMobile.title =
+                    "Notifications non supportées";
+                return;
+            }
+
+            navigator.serviceWorker.ready
+                .then(async (registration) => {
+                    const subscription =
+                        await registration.pushManager.getSubscription();
+
+                    if (Notification.permission === "denied") {
+                        notificationIconMobile.className = "bi bi-bell-slash";
+                        enableNotificationsMobile.title =
+                            "Notifications bloquées";
+                        enableNotificationsMobile.disabled = true;
+                        enableNotificationsMobile.style.opacity = "0.5";
+                    } else if (subscription) {
+                        notificationIconMobile.className = "bi bi-bell-fill";
+                        enableNotificationsMobile.title =
+                            "Notifications activées";
+                        enableNotificationsMobile.style.color = "#28a745";
+                        enableNotificationsMobile.disabled = false;
+                    } else {
+                        notificationIconMobile.className = "bi bi-bell";
+                        enableNotificationsMobile.title =
+                            "Activer les notifications";
+                        enableNotificationsMobile.style.color = "";
+                        enableNotificationsMobile.disabled = false;
+                    }
+                })
+                .catch(() => {});
+        }
+
+        // Initialiser l'état
+        updateMobileNotificationButton();
+
+        // Gérer le clic sur le bouton mobile
+        enableNotificationsMobile.addEventListener("click", async () => {
+            // Simuler un clic sur le bouton de la navbar pour réutiliser la logique existante
+            const enableBtn = document.getElementById("enableNotifications");
+            if (enableBtn) {
+                enableBtn.click();
+                // Mettre à jour l'état après un délai
+                setTimeout(updateMobileNotificationButton, 1000);
+            }
+        });
+
+        // Écouter les changements d'état des notifications
+        document.body.addEventListener(
+            "classChange",
+            updateMobileNotificationButton,
+        );
+
+        // Observer les changements de classe sur le body pour push-subscribed
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === "class") {
+                    updateMobileNotificationButton();
+                }
+            });
+        });
+        observer.observe(document.body, { attributes: true });
+    }
 }
 
 /**

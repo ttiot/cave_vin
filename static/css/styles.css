@@ -1777,3 +1777,348 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 0.25rem rgba(114, 47, 55, 0.25);
 }
+
+/* ============================================================================
+   Menu mobile sidebar (hamburger menu)
+   ============================================================================ */
+
+/* Overlay sombre derrière le menu */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.mobile-menu-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Sidebar mobile */
+.mobile-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  max-width: 85vw;
+  height: 100vh;
+  height: 100dvh;
+  background-color: var(--bg-card);
+  z-index: 1050;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+}
+
+.mobile-sidebar.active {
+  transform: translateX(0);
+}
+
+/* Header du sidebar */
+.mobile-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--accent-primary);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.mobile-sidebar-brand {
+  display: flex;
+  align-items: center;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.mobile-sidebar-brand:hover {
+  color: #fff;
+}
+
+.mobile-sidebar-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.25rem;
+  padding: 0.25rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  line-height: 1;
+}
+
+.mobile-sidebar-close:hover {
+  color: #fff;
+}
+
+/* Corps du sidebar */
+.mobile-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md) 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Barre de recherche dans le sidebar */
+.mobile-sidebar-search {
+  padding: 0 var(--spacing-md) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--spacing-sm);
+}
+
+.mobile-sidebar-search .form-control {
+  background-color: var(--bg-input);
+  border-color: var(--border-color);
+  font-size: 0.9rem;
+}
+
+.mobile-sidebar-search .btn {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.mobile-sidebar-search .btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Navigation dans le sidebar */
+.mobile-sidebar-nav {
+  padding: 0 var(--spacing-sm);
+}
+
+/* Item de navigation simple */
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: 0.875rem var(--spacing-md);
+  color: var(--text-primary);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  margin: 2px 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  font-size: 0.95rem;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item:focus {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mobile-nav-item.active {
+  background-color: rgba(114, 47, 55, 0.1);
+  color: var(--accent-primary);
+}
+
+.mobile-nav-item i {
+  font-size: 1.1rem;
+  width: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.mobile-nav-item:hover i,
+.mobile-nav-item.active i {
+  color: var(--accent-primary);
+}
+
+/* Section de navigation (avec sous-menu) */
+.mobile-nav-section {
+  margin: 2px 0;
+}
+
+.mobile-nav-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: 0.875rem var(--spacing-md);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  font-size: 0.95rem;
+}
+
+.mobile-nav-section-toggle:hover {
+  background-color: var(--bg-hover);
+}
+
+.mobile-nav-section-toggle i:first-child {
+  font-size: 1.1rem;
+  width: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.mobile-nav-section-toggle span {
+  flex: 1;
+}
+
+.mobile-nav-chevron {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.mobile-nav-section.open .mobile-nav-chevron {
+  transform: rotate(180deg);
+}
+
+/* Contenu de la section (sous-menu) */
+.mobile-nav-section-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  margin: 0 var(--spacing-sm);
+}
+
+.mobile-nav-section.open .mobile-nav-section-content {
+  max-height: 500px;
+}
+
+/* Sous-item de navigation */
+.mobile-nav-subitem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0.625rem var(--spacing-md) 0.625rem calc(var(--spacing-md) + 24px + var(--spacing-md));
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mobile-nav-subitem:hover,
+.mobile-nav-subitem:focus {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .mobile-nav-subitem:hover,
+[data-theme="dark"] .mobile-nav-subitem:focus {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.mobile-nav-subitem i {
+  font-size: 0.9rem;
+  width: 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.mobile-nav-subitem:hover i {
+  color: var(--accent-primary);
+}
+
+/* Footer du sidebar */
+.mobile-sidebar-footer {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-hover);
+  flex-shrink: 0;
+}
+
+.mobile-sidebar-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+}
+
+.mobile-action-btn {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  transition: color 0.2s ease;
+  line-height: 1;
+}
+
+.mobile-action-btn:hover {
+  color: var(--accent-primary);
+}
+
+/* Empêcher le scroll du body quand le menu est ouvert */
+body.mobile-menu-open {
+  overflow: hidden;
+}
+
+/* Ajustements pour la navbar sur mobile avec le nouveau bouton hamburger */
+@media (max-width: 991.98px) {
+  .navbar .navbar-toggler {
+    order: -1;
+  }
+  
+  .navbar .navbar-brand {
+    margin-right: auto;
+  }
+  
+  .navbar .navbar-search-toggle {
+    order: 1;
+  }
+}
+
+/* Animation d'entrée pour les items du menu */
+.mobile-sidebar.active .mobile-nav-item,
+.mobile-sidebar.active .mobile-nav-section-toggle {
+  animation: slideInLeft 0.3s ease forwards;
+  opacity: 0;
+}
+
+.mobile-sidebar.active .mobile-nav-item:nth-child(1),
+.mobile-sidebar.active .mobile-nav-section:nth-child(1) .mobile-nav-section-toggle { animation-delay: 0.05s; }
+.mobile-sidebar.active .mobile-nav-item:nth-child(2),
+.mobile-sidebar.active .mobile-nav-section:nth-child(2) .mobile-nav-section-toggle { animation-delay: 0.1s; }
+.mobile-sidebar.active .mobile-nav-item:nth-child(3),
+.mobile-sidebar.active .mobile-nav-section:nth-child(3) .mobile-nav-section-toggle { animation-delay: 0.15s; }
+.mobile-sidebar.active .mobile-nav-item:nth-child(4),
+.mobile-sidebar.active .mobile-nav-section:nth-child(4) .mobile-nav-section-toggle { animation-delay: 0.2s; }
+.mobile-sidebar.active .mobile-nav-item:nth-child(5),
+.mobile-sidebar.active .mobile-nav-section:nth-child(5) .mobile-nav-section-toggle { animation-delay: 0.25s; }
+.mobile-sidebar.active .mobile-nav-item:nth-child(6),
+.mobile-sidebar.active .mobile-nav-section:nth-child(6) .mobile-nav-section-toggle { animation-delay: 0.3s; }
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Mode sombre - ajustements pour le sidebar */
+[data-theme="dark"] .mobile-sidebar {
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .mobile-sidebar-header {
+  background-color: var(--accent-primary-dark);
+}
+
+[data-theme="dark"] .mobile-nav-section-content {
+  background-color: rgba(0, 0, 0, 0.2);
+}
