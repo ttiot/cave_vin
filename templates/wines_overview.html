@@ -202,30 +202,34 @@
            aria-labelledby="cellar-{{ panel.cellar.id }}-tab">
         
         <!-- Métriques compactes -->
-        <div class="row g-2 mb-3">
+        <div class="row g-2 mb-3 cellar-metrics" data-cellar-id="{{ panel.cellar.id }}">
           <div class="col-6 col-md-3">
             <div class="cellar-metric">
-              <span class="metric-label">Bouteilles</span>
-              <span class="metric-value">{{ panel.total_quantity }}</span>
+              <span class="metric-label">Bouteilles en stock</span>
+              <span class="metric-value" data-metric="bottles">{{ panel.total_quantity }}</span>
+              <small class="text-muted d-block">Quantité totale disponible</small>
             </div>
           </div>
           <div class="col-6 col-md-3">
             <div class="cellar-metric">
-              <span class="metric-label">Références</span>
-              <span class="metric-value">{{ panel.wines|length }}</span>
+              <span class="metric-label">Références suivies</span>
+              <span class="metric-value" data-metric="references">{{ panel.wines|length }}</span>
+              <small class="text-muted d-block">Fiches individuelles</small>
             </div>
           </div>
           <div class="col-6 col-md-3">
             <div class="cellar-metric">
-              <span class="metric-label">Styles</span>
-              <span class="metric-value">{{ panel.subcategory_labels|length }}</span>
+              <span class="metric-label">Styles représentés</span>
+              <span class="metric-value" data-metric="styles">{{ panel.subcategory_labels|length }}</span>
+              <small class="text-muted d-block">Catégories et sous-catégories</small>
             </div>
           </div>
           {% if panel.vintage_range %}
           <div class="col-6 col-md-3">
             <div class="cellar-metric">
               <span class="metric-label">Millésimes</span>
-              <span class="metric-value">{{ panel.vintage_range[0] }}–{{ panel.vintage_range[1] }}</span>
+              <span class="metric-value" data-metric="vintages" data-original-min="{{ panel.vintage_range[0] }}" data-original-max="{{ panel.vintage_range[1] }}">{{ panel.vintage_range[0] }} – {{ panel.vintage_range[1] }}</span>
+              <small class="text-muted d-block">Amplitude des années</small>
             </div>
           </div>
           {% endif %}
@@ -272,6 +276,7 @@
           <div class="wine-card-compact wine-card-col"
                data-wine-style="{{ wine.subcategory.name if wine.subcategory else '' }}"
                data-wine-origin="{{ extras.region or '' }}"
+               data-wine-quantity="{{ wine.quantity }}"
                data-cellar-id="{{ panel.cellar.id }}"
                data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
                data-wine-name="{{ wine.name }}"
@@ -406,6 +411,51 @@ document.addEventListener('DOMContentLoaded', function() {
     };
   });
   
+  // Fonction pour mettre à jour les métriques
+  function updateMetrics(cellarId, visibleCards) {
+    const metricsContainer = document.querySelector(`.cellar-metrics[data-cellar-id="${cellarId}"]`);
+    if (!metricsContainer) return;
+    
+    // Calculer les statistiques des cartes visibles
+    let totalBottles = 0;
+    const styles = new Set();
+    const vintages = [];
+    
+    visibleCards.forEach(card => {
+      const quantity = parseInt(card.dataset.wineQuantity, 10) || 0;
+      totalBottles += quantity;
+      
+      const style = card.dataset.wineStyle;
+      if (style) styles.add(style);
+      
+      const year = parseInt(card.dataset.wineYear, 10);
+      if (year && !isNaN(year)) vintages.push(year);
+    });
+    
+    // Mettre à jour les valeurs affichées
+    const bottlesEl = metricsContainer.querySelector('[data-metric="bottles"]');
+    const referencesEl = metricsContainer.querySelector('[data-metric="references"]');
+    const stylesEl = metricsContainer.querySelector('[data-metric="styles"]');
+    const vintagesEl = metricsContainer.querySelector('[data-metric="vintages"]');
+    
+    if (bottlesEl) bottlesEl.textContent = totalBottles;
+    if (referencesEl) referencesEl.textContent = visibleCards.length;
+    if (stylesEl) stylesEl.textContent = styles.size;
+    
+    if (vintagesEl && vintages.length > 0) {
+      const minYear = Math.min(...vintages);
+      const maxYear = Math.max(...vintages);
+      vintagesEl.textContent = minYear === maxYear ? minYear : `${minYear} – ${maxYear}`;
+    } else if (vintagesEl) {
+      // Aucun millésime visible, afficher les valeurs originales ou N/A
+      const originalMin = vintagesEl.dataset.originalMin;
+      const originalMax = vintagesEl.dataset.originalMax;
+      if (originalMin && originalMax) {
+        vintagesEl.textContent = `${originalMin} – ${originalMax}`;
+      }
+    }
+  }
+  
   // Fonction pour appliquer les filtres
   function applyFilters(cellarId) {
     const state = filterState[cellarId];
@@ -416,6 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const originFilters = document.querySelector(`.origin-filters[data-cellar-id="${cellarId}"]`);
     
     const visibleOrigins = new Set();
+    const visibleCards = [];
     
     cards.forEach(card => {
       const cardStyle = card.dataset.wineStyle || '';
@@ -426,6 +477,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (matchesStyle && matchesOrigin) {
         card.classList.remove('wine-card-hidden');
+        visibleCards.push(card);
       } else {
         card.classList.add('wine-card-hidden');
       }
@@ -434,6 +486,9 @@ document.addEventListener('DOMContentLoaded', function() {
         visibleOrigins.add(cardOrigin);
       }
     });
+    
+    // Mettre à jour les métriques avec les cartes visibles
+    updateMetrics(cellarId, visibleCards);
     
     if (originFilters && state.styles.size > 0) {
       originFilters.querySelectorAll('.origin-chip').forEach(chip => {
