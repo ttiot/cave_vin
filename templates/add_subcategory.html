@@ -19,19 +19,35 @@
   <div class="row">
     <div class="col-md-6 mb-3">
       <label class="form-label">Couleur du badge</label>
-      <input type="color" class="form-control form-control-color" name="badge_bg_color" value="{{ badge_bg_color or '#6366f1' }}" title="Choisissez la couleur de fond du badge">
+      <input type="color" class="form-control form-control-color" name="badge_bg_color" id="badge_bg_color" value="{{ badge_bg_color or '#6366f1' }}" title="Choisissez la couleur de fond du badge">
     </div>
     <div class="col-md-6 mb-3">
       <label class="form-label">Couleur du texte</label>
-      <input type="color" class="form-control form-control-color" name="badge_text_color" value="{{ badge_text_color or '#ffffff' }}" title="Choisissez la couleur du texte">
+      <input type="color" class="form-control form-control-color" name="badge_text_color" id="badge_text_color" value="{{ badge_text_color or '#ffffff' }}" title="Choisissez la couleur du texte">
     </div>
   </div>
   <div class="mb-3">
-    <span class="badge" style="background-color: {{ badge_bg_color or '#6366f1' }}; color: {{ badge_text_color or '#ffffff' }};">Aperçu du badge</span>
+    <span class="badge" id="badge_preview" style="background-color: {{ badge_bg_color or '#6366f1' }}; color: {{ badge_text_color or '#ffffff' }};">Aperçu du badge</span>
   </div>
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-dark">Créer</button>
     <a href="{{ url_for('categories.list_categories') }}" class="btn btn-secondary">Annuler</a>
   </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const bgColorInput = document.getElementById('badge_bg_color');
+  const textColorInput = document.getElementById('badge_text_color');
+  const badgePreview = document.getElementById('badge_preview');
+
+  function updateBadgePreview() {
+    badgePreview.style.backgroundColor = bgColorInput.value;
+    badgePreview.style.color = textColorInput.value;
+  }
+
+  bgColorInput.addEventListener('input', updateBadgePreview);
+  textColorInput.addEventListener('input', updateBadgePreview);
+});
+</script>
 {% endblock %}
