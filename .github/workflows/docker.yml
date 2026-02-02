@@ -27,6 +27,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ----- Minification des assets JS/CSS -----
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install minification tools
+        run: npm install -g terser clean-css-cli
+
+      - name: Minify JavaScript
+        run: |
+          echo "📦 Taille originale JS: $(wc -c < static/js/main.js) bytes"
+          terser static/js/main.js \
+            --compress \
+            --mangle \
+            --output static/js/main.js
+          echo "✅ Taille minifiée JS: $(wc -c < static/js/main.js) bytes"
+
+      - name: Minify CSS
+        run: |
+          echo "📦 Taille originale CSS: $(wc -c < static/css/styles.css) bytes"
+          cleancss -o static/css/styles.css static/css/styles.css
+          echo "✅ Taille minifiée CSS: $(wc -c < static/css/styles.css) bytes"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
