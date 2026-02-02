@@ -49,8 +49,8 @@ jobs:
         run: |
           echo "📦 Taille originale CSS: $(wc -c < static/css/styles.css) bytes"
           cleancss \
-            --level 2 \
-            --output static/css/styles.css \
+            -O2 \
+            -o static/css/styles.css \
             static/css/styles.css
           echo "✅ Taille minifiée CSS: $(wc -c < static/css/styles.css) bytes"
 
