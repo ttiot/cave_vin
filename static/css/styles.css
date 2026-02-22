@@ -1806,8 +1806,8 @@ h1, h2, h3, h4, h5, h6 {
   position: fixed;
   top: 0;
   left: 0;
-  width: 280px;
-  max-width: 85vw;
+  width: 320px;
+  max-width: 90vw;
   height: 100vh;
   height: 100dvh;
   background-color: var(--bg-card);
@@ -1828,7 +1828,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-lg) var(--spacing-lg);
   background-color: var(--accent-primary);
   color: #fff;
   flex-shrink: 0;
@@ -1840,7 +1840,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #fff;
   text-decoration: none;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
 }
 
 .mobile-sidebar-brand:hover {
@@ -1851,8 +1851,8 @@ h1, h2, h3, h4, h5, h6 {
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.8);
-  font-size: 1.25rem;
-  padding: 0.25rem;
+  font-size: 1.5rem;
+  padding: 0.5rem;
   cursor: pointer;
   transition: color 0.2s ease;
   line-height: 1;
@@ -1880,7 +1880,8 @@ h1, h2, h3, h4, h5, h6 {
 .mobile-sidebar-search .form-control {
   background-color: var(--bg-input);
   border-color: var(--border-color);
-  font-size: 0.9rem;
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
 }
 
 .mobile-sidebar-search .btn {
@@ -1903,13 +1904,13 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: 0.875rem var(--spacing-md);
+  padding: 1rem var(--spacing-md);
   color: var(--text-primary);
   text-decoration: none;
   border-radius: var(--radius-sm);
   margin: 2px 0;
   transition: background-color 0.15s ease, color 0.15s ease;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
 }
 
 .mobile-nav-item:hover,
@@ -1924,8 +1925,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-nav-item i {
-  font-size: 1.1rem;
-  width: 24px;
+  font-size: 1.3rem;
+  width: 28px;
   text-align: center;
   color: var(--text-secondary);
 }
@@ -1945,7 +1946,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: var(--spacing-md);
   width: 100%;
-  padding: 0.875rem var(--spacing-md);
+  padding: 1rem var(--spacing-md);
   background: none;
   border: none;
   color: var(--text-primary);
@@ -1953,7 +1954,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color 0.15s ease;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
 }
 
 .mobile-nav-section-toggle:hover {
@@ -1961,8 +1962,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-nav-section-toggle i:first-child {
-  font-size: 1.1rem;
-  width: 24px;
+  font-size: 1.3rem;
+  width: 28px;
   text-align: center;
   color: var(--text-secondary);
 }
@@ -1972,7 +1973,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-nav-chevron {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   transition: transform 0.2s ease;
 }
@@ -2000,10 +2001,10 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: 0.625rem var(--spacing-md) 0.625rem calc(var(--spacing-md) + 24px + var(--spacing-md));
+  padding: 0.75rem var(--spacing-md) 0.75rem calc(var(--spacing-md) + 28px + var(--spacing-md));
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: 1rem;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
@@ -2019,8 +2020,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-nav-subitem i {
-  font-size: 0.9rem;
-  width: 20px;
+  font-size: 1.1rem;
+  width: 24px;
   text-align: center;
   color: var(--text-muted);
 }
@@ -2047,10 +2048,10 @@ h1, h2, h3, h4, h5, h6 {
 .mobile-action-btn {
   background: none;
   border: none;
-  padding: 0.5rem;
+  padding: 0.625rem;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   transition: color 0.2s ease;
   line-height: 1;
 }
