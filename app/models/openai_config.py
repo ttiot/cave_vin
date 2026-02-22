@@ -446,7 +446,7 @@ Structure ta réponse au format JSON selon le schéma demandé, sans texte addit
                     "insights": {
                         "type": "array",
                         "minItems": 1,
-                        "maxItems": 5,
+                        "maxItems": 6,
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
@@ -465,9 +465,9 @@ Structure ta réponse au format JSON selon le schéma demandé, sans texte addit
                 "required": ["insights"],
             },
             "parameters": {
-                "max_output_tokens": 900,
+                "max_output_tokens": 1800,
                 "enable_web_search": True,
-                "web_search_context_size": "medium",
+                "web_search_context_size": "high",
             },
         },
         "wine_pairing": {

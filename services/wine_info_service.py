@@ -297,9 +297,9 @@ class WineInfoService:
             system_prompt = prompt_config.render_system_prompt()
             user_prompt = prompt_config.render_user_prompt(wine_details=wine_details)
             schema = prompt_config.response_schema
-            max_output_tokens = prompt_config.get_parameter("max_output_tokens", 900)
-            enable_web_search = prompt_config.get_parameter("enable_web_search", False)
-            web_search_context_size = prompt_config.get_parameter("web_search_context_size", "medium")
+            max_output_tokens = prompt_config.get_parameter("max_output_tokens", 1800)
+            enable_web_search = prompt_config.get_parameter("enable_web_search", True)
+            web_search_context_size = prompt_config.get_parameter("web_search_context_size", "high")
         except Exception as e:
             logger.warning("⚠️ Impossible de charger le prompt configurable: %s. Utilisation des valeurs par défaut.", e)
             # Fallback aux valeurs par défaut
@@ -325,7 +325,7 @@ class WineInfoService:
                     "insights": {
                         "type": "array",
                         "minItems": 1,
-                        "maxItems": 5,
+                        "maxItems": 6,
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
@@ -343,9 +343,9 @@ class WineInfoService:
                 },
                 "required": ["insights"],
             }
-            max_output_tokens = 900
+            max_output_tokens = 1800
             enable_web_search = True
-            web_search_context_size = "medium"
+            web_search_context_size = "high"
 
         logger.info("📤 OpenAI: envoi de la requête à l'API")
         logger.debug(
@@ -360,26 +360,126 @@ class WineInfoService:
         # Préparer le prompt complet pour le logging
         full_prompt = f"[SYSTEM]\n{system_prompt}\n\n[USER]\n{user_prompt}"
         
+        # ------------------------------------------------------------------
+        # Architecture en 2 étapes pour récupérer les URLs web_search
+        # ------------------------------------------------------------------
+        # Étape 1 : Appel avec web_search en format texte libre pour obtenir
+        #           les informations ET les annotations url_citation.
+        #           (Le format json_schema supprime les annotations url_citation)
+        # Étape 2 : Appel avec json_schema (sans web search) en passant le
+        #           texte de l'étape 1 comme contexte pour structurer le JSON.
+        # ------------------------------------------------------------------
+
+        response_step1 = None
         response = None
         error_message = None
         duration_ms = None
-        
-        # Construire la liste des tools (web search optionnel)
-        tools = []
+        total_input_tokens = 0
+        total_output_tokens = 0
+        web_search_urls: List[str] = []
+
+        # ---- Étape 1 : Recherche web + texte libre ----
         if enable_web_search:
             valid_sizes = {"low", "medium", "high"}
-            ctx_size = web_search_context_size if web_search_context_size in valid_sizes else "medium"
-            tools.append({
+            ctx_size = web_search_context_size if web_search_context_size in valid_sizes else "high"
+            tools = [{
                 "type": "web_search_preview",
                 "search_context_size": ctx_size,
-            })
-            logger.info("🌐 Web search activé (context_size=%s)", ctx_size)
+            }]
+            logger.info("🌐 Étape 1 : Recherche web activée (context_size=%s)", ctx_size)
+
+            try:
+                # L'étape 1 utilise un budget de tokens réduit car on n'a besoin
+                # que du texte brut (pas de JSON structuré volumineux)
+                step1_max_tokens = min(max_output_tokens, 1200)
+                step1_kwargs = {
+                    "model": self.openai_model,
+                    "input": [
+                        {
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": system_prompt.strip()}],
+                        },
+                        {
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": user_prompt.strip()}],
+                        },
+                    ],
+                    "tools": tools,
+                    "max_output_tokens": step1_max_tokens,
+                }
+
+                with TimedCall() as timer1:
+                    response_step1 = self.openai_client.responses.create(**step1_kwargs)
+                step1_duration = timer1.duration_ms
+                logger.info("✅ Étape 1 : réponse reçue (durée: %dms)", step1_duration)
+
+                # Extraire les URLs des annotations url_citation
+                web_search_urls = self._extract_web_search_urls(response_step1)
+                if web_search_urls:
+                    logger.info("🌐 Étape 1 : %d URL(s) extraite(s) des annotations", len(web_search_urls))
+                else:
+                    logger.info("🌐 Étape 1 : aucune URL extraite des annotations")
+
+                # Extraire le texte de l'étape 1 pour le passer en contexte
+                step1_text = getattr(response_step1, "output_text", None) or ""
+
+                # Comptabiliser les tokens de l'étape 1
+                s1_in, s1_out = extract_token_usage(response_step1)
+                total_input_tokens += s1_in or 0
+                total_output_tokens += s1_out or 0
+                duration_ms = step1_duration
+
+            except OpenAIError as exc:
+                logger.warning("⚠️ Étape 1 (web search) échouée : %s. Passage direct à l'étape 2.", exc)
+                step1_text = ""
+                step1_duration = 0
+            except Exception as exc:  # pragma: no cover
+                logger.warning("⚠️ Étape 1 erreur inattendue : %s. Passage direct à l'étape 2.", exc)
+                step1_text = ""
+                step1_duration = 0
         else:
-            logger.info("🌐 Web search désactivé")
+            logger.info("🌐 Web search désactivé, passage direct à l'étape 2")
+            step1_text = ""
+            step1_duration = 0
+
+        # ---- Étape 2 : Structuration JSON avec json_schema ----
+        logger.info("📤 Étape 2 : structuration JSON")
+
+        # Construire le prompt de l'étape 2 en injectant le contexte web
+        # On crée un mapping numéroté des URLs pour que le modèle les référence
+        # sans les inventer ni les déformer.
+        url_map: dict[int, str] = {}
+        if step1_text:
+            # Construire le bloc de référence des URLs numérotées
+            urls_ref_block = ""
+            if web_search_urls:
+                for idx, url in enumerate(web_search_urls, 1):
+                    url_map[idx] = url
+                urls_lines = "\n".join(f"[{idx}] {url}" for idx, url in url_map.items())
+                urls_ref_block = (
+                    f"\n\n=== SOURCES WEB DISPONIBLES ===\n"
+                    f"{urls_lines}\n"
+                    f"=== FIN DES SOURCES ===\n"
+                )
+
+            step2_user_prompt = (
+                f"{user_prompt.strip()}\n\n"
+                f"--- Informations collectées via recherche web ---\n"
+                f"{self._truncate(step1_text, 4000)}"
+                f"{urls_ref_block}\n"
+                f"--- Fin des informations web ---\n\n"
+                f"INSTRUCTIONS IMPORTANTES pour le champ source_url :\n"
+                f"- Utilise UNIQUEMENT les URLs listées ci-dessus entre crochets [1], [2], etc.\n"
+                f"- Copie l'URL EXACTE telle quelle (commençant par https://).\n"
+                f"- Ne génère JAMAIS d'URL toi-même. Si aucune URL ne correspond, mets null.\n"
+                f"- N'utilise PAS de format /web?q=... ou de liens de recherche.\n\n"
+                f"Structure les informations au format JSON selon le schéma demandé."
+            )
+        else:
+            step2_user_prompt = user_prompt.strip()
 
         try:
-            # Utilisation de l'API Responses avec le type correct 'input_text'
-            api_kwargs = {
+            step2_kwargs = {
                 "model": self.openai_model,
                 "input": [
                     {
@@ -388,7 +488,7 @@ class WineInfoService:
                     },
                     {
                         "role": "user",
-                        "content": [{"type": "input_text", "text": user_prompt.strip()}],
+                        "content": [{"type": "input_text", "text": step2_user_prompt}],
                     },
                 ],
                 "text": {
@@ -400,18 +500,22 @@ class WineInfoService:
                 },
                 "max_output_tokens": max_output_tokens,
             }
-            if tools:
-                api_kwargs["tools"] = tools
 
-            with TimedCall() as timer:
-                response = self.openai_client.responses.create(**api_kwargs)
-            duration_ms = timer.duration_ms
-            logger.info("✅ OpenAI: réponse reçue de l'API (durée: %dms)", duration_ms)
+            with TimedCall() as timer2:
+                response = self.openai_client.responses.create(**step2_kwargs)
+            step2_duration = timer2.duration_ms
+            duration_ms = (duration_ms or 0) + step2_duration
+            logger.info("✅ Étape 2 : réponse reçue (durée: %dms, total: %dms)", step2_duration, duration_ms)
+
+            # Comptabiliser les tokens de l'étape 2
+            s2_in, s2_out = extract_token_usage(response)
+            total_input_tokens += s2_in or 0
+            total_output_tokens += s2_out or 0
 
             # Enregistrement de la requête et de la réponse (fichier)
             self._log_openai_request_response(
                 system_prompt=system_prompt,
-                user_prompt=user_prompt,
+                user_prompt=step2_user_prompt,
                 schema=schema,
                 response=response,
                 error=None
@@ -419,20 +523,20 @@ class WineInfoService:
 
         except OpenAIError as exc:
             error_message = str(exc)
-            logger.warning("❌ Requête OpenAI échouée : %s", exc)
+            logger.warning("❌ Étape 2 : requête OpenAI échouée : %s", exc)
             self._log_openai_request_response(
                 system_prompt=system_prompt,
-                user_prompt=user_prompt,
+                user_prompt=step2_user_prompt,
                 schema=schema,
                 response=None,
                 error=error_message
             )
         except Exception as exc:  # pragma: no cover - defensive logging
             error_message = f"Unexpected error: {exc}"
-            logger.warning("❌ Erreur inattendue lors de l'appel OpenAI : %s", exc)
+            logger.warning("❌ Étape 2 : erreur inattendue : %s", exc)
             self._log_openai_request_response(
                 system_prompt=system_prompt,
-                user_prompt=user_prompt,
+                user_prompt=step2_user_prompt,
                 schema=schema,
                 response=None,
                 error=error_message
@@ -441,9 +545,6 @@ class WineInfoService:
         # Logging en base de données si un user_id est défini
         if self.user_id:
             try:
-                # Extraire les informations de tokens
-                input_tokens, output_tokens = extract_token_usage(response) if response else (0, 0)
-                
                 # Préparer la réponse pour le log
                 response_text = None
                 if response:
@@ -460,15 +561,15 @@ class WineInfoService:
                     model=self.openai_model,
                     api_key_source=self.api_key_source,
                     system_prompt=system_prompt,
-                    user_prompt=user_prompt,
+                    user_prompt=step2_user_prompt,
                     response_text=response_text,
                     response_status="success" if error_message is None else "error",
                     error_message=error_message,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
                     duration_ms=duration_ms,
                 )
-                logger.debug("📊 Appel IA loggé en base de données")
+                logger.debug("📊 Appel IA loggé en base de données (2 étapes combinées)")
             except Exception as log_exc:
                 logger.warning("⚠️ Impossible de logger l'appel IA en base: %s", log_exc)
         
@@ -483,15 +584,10 @@ class WineInfoService:
             logger.warning("⚠️ OpenAI: impossible de parser la réponse")
             return []
 
-        # Extraire les URLs des annotations web_search (fallback pour source_url)
-        web_search_urls = self._extract_web_search_urls(response) if enable_web_search else []
-        if web_search_urls:
-            logger.info("🌐 %d URL(s) extraite(s) des annotations web_search", len(web_search_urls))
-
         items = payload.get("insights") or []
         logger.info("📊 OpenAI: %d insight(s) trouvé(s) dans la réponse", len(items))
         insights: List[InsightData] = []
-        for index, item in enumerate(items[:5]):
+        for index, item in enumerate(items[:6]):
             raw_content = (item.get("content") or "").strip()
             if not raw_content:
                 logger.debug("⚠️ OpenAI: insight #%d ignoré (contenu vide)", index)
@@ -512,9 +608,12 @@ class WineInfoService:
                 weight_value = max(1, 10 - index)
             weight_value = max(1, min(10, weight_value))
 
-            # URL de source : priorité au JSON, fallback sur les annotations web_search
+            # URL de source : priorité au JSON (rempli grâce à l'étape 2),
+            # fallback sur les annotations web_search de l'étape 1
             raw_source_url = item.get("source_url") or item.get("url")
-            source_url = self._sanitize_source_url(raw_source_url)
+
+            # Résoudre les références numérotées [1], [2], etc. vers les vraies URLs
+            source_url = self._resolve_source_url(raw_source_url, url_map)
 
             # Fallback : utiliser la première URL web_search non encore attribuée
             if not source_url and web_search_urls:
@@ -829,14 +928,56 @@ class WineInfoService:
         return urls
 
     @staticmethod
+    def _resolve_source_url(
+        raw_url: Optional[str],
+        url_map: Optional[dict[int, str]] = None,
+    ) -> Optional[str]:
+        """Résout une URL de source en gérant les références numérotées [1], [2], etc.
+
+        Le modèle peut retourner :
+        - Une URL complète (https://...) → validée et retournée
+        - Une référence numérotée "[1]" ou "1" → résolue via url_map
+        - Une URL relative (/web?q=...) ou invalide → rejetée
+        """
+        if not raw_url:
+            return None
+
+        candidate = str(raw_url).strip()
+
+        # Tenter de résoudre une référence numérotée : "[1]", "[2]", "1", "2", etc.
+        if url_map:
+            ref_match = re.match(r"^\[?(\d+)\]?$", candidate)
+            if ref_match:
+                ref_idx = int(ref_match.group(1))
+                resolved = url_map.get(ref_idx)
+                if resolved:
+                    return resolved
+
+        # Valider comme URL absolue
+        return WineInfoService._sanitize_source_url(candidate)
+
+    @staticmethod
     def _sanitize_source_url(value: Optional[str]) -> Optional[str]:
+        """Valide qu'une URL est absolue, HTTP(S), avec un vrai domaine.
+
+        Rejette les URLs relatives (/web?q=...), les faux patterns,
+        et les URLs sans domaine valide.
+        """
         if not value:
             return None
         candidate = str(value).strip()
+
+        # Rejeter les URLs relatives ou les patterns de recherche
+        if candidate.startswith("/"):
+            return None
+
         parsed = urlparse(candidate)
         if parsed.scheme not in {"http", "https"}:
             return None
         if not parsed.netloc:
+            return None
+        # Rejeter les domaines trop courts ou manifestement faux
+        if "." not in parsed.netloc:
             return None
         return candidate
 
