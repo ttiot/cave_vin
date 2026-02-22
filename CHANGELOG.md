@@ -5,6 +5,24 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-02-22
+
+
+### 📚 Documentation
+
+
+- Update changelog for v2.5.0
+
+
+### 📝 Autres
+
+
+- Improves mobile sidebar readability and spacing
+
+Increases mobile sidebar width and scales typography, icons, and padding to improve tap targets and legibility on small screens.
+
+Bumps stylesheet version to ensure updated styles load.
+
 ## [2.5.0] - 2026-02-22
 
 
