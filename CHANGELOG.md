@@ -5,6 +5,31 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-02-22
+
+
+### 📚 Documentation
+
+
+- Update changelog for v2.4.11
+
+
+### 📝 Autres
+
+
+- Improves user list grouping by parent account
+
+Ensures sub-accounts appear directly after their parent to make the admin user list easier to scan and manage.
+
+Cleans up template blocks to avoid prematurely closing the main block before extra scripts.
+- Adds optional web search to AI wine insights
+
+Adds configurable web search toggle and context size for prompts, ensuring parameter updates are persisted by reassigning the parameters map.
+
+Extends the wine enrichment request to include the web search tool when enabled, and improves citation handling by extracting URL annotations as a fallback for missing source links.
+
+Updates the default response schema to include an optional source URL field and improves insight header truncation in the UI for better readability.
+
 ## [2.4.11] - 2026-02-02
 
 
