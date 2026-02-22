@@ -455,15 +455,20 @@ Structure ta réponse au format JSON selon le schéma demandé, sans texte addit
                                 "title": {"type": "string"},
                                 "content": {"type": "string"},
                                 "source": {"type": "string"},
+                                "source_url": {"type": ["string", "null"]},
                                 "weight": {"type": "integer"},
                             },
-                            "required": ["category", "title", "content", "source", "weight"],
+                            "required": ["category", "title", "content", "source", "source_url", "weight"],
                         },
                     }
                 },
                 "required": ["insights"],
             },
-            "parameters": {"max_output_tokens": 900},
+            "parameters": {
+                "max_output_tokens": 900,
+                "enable_web_search": True,
+                "web_search_context_size": "medium",
+            },
         },
         "wine_pairing": {
             "display_name": "Accords mets-vins",

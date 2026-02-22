@@ -274,10 +274,37 @@
           </div>
           <div class="col-md-6 mb-3">
             <label for="max_output_tokens" class="form-label">Tokens de sortie max</label>
-            <input type="number" class="form-control" id="max_output_tokens" name="max_output_tokens" 
+            <input type="number" class="form-control" id="max_output_tokens" name="max_output_tokens"
                    value="{{ prompt.parameters.max_output_tokens if prompt.parameters and prompt.parameters.max_output_tokens else '' }}"
                    min="100" max="4000" step="100" placeholder="Ex: 900">
             <div class="form-text">Limite le nombre de tokens dans la réponse de l'IA</div>
+          </div>
+        </div>
+        
+        <!-- Options de recherche web -->
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" id="enable_web_search" name="enable_web_search"
+                     {% if prompt.parameters and prompt.parameters.get('enable_web_search', False) %}checked{% endif %}>
+              <label class="form-check-label" for="enable_web_search">
+                <i class="bi bi-globe me-1"></i> Recherche web
+              </label>
+            </div>
+            <div class="form-text">
+              Permet à l'IA de rechercher des informations sur le web avant de répondre.
+              Améliore la précision des profils mais augmente légèrement le coût et le temps de réponse.
+            </div>
+          </div>
+          <div class="col-md-6 mb-3" id="web_search_options" style="{% if not (prompt.parameters and prompt.parameters.get('enable_web_search', False)) %}display: none;{% endif %}">
+            <label for="web_search_context_size" class="form-label">Taille du contexte web</label>
+            <select class="form-select" id="web_search_context_size" name="web_search_context_size">
+              {% set current_ctx = prompt.parameters.get('web_search_context_size', 'medium') if prompt.parameters else 'medium' %}
+              <option value="low" {% if current_ctx == 'low' %}selected{% endif %}>Faible — Moins de contexte, plus rapide</option>
+              <option value="medium" {% if current_ctx == 'medium' %}selected{% endif %}>Moyen — Équilibre qualité/coût</option>
+              <option value="high" {% if current_ctx == 'high' %}selected{% endif %}>Élevé — Plus de contexte, meilleure précision</option>
+            </select>
+            <div class="form-text">Quantité d'informations web injectées dans le contexte de l'IA</div>
           </div>
         </div>
         
@@ -655,6 +682,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Valider au chargement
     validateSchema();
     checkModified(schemaTextarea, 'schema-modified');
+  }
+  
+  // Toggle web search options
+  const webSearchCheckbox = document.getElementById('enable_web_search');
+  const webSearchOptions = document.getElementById('web_search_options');
+  if (webSearchCheckbox && webSearchOptions) {
+    webSearchCheckbox.addEventListener('change', function() {
+      webSearchOptions.style.display = this.checked ? '' : 'none';
+    });
   }
   
   // Vérifier les modifications initiales

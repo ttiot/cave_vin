@@ -298,6 +298,8 @@ class WineInfoService:
             user_prompt = prompt_config.render_user_prompt(wine_details=wine_details)
             schema = prompt_config.response_schema
             max_output_tokens = prompt_config.get_parameter("max_output_tokens", 900)
+            enable_web_search = prompt_config.get_parameter("enable_web_search", False)
+            web_search_context_size = prompt_config.get_parameter("web_search_context_size", "medium")
         except Exception as e:
             logger.warning("⚠️ Impossible de charger le prompt configurable: %s. Utilisation des valeurs par défaut.", e)
             # Fallback aux valeurs par défaut
@@ -332,15 +334,18 @@ class WineInfoService:
                                 "title": {"type": "string"},
                                 "content": {"type": "string"},
                                 "source": {"type": "string"},
+                                "source_url": {"type": ["string", "null"]},
                                 "weight": {"type": "integer"},
                             },
-                            "required": ["category", "title", "content", "source", "weight"],
+                            "required": ["category", "title", "content", "source", "source_url", "weight"],
                         },
                     }
                 },
                 "required": ["insights"],
             }
             max_output_tokens = 900
+            enable_web_search = True
+            web_search_context_size = "medium"
 
         logger.info("📤 OpenAI: envoi de la requête à l'API")
         logger.debug(
@@ -359,30 +364,47 @@ class WineInfoService:
         error_message = None
         duration_ms = None
         
+        # Construire la liste des tools (web search optionnel)
+        tools = []
+        if enable_web_search:
+            valid_sizes = {"low", "medium", "high"}
+            ctx_size = web_search_context_size if web_search_context_size in valid_sizes else "medium"
+            tools.append({
+                "type": "web_search_preview",
+                "search_context_size": ctx_size,
+            })
+            logger.info("🌐 Web search activé (context_size=%s)", ctx_size)
+        else:
+            logger.info("🌐 Web search désactivé")
+
         try:
             # Utilisation de l'API Responses avec le type correct 'input_text'
-            with TimedCall() as timer:
-                response = self.openai_client.responses.create(
-                    model=self.openai_model,
-                    input=[
-                        {
-                            "role": "system",
-                            "content": [{"type": "input_text", "text": system_prompt.strip()}],
-                        },
-                        {
-                            "role": "user",
-                            "content": [{"type": "input_text", "text": user_prompt.strip()}],
-                        },
-                    ],
-                    text={
-                        "format": {
-                            "type": "json_schema",
-                            "name": "wine_enrichment",
-                            "schema": schema
-                        },
+            api_kwargs = {
+                "model": self.openai_model,
+                "input": [
+                    {
+                        "role": "system",
+                        "content": [{"type": "input_text", "text": system_prompt.strip()}],
                     },
-                    max_output_tokens=max_output_tokens,
-                )
+                    {
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": user_prompt.strip()}],
+                    },
+                ],
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "wine_enrichment",
+                        "schema": schema,
+                    },
+                },
+                "max_output_tokens": max_output_tokens,
+            }
+            if tools:
+                api_kwargs["tools"] = tools
+
+            with TimedCall() as timer:
+                response = self.openai_client.responses.create(**api_kwargs)
             duration_ms = timer.duration_ms
             logger.info("✅ OpenAI: réponse reçue de l'API (durée: %dms)", duration_ms)
 
@@ -461,6 +483,11 @@ class WineInfoService:
             logger.warning("⚠️ OpenAI: impossible de parser la réponse")
             return []
 
+        # Extraire les URLs des annotations web_search (fallback pour source_url)
+        web_search_urls = self._extract_web_search_urls(response) if enable_web_search else []
+        if web_search_urls:
+            logger.info("🌐 %d URL(s) extraite(s) des annotations web_search", len(web_search_urls))
+
         items = payload.get("insights") or []
         logger.info("📊 OpenAI: %d insight(s) trouvé(s) dans la réponse", len(items))
         insights: List[InsightData] = []
@@ -485,13 +512,22 @@ class WineInfoService:
                 weight_value = max(1, 10 - index)
             weight_value = max(1, min(10, weight_value))
 
+            # URL de source : priorité au JSON, fallback sur les annotations web_search
+            raw_source_url = item.get("source_url") or item.get("url")
+            source_url = self._sanitize_source_url(raw_source_url)
+
+            # Fallback : utiliser la première URL web_search non encore attribuée
+            if not source_url and web_search_urls:
+                source_url = web_search_urls.pop(0)
+                logger.debug("🌐 Fallback web_search URL pour insight #%d: %s", index, source_url)
+
             insights.append(
                 InsightData(
                     category=category,
                     title=title,
                     content=self._sanitize_content(self._truncate(raw_content, 900)),
                     source_name=source_name,
-                    source_url=self._sanitize_source_url(item.get("url") or item.get("source_url")),
+                    source_url=source_url,
                     weight=weight_value,
                 )
             )
@@ -753,6 +789,44 @@ class WineInfoService:
     def _sanitize_content(cls, value: Optional[str]) -> str:
         cleaned = cls._sanitize_text(value)
         return cleaned or ""
+
+    @staticmethod
+    def _extract_web_search_urls(response) -> List[str]:
+        """Extrait les URLs uniques des annotations web_search de la réponse OpenAI.
+
+        Quand le tool web_search_preview est activé, la réponse contient des
+        annotations de type ``url_citation`` dans les blocs de texte.  Cette
+        méthode les collecte et les déduplique tout en préservant l'ordre.
+
+        Returns:
+            Liste d'URLs uniques (http/https) extraites des annotations.
+        """
+        urls: List[str] = []
+        seen: set = set()
+
+        if response is None:
+            return urls
+
+        try:
+            raw = response.model_dump() if hasattr(response, "model_dump") else {}
+        except Exception:
+            return urls
+
+        if not isinstance(raw, dict):
+            return urls
+
+        for block in raw.get("output", []):
+            for content_item in block.get("content", []):
+                for annotation in content_item.get("annotations", []):
+                    if annotation.get("type") == "url_citation":
+                        url = (annotation.get("url") or "").strip()
+                        if url and url not in seen:
+                            parsed = urlparse(url)
+                            if parsed.scheme in {"http", "https"} and parsed.netloc:
+                                urls.append(url)
+                                seen.add(url)
+
+        return urls
 
     @staticmethod
     def _sanitize_source_url(value: Optional[str]) -> Optional[str]:

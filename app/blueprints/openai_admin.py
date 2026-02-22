@@ -336,16 +336,29 @@ def edit_prompt(prompt_key: str):
             prompt.is_active = bool(request.form.get("is_active"))
             
             # Mettre à jour les paramètres si fournis
+            # Copier le dict pour que SQLAlchemy détecte la mutation
+            params = dict(prompt.parameters or {})
+
             max_output_tokens = request.form.get("max_output_tokens", "").strip()
             if max_output_tokens:
                 try:
                     tokens = int(max_output_tokens)
-                    if prompt.parameters is None:
-                        prompt.parameters = {}
-                    prompt.parameters["max_output_tokens"] = tokens
+                    params["max_output_tokens"] = tokens
                 except (ValueError, TypeError):
                     flash("Nombre de tokens invalide.", "error")
                     return redirect(url_for("openai_admin.edit_prompt", prompt_key=prompt_key))
+
+            # Paramètres de recherche web
+            params["enable_web_search"] = bool(request.form.get("enable_web_search"))
+
+            web_search_context_size = request.form.get("web_search_context_size", "medium").strip()
+            if web_search_context_size in ("low", "medium", "high"):
+                params["web_search_context_size"] = web_search_context_size
+            else:
+                params["web_search_context_size"] = "medium"
+
+            # Réassigner pour que SQLAlchemy détecte le changement
+            prompt.parameters = params
             
             # Mettre à jour le schéma JSON de réponse
             response_schema_str = request.form.get("response_schema", "").strip()

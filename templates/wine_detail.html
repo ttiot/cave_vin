@@ -75,10 +75,10 @@
           {% for insight in wine.insights %}
           <div class="accordion-item">
             <h2 class="accordion-header" id="heading{{ loop.index }}">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
-                {{ insight.title or insight.category|capitalize or 'Information' }}
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}" style="white-space: nowrap; overflow: hidden;">
+                <span class="text-truncate" style="flex: 0 1 auto; min-width: 0;">{{ insight.title or insight.category|capitalize or 'Information' }}</span>
                 {% if insight.source_name %}
-                <span class="ms-2 badge text-bg-secondary">{{ insight.source_name }}</span>
+                <span class="ms-2 badge text-bg-secondary text-truncate" style="max-width: 280px; flex-shrink: 0;">{{ insight.source_name }}</span>
                 {% endif %}
               </button>
             </h2>
