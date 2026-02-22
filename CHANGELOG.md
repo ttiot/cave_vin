@@ -5,6 +5,26 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.2] - 2026-02-22
+
+
+### 📚 Documentation
+
+
+- Update changelog for v2.5.1
+
+
+### 📝 Autres
+
+
+- Adds 2-step web search to preserve source URLs
+
+Improves citation quality by first running web search in free-text to capture url_citation annotations, then structuring the final JSON without losing sources.
+
+Increases insight limit and token budget, upgrades web search context to high, and aggregates token/duration metrics across both steps.
+
+Tightens source URL handling by resolving numbered references and rejecting invalid/relative links to reduce hallucinated sources.
+
 ## [2.5.1] - 2026-02-22
 
 
