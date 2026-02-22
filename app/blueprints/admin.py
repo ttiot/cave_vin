@@ -87,8 +87,18 @@ def manage_users():
                 flash("Utilisateur créé avec succès.")
             return redirect(url_for("admin.manage_users"))
 
-    # Récupérer tous les utilisateurs, triés par compte principal puis sous-comptes
-    users = User.query.order_by(User.parent_id.asc().nullsfirst(), User.username.asc()).all()
+    # Récupérer tous les utilisateurs, triés pour que chaque sous-compte
+    # apparaisse immédiatement après son compte parent
+    all_users = User.query.order_by(User.username.asc()).all()
+    main_users = [u for u in all_users if not u.is_sub_account]
+    sub_by_parent = {}
+    for u in all_users:
+        if u.is_sub_account:
+            sub_by_parent.setdefault(u.parent_id, []).append(u)
+    users = []
+    for u in main_users:
+        users.append(u)
+        users.extend(sub_by_parent.get(u.id, []))
     
     # Récupérer les comptes principaux pour le formulaire de création
     main_accounts = User.query.filter_by(parent_id=None).order_by(User.username.asc()).all()
