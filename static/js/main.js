@@ -1299,4 +1299,5 @@ window.CaveVin = {
     cachePageForOffline,
     subscribeToPush,
     unsubscribeFromPush,
+    initMaturityTimelines,
 };
