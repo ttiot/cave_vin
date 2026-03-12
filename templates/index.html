@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block extra_head %}
 <style>
   /* Cartes de statistiques */
@@ -339,10 +340,7 @@
           </div>
           {% endfor %}
         {% else %}
-          <div class="empty-state">
-            <div class="empty-state-icon">🍷</div>
-            <p class="empty-state-text">Aucune recommandation immédiate.<br>Ajoutez des informations de garde pour vos bouteilles afin d'obtenir des conseils personnalisés.</p>
-          </div>
+          {{ empty_state(icon='bottle', title='Aucune recommandation', message='Ajoutez des informations de garde pour vos bouteilles afin d\'obtenir des conseils personnalisés.', size='sm') }}
         {% endif %}
       </div>
     </div>
@@ -377,10 +375,7 @@
           </a>
           {% endfor %}
         {% else %}
-          <div class="empty-state">
-            <div class="empty-state-icon">📦</div>
-            <p class="empty-state-text">Ajoutez votre première bouteille pour voir vos ajouts récents.</p>
-          </div>
+          {{ empty_state(icon='wine-rack', title='Aucun ajout récent', message='Ajoutez votre première bouteille pour voir vos ajouts récents.', action_url=url_for('wines.add_wine'), action_label='Ajouter une bouteille', size='sm') }}
         {% endif %}
       </div>
     </div>

@@ -1,4 +1,6 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
+{% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="m-0">Historique des bouteilles consommées</h3>
     <a
@@ -131,5 +133,5 @@
     </div>
 </div>
 {% else %}
-<div class="alert alert-info">Aucune bouteille consommée pour le moment.</div>
+{{ empty_state(icon='list', title='Aucune consommation', message='Aucune bouteille consommée pour le moment.', size='lg') }}
 {% endif %} {% endblock %}

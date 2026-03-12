@@ -1765,6 +1765,74 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================================================
+   Empty state unifié
+   ============================================================================ */
+.empty-state-unified {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-xl);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(114, 47, 55, 0.02) 20px,
+      rgba(114, 47, 55, 0.02) 40px
+    );
+}
+
+[data-theme="dark"] .empty-state-unified {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(255, 255, 255, 0.015) 20px,
+      rgba(255, 255, 255, 0.015) 40px
+    );
+}
+
+.empty-state-illustration {
+  color: var(--text-muted);
+  opacity: 0.45;
+  margin-bottom: var(--spacing-md);
+}
+
+.empty-state-illustration svg {
+  width: 80px;
+  height: 80px;
+}
+
+.empty-state-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.empty-state-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  max-width: 320px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Sizes */
+.empty-state-sm { padding: var(--spacing-lg) var(--spacing-md); }
+.empty-state-sm .empty-state-illustration svg { width: 48px; height: 48px; }
+.empty-state-sm .empty-state-title { font-size: 0.85rem; }
+.empty-state-sm .empty-state-message { font-size: 0.8rem; }
+
+.empty-state-lg { padding: var(--spacing-xl) var(--spacing-xl); }
+.empty-state-lg .empty-state-illustration svg { width: 120px; height: 120px; }
+.empty-state-lg .empty-state-title { font-size: 1.15rem; }
+
+/* ============================================================================
    Cartes de vin compactes - Design condensé pour afficher plus de bouteilles
    ============================================================================ */
 

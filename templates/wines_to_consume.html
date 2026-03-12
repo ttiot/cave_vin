@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block extra_head %}
 <style>
   /* Légende d'urgence compacte */
@@ -622,13 +623,7 @@
 </div>
 
 {% else %}
-<div class="alert alert-secondary">
-  <h5>Aucun vin à afficher</h5>
-  <p class="mb-0">Aucun vin avec un millésime n'a été trouvé dans votre cave, ou aucune information de garde n'est disponible.</p>
-  <p class="mb-0 mt-2">
-    <a href="{{ url_for('main.index') }}" class="alert-link">Retour à la liste des vins</a>
-  </p>
-</div>
+{{ empty_state(icon='bottle', title='Aucun vin à afficher', message='Aucun vin avec un millésime n\'a été trouvé dans votre cave, ou aucune information de garde n\'est disponible.', action_url=url_for('main.index'), action_label='Retour à la cave', size='lg') }}
 {% endif %}
 
 <div class="mt-4">

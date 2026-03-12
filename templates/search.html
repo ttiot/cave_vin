@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block content %}
 <div class="mb-3">
   <h3>Recherche multi-critères</h3>
@@ -65,9 +66,7 @@
   {% if wines %}
     <p class="text-muted small">{{ wines|length }} bouteille(s) trouvée(s)</p>
   {% else %}
-    <div class="alert alert-info">
-      Aucune bouteille ne correspond à vos critères de recherche.
-    </div>
+    {{ empty_state(icon='search', title='Aucun résultat', message='Aucune bouteille ne correspond à vos critères de recherche.', size='sm') }}
   {% endif %}
 </div>
 
