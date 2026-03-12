@@ -5,6 +5,32 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-03-12
+
+
+### 🐛 Corrigé
+
+
+- **stats**: Handle None months_until_empty in predictions sort
+
+
+### 📚 Documentation
+
+
+- Update changelog for v2.5.2
+- Add CLAUDE.md for Claude Code agent orientation
+
+
+### 🚀 Ajouté
+
+
+- **ui**: Add scroll-triggered entrance animations with IntersectionObserver
+- **ui**: Harmonize chart theme with wine color palette
+- **ui**: Add unified empty state component system with SVG illustrations
+- **ui**: Redesign dashboard with bento grid layout
+- **ui**: Add maturity timeline visualization for wines
+- **ui**: Redesign wine detail page with hero section and radar chart
+
 ## [2.5.2] - 2026-02-22
 
 
