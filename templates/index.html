@@ -416,10 +416,35 @@
               {{ item.urgency_score|round(0) }}%
             </span>
           </div>
+          {% if item.recommended_years and item.wine.extra_attributes.year %}
+          {% set vintage = item.wine.extra_attributes.year|int %}
+          {% set min_yr = item.recommended_years[0] %}
+          {% set max_yr = item.recommended_years[1] %}
+          <div class="maturity-timeline compact"
+               data-vintage="{{ vintage }}"
+               data-min-years="{{ min_yr }}"
+               data-max-years="{{ max_yr }}"
+               data-current-year="{{ current_year }}">
+            <div class="maturity-timeline-marker-wrap">
+              <div class="maturity-timeline-marker"></div>
+            </div>
+            <div class="maturity-timeline-bar">
+              <div class="mt-segment young"></div>
+              <div class="mt-segment optimal"></div>
+              <div class="mt-segment past"></div>
+            </div>
+            <div class="maturity-timeline-labels">
+              <span>{{ vintage }}</span>
+              <span class="mt-label-optimal">{{ vintage + min_yr }}–{{ vintage + max_yr }}</span>
+              <span>{{ vintage + max_yr + 5 }}</span>
+            </div>
+          </div>
+          {% else %}
           <div class="consume-item-progress">
             <div class="consume-item-progress-fill {% if item.urgency_score >= 80 %}bg-danger{% elif item.urgency_score >= 50 %}bg-warning{% else %}bg-success{% endif %}"
                  style="width: {{ [item.urgency_score, 100]|min }}%"></div>
           </div>
+          {% endif %}
           {% if item.garde_info %}
           <p class="consume-item-info">{{ item.garde_info }}</p>
           {% endif %}

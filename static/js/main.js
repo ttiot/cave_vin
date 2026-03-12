@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initCacheManagement();
     initScrollReveal();
     initMicroInteractions();
+    initMaturityTimelines();
 });
 
 /**
@@ -1254,6 +1255,42 @@ function createRipple(e) {
     ripple.style.top = e.clientY - rect.top - size / 2 + "px";
     card.appendChild(ripple);
     ripple.addEventListener("animationend", () => ripple.remove());
+}
+
+/**
+ * Initialise les timelines de maturité (segments + marqueur diamant).
+ * Fonctionne sur toute page contenant des .maturity-timeline[data-vintage].
+ */
+function initMaturityTimelines() {
+    document.querySelectorAll(".maturity-timeline[data-vintage]").forEach((tl) => {
+        const vintage = parseInt(tl.dataset.vintage);
+        const minYears = parseInt(tl.dataset.minYears);
+        const maxYears = parseInt(tl.dataset.maxYears);
+        const now = parseInt(tl.dataset.currentYear);
+        if (!vintage || !minYears) return;
+
+        const optStart = vintage + minYears;
+        const optEnd = vintage + maxYears;
+        const tlEnd = optEnd + 5;
+        const totalSpan = tlEnd - vintage;
+        if (totalSpan <= 0) return;
+
+        const youngPct = ((optStart - vintage) / totalSpan) * 100;
+        const optimalPct = ((optEnd - optStart) / totalSpan) * 100;
+        const pastPct = 100 - youngPct - optimalPct;
+
+        const segs = tl.querySelectorAll(".mt-segment");
+        if (segs[0]) segs[0].style.flex = `${youngPct} 0 0%`;
+        if (segs[1]) segs[1].style.flex = `${optimalPct} 0 0%`;
+        if (segs[2]) segs[2].style.flex = `${pastPct} 0 0%`;
+
+        const marker = tl.querySelector(".maturity-timeline-marker");
+        if (marker) {
+            const clampedNow = Math.max(vintage, Math.min(now, tlEnd));
+            const markerPct = ((clampedNow - vintage) / totalSpan) * 100;
+            marker.style.left = `${markerPct}%`;
+        }
+    });
 }
 
 // Exposer certaines fonctions globalement pour utilisation dans les templates

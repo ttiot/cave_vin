@@ -2307,3 +2307,123 @@ h1, h2, h3, h4, h5, h6 {
   padding: var(--spacing-md) var(--spacing-lg);
   gap: var(--spacing-sm);
 }
+
+/* ── Maturity Timeline ── */
+.maturity-timeline {
+  --mt-height: 6px;
+  --mt-young: var(--text-muted);
+  --mt-optimal: var(--accent-success);
+  --mt-past: var(--accent-danger);
+  --mt-track: var(--bg-hover);
+  --mt-marker: var(--accent-primary);
+  margin-top: auto;
+  padding-top: var(--spacing-xs);
+}
+
+.maturity-timeline-bar {
+  position: relative;
+  height: var(--mt-height);
+  border-radius: calc(var(--mt-height) / 2);
+  background: var(--mt-track);
+  display: flex;
+  overflow: hidden;
+}
+
+.maturity-timeline-bar .mt-segment {
+  height: 100%;
+  min-width: 2px;
+  transition: flex var(--transition-normal);
+}
+
+.mt-segment.young {
+  background: var(--mt-young);
+  border-radius: calc(var(--mt-height) / 2) 0 0 calc(var(--mt-height) / 2);
+}
+
+.mt-segment.optimal {
+  background: var(--mt-optimal);
+}
+
+.mt-segment.past {
+  background: var(--mt-past);
+  border-radius: 0 calc(var(--mt-height) / 2) calc(var(--mt-height) / 2) 0;
+}
+
+/* Diamond marker for "Now" */
+.maturity-timeline-marker-wrap {
+  position: relative;
+  height: 0;
+}
+
+.maturity-timeline-marker {
+  position: absolute;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--mt-marker);
+  border: 2px solid var(--bg-card);
+  border-radius: 2px;
+  z-index: 2;
+  box-shadow: 0 1px 4px var(--shadow-color);
+  transition: left var(--transition-normal);
+}
+
+/* Labels under the bar */
+.maturity-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.maturity-timeline-labels span {
+  white-space: nowrap;
+}
+
+.maturity-timeline-labels .mt-label-optimal {
+  color: var(--accent-success);
+  font-weight: 600;
+}
+
+/* Compact variant for dashboard cards */
+.maturity-timeline.compact {
+  --mt-height: 4px;
+}
+
+.maturity-timeline.compact .maturity-timeline-marker {
+  width: 8px;
+  height: 8px;
+  top: -2px;
+}
+
+.maturity-timeline.compact .maturity-timeline-labels {
+  font-size: 0.55rem;
+  margin-top: 4px;
+}
+
+/* Large variant for detail page */
+.maturity-timeline.large {
+  --mt-height: 10px;
+}
+
+.maturity-timeline.large .maturity-timeline-marker {
+  width: 16px;
+  height: 16px;
+  top: -4px;
+}
+
+.maturity-timeline.large .maturity-timeline-labels {
+  font-size: 0.75rem;
+  margin-top: 10px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .maturity-timeline-marker,
+  .mt-segment {
+    transition: none;
+  }
+}

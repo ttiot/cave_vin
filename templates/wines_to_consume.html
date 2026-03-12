@@ -560,7 +560,32 @@
       </span>
       {% endif %}
       
-      <!-- Barre de progression -->
+      <!-- Timeline de maturité -->
+      {% if item.recommended_years %}
+      {% set vintage = extras.get('year', 0)|int %}
+      {% set min_yr = item.recommended_years[0] %}
+      {% set max_yr = item.recommended_years[1] %}
+      <div class="maturity-timeline"
+           data-vintage="{{ vintage }}"
+           data-min-years="{{ min_yr }}"
+           data-max-years="{{ max_yr }}"
+           data-current-year="{{ current_year }}">
+        <div class="maturity-timeline-marker-wrap">
+          <div class="maturity-timeline-marker"></div>
+        </div>
+        <div class="maturity-timeline-bar">
+          <div class="mt-segment young"></div>
+          <div class="mt-segment optimal"></div>
+          <div class="mt-segment past"></div>
+        </div>
+        <div class="maturity-timeline-labels">
+          <span>{{ vintage }}</span>
+          <span class="mt-label-optimal">{{ vintage + min_yr }}–{{ vintage + max_yr }}</span>
+          <span>{{ vintage + max_yr + 5 }}</span>
+        </div>
+      </div>
+      {% else %}
+      <!-- Fallback progress bar quand pas de données de garde -->
       <div class="progress-compact">
         <div class="progress-bar-compact">
           <div class="progress-fill
@@ -573,6 +598,7 @@
         </div>
         <div class="progress-label">Score : {{ "%.0f"|format(urgency) }}/100</div>
       </div>
+      {% endif %}
     </div>
     
     <!-- Actions -->
