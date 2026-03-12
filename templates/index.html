@@ -278,17 +278,17 @@
 
 <!-- Statistiques -->
 <div class="row g-4 mb-4">
-  <div class="col-md-6 col-lg-3">
+  <div class="col-md-6 col-lg-3 reveal">
     <div class="stat-card">
       <div class="stat-card-label">Nombre de bouteilles</div>
-      <div class="stat-card-value">{{ total_bottles }}</div>
+      <div class="stat-card-value" data-counter-up="{{ total_bottles }}">{{ total_bottles }}</div>
     </div>
   </div>
-  <div class="col-md-6 col-lg-3">
+  <div class="col-md-6 col-lg-3 reveal">
     <div class="stat-card">
       <div class="stat-card-label">Valeur estimée de la cave</div>
       {% if estimated_value_display %}
-      <div class="stat-card-value">{{ estimated_value_display }}&nbsp;€</div>
+      <div class="stat-card-value" data-counter-up="{{ estimated_value_display }}" data-counter-suffix="&nbsp;€">{{ estimated_value_display }}&nbsp;€</div>
       {% else %}
       <div class="stat-card-value" style="color: var(--text-muted);">—</div>
       <div class="stat-card-hint">Ajoutez des estimations de prix pour obtenir cette valeur.</div>
@@ -300,7 +300,7 @@
 <!-- Sections principales -->
 <div class="row g-4">
   <!-- À consommer en priorité -->
-  <div class="col-lg-6">
+  <div class="col-lg-6 reveal">
     <div class="section-card">
       <div class="section-card-header">
         <div>
@@ -349,7 +349,7 @@
   </div>
 
   <!-- Derniers ajouts -->
-  <div class="col-lg-6">
+  <div class="col-lg-6 reveal">
     <div class="section-card">
       <div class="section-card-header">
         <div>

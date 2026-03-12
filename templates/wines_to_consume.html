@@ -427,30 +427,7 @@
     gap: var(--spacing-sm);
   }
   
-  /* Animation d'entrée pour les cartes */
-  @keyframes cardSlideIn {
-    from {
-      opacity: 0;
-      transform: translateY(15px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .wine-card-compact {
-    animation: cardSlideIn 0.3s ease forwards;
-  }
-  
-  .wine-card-compact:nth-child(1) { animation-delay: 0.02s; }
-  .wine-card-compact:nth-child(2) { animation-delay: 0.04s; }
-  .wine-card-compact:nth-child(3) { animation-delay: 0.06s; }
-  .wine-card-compact:nth-child(4) { animation-delay: 0.08s; }
-  .wine-card-compact:nth-child(5) { animation-delay: 0.1s; }
-  .wine-card-compact:nth-child(6) { animation-delay: 0.12s; }
-  .wine-card-compact:nth-child(7) { animation-delay: 0.14s; }
-  .wine-card-compact:nth-child(8) { animation-delay: 0.16s; }
+  /* Animation d'entrée déléguée au système .reveal global */
   
   /* Responsive */
   @media (max-width: 576px) {
@@ -518,7 +495,7 @@
   {% set urgency = item.urgency_score %}
   {% set age = item.wine_age %}
   
-  <div class="wine-card-compact"
+  <div class="wine-card-compact reveal"
        data-wine-id="{{ wine.id }}"
        data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
        data-wine-name="{{ wine.name }}"
