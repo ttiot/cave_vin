@@ -2,194 +2,265 @@
 {% from "_macros.html" import empty_state %}
 {% block extra_head %}
 <style>
-  /* Cartes de statistiques */
-  .stat-card {
-    background-color: var(--bg-card);
+  /* ── Bento Grid Dashboard ── */
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: minmax(120px, auto);
+    gap: var(--spacing-lg);
+  }
+
+  @media (max-width: 991.98px) {
+    .bento-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 575.98px) {
+    .bento-grid { grid-template-columns: 1fr; }
+  }
+
+  .bento-tile {
+    background: var(--bg-card);
     border-radius: var(--radius-xl);
     padding: var(--spacing-xl);
     box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
   }
-  
-  .stat-card:hover {
+
+  .bento-tile:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px -8px var(--shadow-hover);
   }
-  
-  .stat-card-label {
+
+  /* Glassmorphism accent */
+  .bento-tile.glass {
+    background: rgba(var(--bg-card-rgb, 255, 255, 255), 0.65);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(var(--border-color-rgb, 210, 210, 215), 0.4);
+  }
+
+  [data-theme="dark"] .bento-tile.glass {
+    background: rgba(28, 28, 30, 0.65);
+    border-color: rgba(56, 56, 58, 0.4);
+  }
+
+  /* Tile span variants */
+  .bento-span-2  { grid-column: span 2; }
+  .bento-span-3  { grid-column: span 3; }
+  .bento-tall     { grid-row: span 2; }
+
+  @media (max-width: 575.98px) {
+    .bento-span-2, .bento-span-3 { grid-column: span 1; }
+    .bento-tall { grid-row: span 1; }
+  }
+
+  /* ── Stat tile ── */
+  .stat-label {
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: var(--text-secondary);
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
   }
-  
-  .stat-card-value {
+
+  .stat-value {
     font-size: 2.5rem;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.1;
   }
-  
-  .stat-card-hint {
-    font-size: 0.8rem;
+
+  .stat-hint {
+    font-size: 0.78rem;
     color: var(--text-muted);
     margin-top: var(--spacing-sm);
   }
-  
-  /* Section cards */
-  .section-card {
-    background-color: var(--bg-card);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 4px 6px -1px var(--shadow-color), 0 10px 20px -5px var(--shadow-color);
-    overflow: hidden;
-    height: 100%;
+
+  /* ── Quick actions 2x2 ── */
+  .quick-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+    flex: 1;
+  }
+
+  .quick-action-btn {
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    background: var(--bg-hover);
+    border: 1.5px solid var(--border-color);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 500;
+    transition: all var(--transition-fast);
   }
-  
-  .section-card-header {
-    padding: var(--spacing-lg);
-    border-bottom: 1px solid var(--border-color);
+
+  .quick-action-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+  }
+
+  .quick-action-btn i {
+    font-size: 1.25rem;
+  }
+
+  /* ── Cellar distribution bar ── */
+  .cellar-dist-bar {
+    display: flex;
+    height: 18px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-hover);
+  }
+
+  .cellar-dist-bar .dist-seg {
+    transition: width var(--transition-normal);
+    min-width: 2px;
+  }
+
+  .cellar-dist-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs) var(--spacing-md);
+    margin-top: var(--spacing-sm);
+  }
+
+  .cellar-dist-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .cellar-dist-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Section tile titles ── */
+  .tile-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
   }
-  
-  .section-card-title {
-    font-size: 1.1rem;
+
+  .tile-title {
+    font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
   }
-  
-  .section-card-subtitle {
-    font-size: 0.8rem;
+
+  .tile-subtitle {
+    font-size: 0.78rem;
     color: var(--text-secondary);
     margin-top: 2px;
   }
-  
-  .section-card-body {
-    padding: var(--spacing-lg);
-    flex: 1;
-  }
-  
-  /* Items de vin à consommer */
+
+  /* ── Consume items ── */
   .consume-item {
-    padding: var(--spacing-md) 0;
+    padding: var(--spacing-sm) 0;
     border-bottom: 1px solid var(--border-color);
   }
-  
-  .consume-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-  
-  .consume-item:first-child {
-    padding-top: 0;
-  }
-  
+  .consume-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .consume-item:first-child { padding-top: 0; }
+
   .consume-item-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    gap: var(--spacing-sm);
   }
-  
+
   .consume-item-title {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
   }
-  
+
   .consume-item-meta {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
     margin-top: 2px;
   }
-  
+
   .consume-item-badge {
-    padding: 0.35rem 0.75rem;
+    padding: 0.25rem 0.6rem;
     border-radius: var(--radius-lg);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
   }
-  
-  .consume-item-badge.urgent {
-    background-color: var(--accent-danger);
-    color: #fff;
-  }
-  
-  .consume-item-badge.priority {
-    background-color: var(--accent-warning);
-    color: #1d1d1f;
-  }
-  
+  .consume-item-badge.urgent { background-color: var(--accent-danger); color: #fff; }
+  .consume-item-badge.priority { background-color: var(--accent-warning); color: #1d1d1f; }
+
   .consume-item-progress {
-    height: 6px;
+    height: 5px;
     background-color: var(--bg-hover);
     border-radius: var(--radius-sm);
     overflow: hidden;
-    margin: var(--spacing-sm) 0;
+    margin: var(--spacing-xs) 0;
   }
-  
+
   .consume-item-progress-fill {
     height: 100%;
     border-radius: var(--radius-sm);
-    transition: width var(--transition-normal);
   }
-  
+
   .consume-item-info {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
     line-height: 1.4;
   }
-  
-  /* Liste des derniers ajouts */
+
+  /* ── Recent items ── */
   .recent-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    margin: 0 calc(-1 * var(--spacing-md));
+    padding: var(--spacing-sm) var(--spacing-sm);
+    margin: 0 calc(-1 * var(--spacing-sm));
     border-radius: var(--radius-md);
     text-decoration: none;
     color: inherit;
     transition: background-color var(--transition-fast);
   }
-  
-  .recent-item:hover {
-    background-color: var(--bg-hover);
-    color: inherit;
-  }
-  
+  .recent-item:hover { background-color: var(--bg-hover); color: inherit; }
+
   .recent-item-icon {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-light));
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
     flex-shrink: 0;
   }
-  
-  .recent-item-content {
-    flex: 1;
-    min-width: 0;
-  }
-  
+
+  .recent-item-content { flex: 1; min-width: 0; }
+
   .recent-item-title {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
@@ -197,27 +268,27 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .recent-item-meta {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-xs);
     flex-wrap: wrap;
-    margin-top: 2px;
+    margin-top: 1px;
   }
-  
+
   .recent-item-cellar {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     white-space: nowrap;
   }
-  
-  /* Bouton d'action header */
+
+  /* ── Section action button ── */
   .btn-section-action {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-md);
     border: 1.5px solid var(--border-color);
     background-color: var(--bg-card);
@@ -227,29 +298,10 @@
     justify-content: center;
     transition: all var(--transition-fast);
   }
-  
   .btn-section-action:hover {
     background-color: var(--bg-hover);
     border-color: var(--text-muted);
     color: var(--text-primary);
-  }
-  
-  /* Empty state */
-  .empty-state {
-    text-align: center;
-    padding: var(--spacing-xl);
-    color: var(--text-muted);
-  }
-  
-  .empty-state-icon {
-    font-size: 2.5rem;
-    margin-bottom: var(--spacing-md);
-    opacity: 0.5;
-  }
-  
-  .empty-state-text {
-    font-size: 0.9rem;
-    line-height: 1.5;
   }
 </style>
 {% endblock %}
@@ -260,14 +312,6 @@
     <h3 class="m-0">Tableau de bord</h3>
     <p class="text-muted mb-0">Un aperçu rapide de votre cave à vin</p>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{{ url_for('wines.add_wine') }}" class="btn btn-dark">
-      <i class="bi bi-plus-lg me-1"></i> Ajouter une bouteille
-    </a>
-    <a href="{{ url_for('search.search_wines') }}" class="btn btn-outline-secondary">
-      <i class="bi bi-box-arrow-up-right me-1"></i> Consommer une bouteille
-    </a>
-  </div>
 </div>
 
 {% if not cellars %}
@@ -277,108 +321,146 @@
 </div>
 {% endif %}
 
-<!-- Statistiques -->
-<div class="row g-4 mb-4">
-  <div class="col-md-6 col-lg-3 reveal">
-    <div class="stat-card">
-      <div class="stat-card-label">Nombre de bouteilles</div>
-      <div class="stat-card-value" data-counter-up="{{ total_bottles }}">{{ total_bottles }}</div>
+<!-- ── Bento Grid ── -->
+<div class="bento-grid">
+
+  <!-- Stat: Bouteilles -->
+  <div class="bento-tile glass reveal">
+    <div class="stat-label">Bouteilles en cave</div>
+    <div class="stat-value" data-counter-up="{{ total_bottles }}">{{ total_bottles }}</div>
+    {% if cellars %}
+    <div class="stat-hint">{{ cellars|length }} cave{{ 's' if cellars|length > 1 }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Stat: Valeur -->
+  <div class="bento-tile glass reveal">
+    <div class="stat-label">Valeur estimée</div>
+    {% if estimated_value_display %}
+    <div class="stat-value" data-counter-up="{{ estimated_value_display }}" data-counter-suffix="&nbsp;€">{{ estimated_value_display }}&nbsp;€</div>
+    {% else %}
+    <div class="stat-value" style="color: var(--text-muted); font-size: 1.5rem;">—</div>
+    <div class="stat-hint">Ajoutez des estimations de prix.</div>
+    {% endif %}
+  </div>
+
+  <!-- Quick actions 2x2 -->
+  <div class="bento-tile reveal bento-span-2">
+    <div class="stat-label">Actions rapides</div>
+    <div class="quick-actions-grid">
+      <a href="{{ url_for('wines.add_wine') }}" class="quick-action-btn">
+        <i class="bi bi-plus-circle"></i>
+        Ajouter
+      </a>
+      <a href="{{ url_for('import.index') }}" class="quick-action-btn">
+        <i class="bi bi-camera"></i>
+        Scanner
+      </a>
+      <a href="{{ url_for('search.search_wines') }}" class="quick-action-btn">
+        <i class="bi bi-search"></i>
+        Chercher
+      </a>
+      <a href="{{ url_for('search.wines_to_consume') }}" class="quick-action-btn">
+        <i class="bi bi-cup-straw"></i>
+        Consommer
+      </a>
     </div>
   </div>
-  <div class="col-md-6 col-lg-3 reveal">
-    <div class="stat-card">
-      <div class="stat-card-label">Valeur estimée de la cave</div>
-      {% if estimated_value_display %}
-      <div class="stat-card-value" data-counter-up="{{ estimated_value_display }}" data-counter-suffix="&nbsp;€">{{ estimated_value_display }}&nbsp;€</div>
+
+  <!-- Cellar distribution -->
+  {% if cellars %}
+  <div class="bento-tile reveal bento-span-2">
+    <div class="stat-label">Répartition par cave</div>
+    {% set cellar_colors = ['#722f37', '#d4a373', '#606c38', '#9b2948', '#bc6c25', '#6b4226', '#283618', '#a98467'] %}
+    <div class="cellar-dist-bar mt-2">
+      {% for cellar in cellars %}
+        {% set pct = (cellar.wines|selectattr('quantity')|map(attribute='quantity')|sum / total_bottles * 100) if total_bottles > 0 else 0 %}
+        <div class="dist-seg" style="width: {{ pct }}%; background-color: {{ cellar_colors[loop.index0 % cellar_colors|length] }}" title="{{ cellar.name }}: {{ pct|round(0) }}%"></div>
+      {% endfor %}
+    </div>
+    <div class="cellar-dist-legend">
+      {% for cellar in cellars %}
+      <span class="cellar-dist-legend-item">
+        <span class="cellar-dist-legend-dot" style="background: {{ cellar_colors[loop.index0 % cellar_colors|length] }}"></span>
+        {{ cellar.name }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- À consommer en priorité (tall, span 2) -->
+  <div class="bento-tile bento-span-2 bento-tall reveal">
+    <div class="tile-header">
+      <div>
+        <h5 class="tile-title">À consommer en priorité</h5>
+        <div class="tile-subtitle">Basé sur la garde et l'âge du millésime</div>
+      </div>
+      <a href="{{ url_for('search.wines_to_consume') }}" class="btn-section-action" title="Voir tout">
+        <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+    <div style="flex: 1; overflow-y: auto;">
+      {% if wines_to_consume_preview %}
+        {% for item in wines_to_consume_preview %}
+        <div class="consume-item">
+          <div class="consume-item-header">
+            <div>
+              <h6 class="consume-item-title">{{ item.wine.name }}{% if item.wine.extra_attributes.year %} — {{ item.wine.extra_attributes.year }}{% endif %}</h6>
+              <div class="consume-item-meta">
+                {{ item.wine.cellar.name if item.wine.cellar else 'Sans cave' }}
+                {% if item.wine.subcategory %} · {{ item.wine.subcategory.name }}{% endif %}
+              </div>
+            </div>
+            <span class="consume-item-badge {% if item.urgency_score >= 80 %}urgent{% else %}priority{% endif %}">
+              {{ item.urgency_score|round(0) }}%
+            </span>
+          </div>
+          <div class="consume-item-progress">
+            <div class="consume-item-progress-fill {% if item.urgency_score >= 80 %}bg-danger{% elif item.urgency_score >= 50 %}bg-warning{% else %}bg-success{% endif %}"
+                 style="width: {{ [item.urgency_score, 100]|min }}%"></div>
+          </div>
+          {% if item.garde_info %}
+          <p class="consume-item-info">{{ item.garde_info }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
       {% else %}
-      <div class="stat-card-value" style="color: var(--text-muted);">—</div>
-      <div class="stat-card-hint">Ajoutez des estimations de prix pour obtenir cette valeur.</div>
+        {{ empty_state(icon='bottle', title='Aucune recommandation', message='Ajoutez des informations de garde pour obtenir des conseils.', size='sm') }}
       {% endif %}
     </div>
   </div>
-</div>
 
-<!-- Sections principales -->
-<div class="row g-4">
-  <!-- À consommer en priorité -->
-  <div class="col-lg-6 reveal">
-    <div class="section-card">
-      <div class="section-card-header">
-        <div>
-          <h5 class="section-card-title">À consommer en priorité</h5>
-          <div class="section-card-subtitle">Basé sur les informations de garde et l'âge du millésime</div>
-        </div>
-        <a href="{{ url_for('search.wines_to_consume') }}" class="btn-section-action" title="Voir tous les alcools à consommer">
-          <i class="bi bi-arrow-right"></i>
-        </a>
-      </div>
-      <div class="section-card-body">
-        {% if wines_to_consume_preview %}
-          {% for item in wines_to_consume_preview %}
-          <div class="consume-item">
-            <div class="consume-item-header">
-              <div>
-                <h6 class="consume-item-title">{{ item.wine.name }}{% if item.wine.extra_attributes.year %} — {{ item.wine.extra_attributes.year }}{% endif %}</h6>
-                <div class="consume-item-meta">
-                  {{ item.wine.cellar.name if item.wine.cellar else 'Sans cave' }}
-                  {% if item.wine.subcategory %}
-                    · {{ item.wine.subcategory.name }}
-                  {% endif %}
-                </div>
-              </div>
-              <span class="consume-item-badge {% if item.urgency_score >= 80 %}urgent{% else %}priority{% endif %}">
-                Urgence {{ item.urgency_score|round(0) }}%
-              </span>
+  <!-- Derniers ajouts (tall, span 2) -->
+  <div class="bento-tile bento-span-2 bento-tall reveal">
+    <div class="tile-header">
+      <h5 class="tile-title">Derniers ajouts</h5>
+    </div>
+    <div style="flex: 1; overflow-y: auto;">
+      {% if recent_wines %}
+        {% for wine in recent_wines %}
+        <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="recent-item">
+          <div class="recent-item-icon">{{ wine.name[:1] }}</div>
+          <div class="recent-item-content">
+            <h6 class="recent-item-title">{{ wine.name }}{% if wine.extra_attributes.year %} — {{ wine.extra_attributes.year }}{% endif %}</h6>
+            <div class="recent-item-meta">
+              {% if wine.subcategory %}
+                <span class="badge" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
+              {% else %}
+                <span class="badge" style="background-color: var(--text-muted); color: #fff;">Non catégorisé</span>
+              {% endif %}
+              <span>{{ wine.extra_attributes.region or 'Région inconnue' }}</span>
+              <span>Qté: {{ wine.quantity }}</span>
             </div>
-            <div class="consume-item-progress">
-              <div class="consume-item-progress-fill {% if item.urgency_score >= 80 %}bg-danger{% elif item.urgency_score >= 50 %}bg-warning{% else %}bg-success{% endif %}" 
-                   style="width: {{ [item.urgency_score, 100]|min }}%"></div>
-            </div>
-            {% if item.garde_info %}
-            <p class="consume-item-info">{{ item.garde_info }}</p>
-            {% endif %}
           </div>
-          {% endfor %}
-        {% else %}
-          {{ empty_state(icon='bottle', title='Aucune recommandation', message='Ajoutez des informations de garde pour vos bouteilles afin d\'obtenir des conseils personnalisés.', size='sm') }}
-        {% endif %}
-      </div>
+          <span class="recent-item-cellar">{{ wine.cellar.name if wine.cellar else 'Sans cave' }}</span>
+        </a>
+        {% endfor %}
+      {% else %}
+        {{ empty_state(icon='wine-rack', title='Aucun ajout récent', message='Ajoutez votre première bouteille.', action_url=url_for('wines.add_wine'), action_label='Ajouter une bouteille', size='sm') }}
+      {% endif %}
     </div>
   </div>
 
-  <!-- Derniers ajouts -->
-  <div class="col-lg-6 reveal">
-    <div class="section-card">
-      <div class="section-card-header">
-        <div>
-          <h5 class="section-card-title">Derniers ajouts en cave</h5>
-        </div>
-      </div>
-      <div class="section-card-body">
-        {% if recent_wines %}
-          {% for wine in recent_wines %}
-          <a href="{{ url_for('wines.wine_detail', wine_id=wine.id) }}" class="recent-item">
-            <div class="recent-item-icon">{{ wine.name[:1] }}</div>
-            <div class="recent-item-content">
-              <h6 class="recent-item-title">{{ wine.name }}{% if wine.extra_attributes.year %} — {{ wine.extra_attributes.year }}{% endif %}</h6>
-              <div class="recent-item-meta">
-                {% if wine.subcategory %}
-                  <span class="badge" style="{{ wine.subcategory|subcategory_badge_style }}">{{ wine.subcategory.name }}</span>
-                {% else %}
-                  <span class="badge" style="background-color: var(--text-muted); color: #fff;">Non catégorisé</span>
-                {% endif %}
-                <span>{{ wine.extra_attributes.region or 'Région inconnue' }}</span>
-                <span>Qté: {{ wine.quantity }}</span>
-              </div>
-            </div>
-            <span class="recent-item-cellar">{{ wine.cellar.name if wine.cellar else 'Sans cave' }}</span>
-          </a>
-          {% endfor %}
-        {% else %}
-          {{ empty_state(icon='wine-rack', title='Aucun ajout récent', message='Ajoutez votre première bouteille pour voir vos ajouts récents.', action_url=url_for('wines.add_wine'), action_label='Ajouter une bouteille', size='sm') }}
-        {% endif %}
-      </div>
-    </div>
-  </div>
 </div>
 {% endblock %}
