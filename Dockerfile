@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM python:3.11-slim
 
+# --- Version de l'application ---
+ARG APP_VERSION=dev
+
 # --- Sécurité & perfs ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -9,7 +12,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_ROOT_USER_ACTION=ignore \
     # Gunicorn par défaut : ajuste si besoin (workers = 2*CPU+1 en général)
     GUNICORN_CMD_ARGS="--workers=3 --threads=2 --timeout=30 --graceful-timeout=30 --bind=0.0.0.0:8000 --access-logfile=-" \
-    PORT=8000
+    PORT=8000 \
+    APP_VERSION=${APP_VERSION}
 
 WORKDIR /app
 

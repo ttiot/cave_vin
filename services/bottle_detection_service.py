@@ -193,7 +193,7 @@ class BottleDetectionService:
         return cls(
             openai_client=openai_client,
             openai_model=openai_model,
-            log_requests=True,
+            log_requests=False,  # Désactivé car le logging se fait en base de données via AICallLog
             user_id=user_id,
             source_name=source_name,
         )

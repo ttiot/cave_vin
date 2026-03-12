@@ -434,26 +434,49 @@ def validate_import():
                 owner=owner_account,
             )
             db.session.add(wine)
-            db.session.flush()  # Pour obtenir l'ID
-            
-            # Planifier l'enrichissement
-            schedule_wine_enrichment(wine.id)
-            
-            # Notification
-            try:
-                notify_wine_added(wine, current_user.id)
-            except Exception:
-                pass
-            
             imported_count += 1
             
         except Exception as exc:
             logger.exception("Erreur lors de l'import de la bouteille %d: %s", i, exc)
             errors.append(f"Bouteille {i+1}: Erreur inattendue - {str(exc)}")
     
-    # Commit final
+    # Commit final - IMPORTANT: doit être fait AVANT schedule_wine_enrichment
+    # car l'enrichissement s'exécute dans un thread séparé qui a besoin que le vin
+    # soit persisté en base de données
     if imported_count > 0:
         db.session.commit()
+        
+        # Maintenant que les vins sont persistés, planifier l'enrichissement et les notifications
+        # Récupérer les vins nouvellement créés pour l'enrichissement
+        for i in range(bottle_count):
+            prefix = f"bottle_{i}_"
+            if not request.form.get(f"{prefix}selected"):
+                continue
+            
+            # Vérifier si c'était un ajout à une bouteille existante (pas d'enrichissement nécessaire)
+            add_to_existing_id = request.form.get(f"{prefix}add_to_existing", type=int)
+            if add_to_existing_id:
+                continue
+            
+            name = (request.form.get(f"{prefix}name") or "").strip()
+            if not name:
+                continue
+            
+            # Trouver le vin créé par son nom (le plus récent)
+            wine = Wine.query.filter_by(
+                user_id=owner_id,
+                name=name
+            ).order_by(Wine.id.desc()).first()
+            
+            if wine:
+                # Planifier l'enrichissement
+                schedule_wine_enrichment(wine.id, owner_id)
+                
+                # Notification
+                try:
+                    notify_wine_added(wine, current_user.id)
+                except Exception:
+                    pass
     
     # Nettoyer la session
     session.pop("import_detection_results", None)

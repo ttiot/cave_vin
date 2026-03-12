@@ -27,6 +27,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ----- Minification des assets JS/CSS -----
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install minification tools
+        run: npm install -g terser clean-css-cli
+
+      - name: Minify JavaScript
+        run: |
+          echo "📦 Taille originale JS: $(wc -c < static/js/main.js) bytes"
+          terser static/js/main.js \
+            --compress "drop_console=true,drop_debugger=true,passes=3" \
+            --mangle "toplevel=true" \
+            --output static/js/main.js
+          echo "✅ Taille minifiée JS: $(wc -c < static/js/main.js) bytes"
+
+      - name: Minify CSS
+        run: |
+          echo "📦 Taille originale CSS: $(wc -c < static/css/styles.css) bytes"
+          cleancss \
+            -O2 \
+            -o static/css/styles.css \
+            static/css/styles.css
+          echo "✅ Taille minifiée CSS: $(wc -c < static/css/styles.css) bytes"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -39,6 +66,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----- Short SHA pour la version -----
+      - name: Get short SHA
+        id: short_sha
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       # ----- Métadonnées pour push sur branche -----
       - name: Docker metadata (branch)
@@ -63,6 +95,8 @@ jobs:
           push: true
           tags: ${{ steps.meta_branch.outputs.tags }}
           labels: ${{ steps.meta_branch.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.short_sha.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -95,5 +129,7 @@ jobs:
           push: true
           tags: ${{ steps.meta_tag.outputs.tags }}
           labels: ${{ steps.meta_tag.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

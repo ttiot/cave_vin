@@ -87,8 +87,18 @@ def manage_users():
                 flash("Utilisateur créé avec succès.")
             return redirect(url_for("admin.manage_users"))
 
-    # Récupérer tous les utilisateurs, triés par compte principal puis sous-comptes
-    users = User.query.order_by(User.parent_id.asc().nullsfirst(), User.username.asc()).all()
+    # Récupérer tous les utilisateurs, triés pour que chaque sous-compte
+    # apparaisse immédiatement après son compte parent
+    all_users = User.query.order_by(User.username.asc()).all()
+    main_users = [u for u in all_users if not u.is_sub_account]
+    sub_by_parent = {}
+    for u in all_users:
+        if u.is_sub_account:
+            sub_by_parent.setdefault(u.parent_id, []).append(u)
+    users = []
+    for u in main_users:
+        users.append(u)
+        users.extend(sub_by_parent.get(u.id, []))
     
     # Récupérer les comptes principaux pour le formulaire de création
     main_accounts = User.query.filter_by(parent_id=None).order_by(User.username.asc()).all()
@@ -291,6 +301,32 @@ def update_email(user_id: int):
         flash(f"L'adresse email de {user.username} a été mise à jour.")
     else:
         flash(f"L'adresse email de {user.username} a été supprimée.")
+    return redirect(url_for("admin.manage_users"))
+
+
+@admin_bp.route("/users/<int:user_id>/update-password", methods=["POST"])
+@login_required
+@admin_required
+def update_password(user_id: int):
+    """Modifier le mot de passe d'un utilisateur (admin uniquement)."""
+
+    user = User.query.get_or_404(user_id)
+    new_password = (request.form.get("new_password") or "").strip()
+    is_temporary = bool(request.form.get("temporary"))
+
+    if not new_password:
+        flash("Le nouveau mot de passe est obligatoire.")
+        return redirect(url_for("admin.manage_users"))
+
+    if len(new_password) < 6:
+        flash("Le mot de passe doit contenir au moins 6 caractères.")
+        return redirect(url_for("admin.manage_users"))
+
+    user.password = generate_password_hash(new_password)
+    user.has_temporary_password = is_temporary
+    db.session.commit()
+
+    flash(f"Le mot de passe de {user.username} a été modifié avec succès.")
     return redirect(url_for("admin.manage_users"))
 
 

@@ -18,7 +18,7 @@
   <div class="row justify-content-center">
     <div class="col-lg-8">
       <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header card-header-wine">
           <i class="bi bi-upload me-2"></i>Étape 1 : Télécharger une photo
         </div>
         <div class="card-body">
@@ -26,11 +26,11 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             
             <div class="mb-4">
-              <div class="upload-zone p-5 border border-2 border-dashed rounded text-center" id="upload-zone">
+              <div class="upload-zone upload-zone-wine p-5 border border-2 border-dashed rounded text-center" id="upload-zone">
                 <i class="bi bi-cloud-arrow-up display-1 text-muted"></i>
                 <p class="mt-3 mb-2">Glissez-déposez une image ici</p>
                 <p class="text-muted small">ou</p>
-                <label class="btn btn-outline-primary">
+                <label class="btn btn-outline-wine">
                   <i class="bi bi-folder2-open me-2"></i>Parcourir
                   <input type="file" name="image" id="image-input" accept="image/*" class="d-none" required>
                 </label>
@@ -53,7 +53,7 @@
             </div>
             
             <div class="d-grid">
-              <button type="submit" class="btn btn-primary btn-lg" id="analyze-btn" disabled>
+              <button type="submit" class="btn btn-wine btn-lg" id="analyze-btn" disabled>
                 <i class="bi bi-magic me-2"></i>Analyser l'image
               </button>
             </div>
@@ -89,7 +89,7 @@
       <!-- Colonne résumé -->
       <div class="col-lg-4 mb-4">
         <div class="card shadow-sm sticky-top" style="top: 80px;">
-          <div class="card-header bg-success text-white">
+          <div class="card-header card-header-wine">
             <i class="bi bi-check-circle me-2"></i>Analyse terminée
           </div>
           <div class="card-body text-center">
@@ -116,7 +116,7 @@
       <!-- Colonne bouteilles détectées -->
       <div class="col-lg-8">
         <div class="card shadow-sm mb-4">
-          <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+          <div class="card-header card-header-wine d-flex justify-content-between align-items-center">
             <span>
               <i class="bi bi-list-check me-2"></i>Étape 2 : Vérifier et modifier
             </span>
@@ -145,7 +145,7 @@
             </div>
             
             <!-- Liste des bouteilles -->
-            <div class="accordion" id="bottles-accordion">
+            <div class="accordion accordion-wine" id="bottles-accordion">
               {% for bottle in detection_results.bottles %}
               <div class="accordion-item bottle-item" data-index="{{ loop.index0 }}">
                 <h2 class="accordion-header">
@@ -167,7 +167,7 @@
                         {% endif %}
                       </div>
                       <div class="text-end">
-                        <span class="badge bg-primary">x{{ bottle.quantity }}</span>
+                        <span class="badge badge-wine">x{{ bottle.quantity }}</span>
                         {% if bottle.confidence >= 0.8 %}
                         <span class="badge bg-success ms-1" title="Confiance élevée">
                           <i class="bi bi-check-circle"></i> {{ (bottle.confidence * 100)|int }}%
@@ -376,7 +376,7 @@
   <div class="modal fade" id="createSubcategoryModal" tabindex="-1" aria-labelledby="createSubcategoryModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
-        <div class="modal-header bg-success text-white">
+        <div class="modal-header card-header-wine">
           <h5 class="modal-title" id="createSubcategoryModalLabel">
             <i class="bi bi-plus-circle me-2"></i>Créer une nouvelle catégorie
           </h5>
@@ -409,7 +409,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-          <button type="button" class="btn btn-success" id="confirmCreateSubcategory">
+          <button type="button" class="btn btn-wine" id="confirmCreateSubcategory">
             <i class="bi bi-check-lg me-1"></i>Créer la catégorie
           </button>
         </div>
@@ -426,13 +426,13 @@
 <!-- Loading overlay pour l'analyse -->
 <div class="loading-overlay" id="loading-overlay" style="display: none;">
   <div class="text-center">
-    <div class="spinner-border text-primary mb-3" role="status">
+    <div class="spinner-border spinner-wine mb-3" role="status">
       <span class="visually-hidden">Chargement...</span>
     </div>
     <h4 class="mb-2">Analyse en cours...</h4>
     <p class="text-muted mb-3">L'IA examine votre photo pour identifier les bouteilles</p>
     <div class="progress mb-2">
-      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+      <div class="progress-bar progress-bar-wine progress-bar-striped progress-bar-animated" role="progressbar"
            style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
     </div>
     <p class="small text-muted" id="loading-status">Envoi de l'image...</p>
@@ -441,15 +441,15 @@
 
 <style>
 .upload-zone {
-  background-color: var(--bs-light);
+  background-color: var(--bg-hover, var(--bs-light));
   transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .upload-zone:hover,
 .upload-zone.dragover {
-  background-color: rgba(var(--bs-primary-rgb), 0.1);
-  border-color: var(--bs-primary) !important;
+  background-color: rgba(114, 47, 55, 0.1);
+  border-color: var(--accent-primary, #722f37) !important;
 }
 
 .upload-zone.dragover {
@@ -465,7 +465,13 @@
 }
 
 .accordion-button:not(.collapsed) {
-  background-color: rgba(var(--bs-success-rgb), 0.1);
+  background-color: rgba(114, 47, 55, 0.1);
+  color: var(--accent-primary, #722f37);
+}
+
+.accordion-button:focus {
+  border-color: var(--accent-primary, #722f37);
+  box-shadow: 0 0 0 0.25rem rgba(114, 47, 55, 0.25);
 }
 
 /* Styles pour les bouteilles existantes */

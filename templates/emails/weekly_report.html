@@ -356,78 +356,68 @@
             <!-- Wines to Consume Section -->
             {% if wines_to_consume %}
             <div class="section">
-                <h2 class="section-title">🍾 Vins à consommer</h2>
+                <h2 class="section-title">🍾 À consommer en priorité</h2>
+                <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                    Basé sur les informations de garde et l'âge du millésime
+                </p>
                 
-                {% set urgent_wines = wines_to_consume|selectattr('urgency', 'equalto', 'urgent')|list %}
-                {% set optimal_wines = wines_to_consume|selectattr('urgency', 'equalto', 'optimal')|list %}
-                {% set soon_wines = wines_to_consume|selectattr('urgency', 'equalto', 'bientôt')|list %}
-                
-                {% if urgent_wines %}
-                <h3 style="font-size: 14px; color: #dc3545; margin: 15px 0 10px;">⚠️ À consommer rapidement</h3>
                 <ul class="wine-list">
-                    {% for wine in urgent_wines[:5] %}
-                    <li class="wine-item urgent">
-                        <div class="wine-name">
-                            {{ wine.name }}
-                            <span class="badge badge-urgent">Urgent</span>
+                    {% for wine in wines_to_consume[:5] %}
+                    <li class="wine-item {% if wine.urgency == 'urgent' %}urgent{% elif wine.urgency == 'optimal' %}optimal{% endif %}">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td>
+                                    <div class="wine-name">
+                                        {{ wine.name }}{% if wine.year %} — {{ wine.year }}{% endif %}
+                                    </div>
+                                    <div class="wine-details">
+                                        {% if wine.cellar_name %}{{ wine.cellar_name }}{% endif %}
+                                        {% if wine.subcategory %}• {{ wine.subcategory }}{% endif %}
+                                    </div>
+                                </td>
+                                <td style="text-align: right; vertical-align: top;">
+                                    <span class="badge {% if wine.urgency == 'urgent' %}badge-urgent{% elif wine.urgency == 'optimal' %}badge-optimal{% else %}badge-soon{% endif %}">
+                                        Urgence {{ wine.urgency_score }}%
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+                        <!-- Barre de progression d'urgence -->
+                        <div style="margin-top: 8px;">
+                            <div class="progress-bar" style="height: 6px; background: #e0e0e0;">
+                                <div style="width: {{ wine.urgency_score }}%; height: 100%; background: {% if wine.urgency_score >= 80 %}#dc3545{% elif wine.urgency_score >= 50 %}#ffc107{% else %}#28a745{% endif %}; border-radius: 10px;"></div>
+                            </div>
                         </div>
-                        <div class="wine-details">
-                            {% if wine.year %}{{ wine.year }} • {% endif %}
-                            {% if wine.region %}{{ wine.region }} • {% endif %}
-                            Apogée {{ wine.apogee }} • 
-                            {{ wine.quantity }} bouteille{% if wine.quantity > 1 %}s{% endif %}
-                            {% if wine.cellar_name %}• {{ wine.cellar_name }}{% endif %}
+                        {% if wine.garde_info %}
+                        <div style="margin-top: 8px; font-size: 12px; color: #666; font-style: italic;">
+                            {{ wine.garde_info[:200] }}{% if wine.garde_info|length > 200 %}...{% endif %}
                         </div>
+                        {% endif %}
                     </li>
                     {% endfor %}
                 </ul>
-                {% endif %}
                 
-                {% if optimal_wines %}
-                <h3 style="font-size: 14px; color: #28a745; margin: 15px 0 10px;">✨ À leur apogée cette année</h3>
-                <ul class="wine-list">
-                    {% for wine in optimal_wines[:5] %}
-                    <li class="wine-item optimal">
-                        <div class="wine-name">
-                            {{ wine.name }}
-                            <span class="badge badge-optimal">Optimal</span>
-                        </div>
-                        <div class="wine-details">
-                            {% if wine.year %}{{ wine.year }} • {% endif %}
-                            {% if wine.region %}{{ wine.region }} • {% endif %}
-                            {{ wine.quantity }} bouteille{% if wine.quantity > 1 %}s{% endif %}
-                            {% if wine.cellar_name %}• {{ wine.cellar_name }}{% endif %}
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                
-                {% if soon_wines %}
-                <h3 style="font-size: 14px; color: #856404; margin: 15px 0 10px;">📅 À prévoir prochainement</h3>
-                <ul class="wine-list">
-                    {% for wine in soon_wines[:3] %}
-                    <li class="wine-item">
-                        <div class="wine-name">
-                            {{ wine.name }}
-                            <span class="badge badge-soon">{{ wine.apogee }}</span>
-                        </div>
-                        <div class="wine-details">
-                            {% if wine.year %}{{ wine.year }} • {% endif %}
-                            {% if wine.region %}{{ wine.region }} • {% endif %}
-                            {{ wine.quantity }} bouteille{% if wine.quantity > 1 %}s{% endif %}
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
+                {% set urgent_count = wines_to_consume|selectattr('urgency', 'equalto', 'urgent')|list|length %}
+                {% set optimal_count = wines_to_consume|selectattr('urgency', 'equalto', 'optimal')|list|length %}
+                {% if urgent_count > 0 or optimal_count > 0 %}
+                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 13px;">
+                    <strong>Résumé :</strong>
+                    {% if urgent_count > 0 %}
+                    <span style="color: #dc3545;">{{ urgent_count }} vin{% if urgent_count > 1 %}s{% endif %} urgent{% if urgent_count > 1 %}s{% endif %}</span>
+                    {% endif %}
+                    {% if urgent_count > 0 and optimal_count > 0 %} • {% endif %}
+                    {% if optimal_count > 0 %}
+                    <span style="color: #28a745;">{{ optimal_count }} à l'apogée</span>
+                    {% endif %}
+                </div>
                 {% endif %}
             </div>
             {% else %}
             <div class="section">
-                <h2 class="section-title">🍾 Vins à consommer</h2>
+                <h2 class="section-title">🍾 À consommer en priorité</h2>
                 <div class="empty-state">
-                    <p>Aucun vin n'atteint son apogée prochainement.</p>
-                    <p style="font-size: 12px;">Pensez à renseigner l'année d'apogée de vos vins pour recevoir des recommandations.</p>
+                    <p>Aucun vin ne nécessite une attention particulière pour le moment.</p>
+                    <p style="font-size: 12px;">Les recommandations sont basées sur l'âge du vin, les informations de garde et l'année d'apogée.</p>
                 </div>
             </div>
             {% endif %}

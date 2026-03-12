@@ -318,14 +318,15 @@ Fournis une explication générale sur les accords recommandés."""
                     user_id=self.user_id,
                     call_type="wine_pairing",
                     model=self.openai_model,
-                    prompt=full_prompt,
-                    response=response_text,
+                    api_key_source=self.api_key_source,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    response_text=response_text,
+                    response_status="success" if error_message is None else "error",
+                    error_message=error_message,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     duration_ms=duration_ms,
-                    success=error_message is None,
-                    error_message=error_message,
-                    api_key_source=self.api_key_source,
                 )
                 logger.debug("📊 Appel IA loggé en base de données")
             except Exception as log_exc:

@@ -8,10 +8,12 @@ Ces fonctions sont conçues pour être appelées depuis un process séparé
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from flask import render_template
+from sqlalchemy.orm import selectinload
 
 if TYPE_CHECKING:
     from app.models import User
@@ -19,15 +21,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def get_wines_to_consume(user_id: int, days_ahead: int = 365) -> list[dict]:
+def get_wines_to_consume(user_id: int, limit: int = 10) -> list[dict]:
     """Récupère les vins à consommer pour un utilisateur.
+    
+    Utilise une logique basée sur :
+    1. Le champ 'apogee' dans extra_attributes (si renseigné)
+    2. Les insights de garde générés par l'IA
+    3. L'âge du vin comme heuristique par défaut
     
     Args:
         user_id: ID de l'utilisateur (ou du compte propriétaire)
-        days_ahead: Nombre de jours à regarder en avance pour l'apogée
+        limit: Nombre maximum de vins à retourner
     
     Returns:
-        Liste de dictionnaires avec les informations des vins à consommer
+        Liste de dictionnaires avec les informations des vins à consommer,
+        triés par score d'urgence décroissant
     """
     from app.models import Wine, User
     
@@ -37,50 +45,131 @@ def get_wines_to_consume(user_id: int, days_ahead: int = 365) -> list[dict]:
     
     # Utiliser l'owner_id pour les sous-comptes
     owner_id = user.owner_id
-    
     current_year = datetime.now().year
-    target_year = current_year + (days_ahead // 365)
     
     wines_to_consume = []
     
     # Récupérer tous les vins de l'utilisateur avec une quantité > 0
-    wines = Wine.query.filter(
+    # Inclure les insights pour l'analyse
+    wines = Wine.query.options(
+        selectinload(Wine.insights),
+        selectinload(Wine.cellar),
+        selectinload(Wine.subcategory),
+    ).filter(
         Wine.user_id == owner_id,
         Wine.quantity > 0
     ).all()
     
     for wine in wines:
         extra = wine.extra_attributes or {}
+        year = extra.get('year')
         
-        # Vérifier si le vin a une année d'apogée
+        # Calculer l'âge du vin si possible
+        wine_age = None
+        if year:
+            try:
+                wine_age = current_year - int(year)
+            except (ValueError, TypeError):
+                pass
+        
+        urgency_score = 0
+        garde_info = None
+        recommended_years = None
+        
+        # Méthode 1: Vérifier le champ apogee explicite
         apogee_year = extra.get('apogee')
         if apogee_year:
             try:
                 apogee = int(apogee_year)
-                # Vin à consommer si l'apogée est atteinte ou dépassée
-                if apogee <= target_year:
-                    urgency = "urgent" if apogee < current_year else (
-                        "optimal" if apogee == current_year else "bientôt"
-                    )
-                    wines_to_consume.append({
-                        "id": wine.id,
-                        "name": wine.name,
-                        "year": extra.get('year'),
-                        "region": extra.get('region'),
-                        "apogee": apogee,
-                        "quantity": wine.quantity,
-                        "cellar_name": wine.cellar.name if wine.cellar else None,
-                        "urgency": urgency,
-                        "subcategory": wine.subcategory.name if wine.subcategory else None,
-                    })
+                if apogee < current_year:
+                    # Dépassé l'apogée - urgent
+                    years_past = current_year - apogee
+                    urgency_score = min(100, 80 + years_past * 5)
+                elif apogee == current_year:
+                    # À l'apogée cette année - optimal
+                    urgency_score = 70
+                elif apogee <= current_year + 2:
+                    # Apogée dans les 2 prochaines années
+                    urgency_score = 50
             except (ValueError, TypeError):
                 pass
+        
+        # Méthode 2: Analyser les insights de garde (si pas déjà un score élevé)
+        if urgency_score < 50:
+            for insight in wine.insights:
+                content = insight.content or ""
+                content_lower = content.lower()
+                
+                # Chercher des informations de garde
+                if any(keyword in content_lower for keyword in [
+                    'garde', 'garder', 'conserver', 'vieillissement',
+                    'apogée', 'apogee', 'boire', 'consommer'
+                ]):
+                    garde_info = content
+                    
+                    # Extraire une fenêtre de garde (ex: "3 à 5 ans")
+                    years_match = re.search(r'(\d+)\s*(?:à|-)\s*(\d+)\s*ans?', content_lower)
+                    if years_match and wine_age is not None:
+                        min_years = int(years_match.group(1))
+                        max_years = int(years_match.group(2))
+                        recommended_years = (min_years, max_years)
+                        
+                        if wine_age >= max_years:
+                            # Dépassé la fenêtre de garde
+                            urgency_score = max(urgency_score, 100)
+                        elif wine_age >= min_years:
+                            # Dans la fenêtre de garde
+                            progress = (wine_age - min_years) / (max_years - min_years)
+                            urgency_score = max(urgency_score, 50 + int(progress * 50))
+                        else:
+                            # Pas encore dans la fenêtre
+                            urgency_score = max(urgency_score, int((wine_age / min_years) * 30))
+                    
+                    # Mots-clés d'urgence
+                    if any(kw in content_lower for kw in ['maintenant', 'immédiatement', 'rapidement', 'bientôt']):
+                        urgency_score = max(urgency_score, 80)
+                    
+                    # Mots-clés d'apogée
+                    if any(kw in content_lower for kw in ['apogée', 'optimal', 'parfait']):
+                        urgency_score = max(urgency_score, 60)
+        
+        # Méthode 3: Heuristique basée sur l'âge (si toujours pas de score)
+        if urgency_score == 0 and wine_age is not None and wine_age > 0:
+            if wine_age >= 15:
+                urgency_score = 70
+            elif wine_age >= 10:
+                urgency_score = 50
+            elif wine_age >= 5:
+                urgency_score = 30
+        
+        # Ajouter le vin s'il a un score d'urgence significatif
+        if urgency_score >= 30:
+            # Déterminer le niveau d'urgence textuel
+            if urgency_score >= 80:
+                urgency = "urgent"
+            elif urgency_score >= 50:
+                urgency = "optimal"
+            else:
+                urgency = "bientôt"
+            
+            wines_to_consume.append({
+                "id": wine.id,
+                "name": wine.name,
+                "year": year,
+                "region": extra.get('region'),
+                "apogee": apogee_year,
+                "quantity": wine.quantity,
+                "cellar_name": wine.cellar.name if wine.cellar else None,
+                "urgency": urgency,
+                "urgency_score": urgency_score,
+                "subcategory": wine.subcategory.name if wine.subcategory else None,
+                "garde_info": garde_info,
+            })
     
-    # Trier par urgence (urgent > optimal > bientôt) puis par apogée
-    urgency_order = {"urgent": 0, "optimal": 1, "bientôt": 2}
-    wines_to_consume.sort(key=lambda w: (urgency_order.get(w["urgency"], 3), w["apogee"]))
+    # Trier par score d'urgence décroissant
+    wines_to_consume.sort(key=lambda w: w["urgency_score"], reverse=True)
     
-    return wines_to_consume
+    return wines_to_consume[:limit]
 
 
 def get_recent_activity(user_id: int, days: int = 7) -> dict:
@@ -287,22 +376,37 @@ def render_weekly_report_text(report_data: dict) -> str:
     lines.append(f"  • Variation nette : {summary.get('net_change', 0):+d} bouteilles")
     lines.append("")
     
-    # Vins à consommer
+    # Vins à consommer en priorité
     if wines_to_consume:
-        lines.append("🍾 VINS À CONSOMMER")
-        urgent = [w for w in wines_to_consume if w["urgency"] == "urgent"]
-        optimal = [w for w in wines_to_consume if w["urgency"] == "optimal"]
+        lines.append("🍾 À CONSOMMER EN PRIORITÉ")
+        lines.append("  (Basé sur les informations de garde et l'âge du millésime)")
+        lines.append("")
         
-        if urgent:
-            lines.append("  ⚠️ À consommer rapidement :")
-            for wine in urgent[:5]:
-                lines.append(f"    - {wine['name']} ({wine.get('year', 'N/A')}) - Apogée {wine['apogee']}")
+        for wine in wines_to_consume[:5]:
+            year_str = f" — {wine.get('year')}" if wine.get('year') else ""
+            urgency_score = wine.get('urgency_score', 0)
+            lines.append(f"  • {wine['name']}{year_str}")
+            lines.append(f"    Urgence: {urgency_score}%")
+            if wine.get('cellar_name'):
+                lines.append(f"    Cave: {wine['cellar_name']}")
+            if wine.get('subcategory'):
+                lines.append(f"    Type: {wine['subcategory']}")
+            lines.append("")
         
-        if optimal:
-            lines.append("  ✨ À leur apogée cette année :")
-            for wine in optimal[:5]:
-                lines.append(f"    - {wine['name']} ({wine.get('year', 'N/A')})")
-        
+        # Résumé
+        urgent_count = len([w for w in wines_to_consume if w["urgency"] == "urgent"])
+        optimal_count = len([w for w in wines_to_consume if w["urgency"] == "optimal"])
+        if urgent_count > 0 or optimal_count > 0:
+            summary_parts = []
+            if urgent_count > 0:
+                summary_parts.append(f"{urgent_count} vin{'s' if urgent_count > 1 else ''} urgent{'s' if urgent_count > 1 else ''}")
+            if optimal_count > 0:
+                summary_parts.append(f"{optimal_count} à l'apogée")
+            lines.append(f"  Résumé: {' • '.join(summary_parts)}")
+            lines.append("")
+    else:
+        lines.append("🍾 À CONSOMMER EN PRIORITÉ")
+        lines.append("  Aucun vin ne nécessite une attention particulière pour le moment.")
         lines.append("")
     
     lines.append("---")
