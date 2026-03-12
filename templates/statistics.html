@@ -7,34 +7,71 @@
 />
 <style>
   #worldMap { height: 360px; }
-  .stat-card { min-height: 140px; }
+  .stat-card { min-height: 140px; position: relative; overflow: hidden; }
+
+  /* Barre colorée en haut des stat cards de maturité */
+  .stat-card[data-maturity]::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+  .stat-card[data-maturity="young"]::before { background: var(--text-muted); }
+  .stat-card[data-maturity="approaching"]::before { background: var(--accent-warning); }
+  .stat-card[data-maturity="optimal"]::before { background: var(--accent-success); }
+  .stat-card[data-maturity="past"]::before { background: var(--accent-danger); }
+
+  /* Segmented control style iOS — remplace les nav-tabs */
+  .segmented-control {
+    display: inline-flex;
+    background: var(--bg-hover);
+    border-radius: var(--radius-lg);
+    padding: 3px;
+    gap: 2px;
+  }
+  .segmented-control .seg-btn {
+    border: none;
+    background: transparent;
+    padding: 0.5rem 1.25rem;
+    border-radius: calc(var(--radius-lg) - 2px);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+  .segmented-control .seg-btn:hover {
+    color: var(--text-primary);
+  }
+  .segmented-control .seg-btn.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px var(--shadow-color);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <h2 class="mb-4">Tableau de bord statistiques</h2>
 
-<ul class="nav nav-tabs" id="statsTabs" role="tablist">
-  <li class="nav-item" role="presentation">
-    <button class="nav-link active" id="composition-tab" data-bs-toggle="tab" data-bs-target="#composition" type="button" role="tab" aria-controls="composition" aria-selected="true">Composition</button>
-  </li>
-  <li class="nav-item" role="presentation">
-    <button class="nav-link" id="finance-tab" data-bs-toggle="tab" data-bs-target="#finance" type="button" role="tab" aria-controls="finance" aria-selected="false">Finance</button>
-  </li>
-  <li class="nav-item" role="presentation">
-    <button class="nav-link" id="evolution-tab" data-bs-toggle="tab" data-bs-target="#evolution" type="button" role="tab" aria-controls="evolution" aria-selected="false">Évolution</button>
-  </li>
-</ul>
+<div class="segmented-control mb-1" id="statsTabs" role="tablist">
+  <button class="seg-btn active" id="composition-tab" data-bs-toggle="tab" data-bs-target="#composition" type="button" role="tab" aria-controls="composition" aria-selected="true">Composition</button>
+  <button class="seg-btn" id="finance-tab" data-bs-toggle="tab" data-bs-target="#finance" type="button" role="tab" aria-controls="finance" aria-selected="false">Finance</button>
+  <button class="seg-btn" id="evolution-tab" data-bs-toggle="tab" data-bs-target="#evolution" type="button" role="tab" aria-controls="evolution" aria-selected="false">Evolution</button>
+</div>
 
 <div class="tab-content pt-4" id="statsTabsContent">
   <div class="tab-pane fade show active" id="composition" role="tabpanel" aria-labelledby="composition-tab">
     <div class="row g-3">
+      {% set maturity_keys = ['young', 'approaching', 'optimal', 'past'] %}
       {% for label in maturity_order %}
       <div class="col-md-3 reveal">
-        <div class="card shadow-sm stat-card">
+        <div class="card shadow-sm stat-card" data-maturity="{{ maturity_keys[loop.index0] if loop.index0 < maturity_keys|length else 'young' }}">
           <div class="card-body">
             <h6 class="card-subtitle mb-2 text-muted text-uppercase">{{ label }}</h6>
-            <h3 class="card-title mb-0">{{ maturity_counts.get(label, 0) }}</h3>
+            <h3 class="card-title mb-0" data-counter-up="{{ maturity_counts.get(label, 0) }}">{{ maturity_counts.get(label, 0) }}</h3>
           </div>
         </div>
       </div>
@@ -196,26 +233,72 @@
   const consumptionData = {{ consumption_by_month|tojson }};
   const stockData = {{ stock_by_month|tojson }};
 
+  /* ── Palette vin thématique (10 couleurs) ── */
+  const WINE_PALETTE = [
+    '#722f37', /* burgundy */
+    '#d4a373', /* cork */
+    '#9b2948', /* grape */
+    '#e8998d', /* rosé */
+    '#606c38', /* vineyard */
+    '#bc6c25', /* oak */
+    '#6b4226', /* barrel */
+    '#dda15e', /* honey */
+    '#283618', /* deep vine */
+    '#a98467', /* tan */
+  ];
+
+  function isDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+  }
+
+  function chartTextColor() {
+    return isDark() ? '#a1a1a6' : '#6e6e73';
+  }
+
+  function chartGridColor() {
+    return isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  }
+
+  function themeOptions() {
+    const color = chartTextColor();
+    return {
+      color: color,
+      plugins: {
+        legend: {
+          labels: { color: color },
+        },
+      },
+      scales: {
+        x: { ticks: { color: color }, grid: { color: chartGridColor() } },
+        y: { ticks: { color: color }, grid: { color: chartGridColor() }, beginAtZero: true },
+      },
+    };
+  }
+
+  /* Store chart instances for theme updates */
+  const chartInstances = {};
+
   function buildPieChart(canvasId, dataset, label) {
     const ctx = document.getElementById(canvasId);
-    if (!ctx || Object.keys(dataset).length === 0) {
-      return;
-    }
-    new Chart(ctx, {
-      type: 'pie',
+    if (!ctx || Object.keys(dataset).length === 0) return;
+    const colors = WINE_PALETTE.slice(0, Object.keys(dataset).length);
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
       data: {
         labels: Object.keys(dataset),
         datasets: [{
           data: Object.values(dataset),
+          backgroundColor: colors,
+          borderColor: isDark() ? '#1c1c1e' : '#ffffff',
+          borderWidth: 2,
         }],
       },
       options: {
+        cutout: '55%',
         plugins: {
           legend: {
             position: 'bottom',
-          },
-          title: {
-            display: false,
+            labels: { color: chartTextColor(), padding: 16, usePointStyle: true, pointStyleWidth: 10 },
           },
         },
       },
@@ -225,24 +308,30 @@
   function buildStockChart() {
     const ctx = document.getElementById('stockLine');
     if (!ctx) return;
-    new Chart(ctx, {
+    const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(114, 47, 55, 0.35)');
+    gradient.addColorStop(1, 'rgba(114, 47, 55, 0.02)');
+
+    const opts = themeOptions();
+    chartInstances.stockLine = new Chart(ctx, {
       type: 'line',
       data: {
         labels: monthLabels,
         datasets: [{
           label: 'Stock (bouteilles)',
           data: stockData,
-          fill: false,
-          borderColor: '#6366f1',
-          tension: 0.2,
+          fill: true,
+          backgroundColor: gradient,
+          borderColor: '#722f37',
+          borderWidth: 2,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: '#722f37',
         }],
       },
       options: {
-        scales: {
-          y: {
-            beginAtZero: true,
-          },
-        },
+        ...opts,
+        plugins: { ...opts.plugins, legend: { display: false } },
       },
     });
   }
@@ -250,7 +339,8 @@
   function buildFlowChart() {
     const ctx = document.getElementById('flowBar');
     if (!ctx) return;
-    new Chart(ctx, {
+    const opts = themeOptions();
+    chartInstances.flowBar = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: monthLabels,
@@ -258,33 +348,60 @@
           {
             label: 'Bouteilles ajoutées',
             data: additionsData,
-            backgroundColor: 'rgba(34, 197, 94, 0.7)',
+            backgroundColor: '#606c38',
+            borderRadius: 4,
           },
           {
             label: 'Bouteilles consommées',
             data: consumptionData,
-            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+            backgroundColor: '#9b2948',
+            borderRadius: 4,
           },
         ],
       },
       options: {
+        ...opts,
         responsive: true,
-        scales: {
-          y: {
-            beginAtZero: true,
-          },
+        plugins: {
+          ...opts.plugins,
+          legend: { ...opts.plugins.legend, position: 'bottom', labels: { ...opts.plugins.legend.labels, usePointStyle: true, pointStyleWidth: 10 } },
         },
       },
     });
   }
 
+  /* ── Rebuild charts on theme change ── */
+  function updateChartsTheme() {
+    Object.values(chartInstances).forEach(chart => {
+      if (!chart) return;
+      const color = chartTextColor();
+      const gridColor = chartGridColor();
+      if (chart.options.plugins?.legend?.labels) {
+        chart.options.plugins.legend.labels.color = color;
+      }
+      ['x', 'y'].forEach(axis => {
+        if (chart.options.scales?.[axis]) {
+          chart.options.scales[axis].ticks.color = color;
+          chart.options.scales[axis].grid.color = gridColor;
+        }
+      });
+      // Update doughnut border color
+      chart.data.datasets.forEach(ds => {
+        if (ds.borderColor === '#ffffff' || ds.borderColor === '#1c1c1e') {
+          ds.borderColor = isDark() ? '#1c1c1e' : '#ffffff';
+        }
+      });
+      chart.update('none');
+    });
+  }
+
+  window.addEventListener('themechange', updateChartsTheme);
+
   let leafletMap = null;
 
   function buildMap() {
     const mapElement = document.getElementById('worldMap');
-    if (!mapElement || mapMarkers.length === 0) {
-      return;
-    }
+    if (!mapElement || mapMarkers.length === 0) return;
 
     if (!leafletMap) {
       leafletMap = L.map('worldMap').setView([20, 0], 2);
@@ -295,20 +412,16 @@
       const quantities = mapMarkers.map(item => item.total);
       const min = Math.min(...quantities);
       const max = Math.max(...quantities);
-
       const radiusFor = (value) => {
-        if (min === max) {
-          return 12;
-        }
-        const normalized = (value - min) / (max - min);
-        return 8 + normalized * 18;
+        if (min === max) return 12;
+        return 8 + ((value - min) / (max - min)) * 18;
       };
 
       mapMarkers.forEach(marker => {
         const circle = L.circleMarker([marker.lat, marker.lng], {
           radius: radiusFor(marker.total),
-          color: '#c026d3',
-          fillColor: '#e879f9',
+          color: '#722f37',
+          fillColor: '#9b2948',
           fillOpacity: 0.6,
           weight: 2,
         }).addTo(leafletMap);
@@ -326,6 +439,7 @@
     buildFlowChart();
     buildMap();
 
+    /* Segmented control — wire up tab switching */
     const tabsContainer = document.getElementById('statsTabs');
     if (tabsContainer) {
       tabsContainer.addEventListener('shown.bs.tab', (event) => {
