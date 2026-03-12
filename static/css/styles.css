@@ -1672,28 +1672,165 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Animation d'entrée pour les cartes */
-@keyframes cardFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
+/* Animation d'entrée au scroll — IntersectionObserver */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.5s cubic-bezier(.25,.46,.45,.94),
+              transform 0.5s cubic-bezier(.25,.46,.45,.94);
+  will-change: opacity, transform;
+}
+
+.reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
+    transition: none;
   }
 }
 
-.wine-card-modern.animate-in {
-  animation: cardFadeIn 0.4s ease forwards;
+/* ============================================================================
+   Micro-interactions
+   ============================================================================ */
+
+/* Boutons : scale au clic */
+.btn:active,
+.btn-section-action:active,
+.btn-action-compact:active {
+  transform: scale(0.97) !important;
+  transition: transform 0.08s ease;
 }
 
-.wine-card-modern.animate-in:nth-child(1) { animation-delay: 0.05s; }
-.wine-card-modern.animate-in:nth-child(2) { animation-delay: 0.1s; }
-.wine-card-modern.animate-in:nth-child(3) { animation-delay: 0.15s; }
-.wine-card-modern.animate-in:nth-child(4) { animation-delay: 0.2s; }
-.wine-card-modern.animate-in:nth-child(5) { animation-delay: 0.25s; }
-.wine-card-modern.animate-in:nth-child(6) { animation-delay: 0.3s; }
+/* Ripple effect sur les cartes */
+.wine-card-modern,
+.wine-card-compact,
+.bento-tile {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(114, 47, 55, 0.12) 0%, transparent 70%);
+  transform: scale(0);
+  animation: rippleExpand 0.5s ease-out forwards;
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-theme="dark"] .ripple-effect {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+}
+
+@keyframes rippleExpand {
+  to { transform: scale(2.5); opacity: 0; }
+}
+
+/* Theme toggle : spin animation */
+.theme-toggle.spin-toggle {
+  animation: spinToggle 0.4s cubic-bezier(.4, 0, .2, 1);
+}
+
+@keyframes spinToggle {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* Focus ring pulse */
+.form-control:focus,
+.form-select:focus {
+  animation: focusPulse 0.3s ease;
+}
+
+@keyframes focusPulse {
+  0% { box-shadow: 0 0 0 0 rgba(114, 47, 55, 0.4); }
+  100% { box-shadow: 0 0 0 0.2rem rgba(114, 47, 55, 0.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ripple-effect,
+  .theme-toggle.spin-toggle,
+  .form-control:focus,
+  .form-select:focus {
+    animation: none;
+  }
+  .btn:active { transform: none !important; }
+}
+
+/* ============================================================================
+   Empty state unifié
+   ============================================================================ */
+.empty-state-unified {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-xl);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(114, 47, 55, 0.02) 20px,
+      rgba(114, 47, 55, 0.02) 40px
+    );
+}
+
+[data-theme="dark"] .empty-state-unified {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(255, 255, 255, 0.015) 20px,
+      rgba(255, 255, 255, 0.015) 40px
+    );
+}
+
+.empty-state-illustration {
+  color: var(--text-muted);
+  opacity: 0.45;
+  margin-bottom: var(--spacing-md);
+}
+
+.empty-state-illustration svg {
+  width: 80px;
+  height: 80px;
+}
+
+.empty-state-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.empty-state-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  max-width: 320px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Sizes */
+.empty-state-sm { padding: var(--spacing-lg) var(--spacing-md); }
+.empty-state-sm .empty-state-illustration svg { width: 48px; height: 48px; }
+.empty-state-sm .empty-state-title { font-size: 0.85rem; }
+.empty-state-sm .empty-state-message { font-size: 0.8rem; }
+
+.empty-state-lg { padding: var(--spacing-xl) var(--spacing-xl); }
+.empty-state-lg .empty-state-illustration svg { width: 120px; height: 120px; }
+.empty-state-lg .empty-state-title { font-size: 1.15rem; }
 
 /* ============================================================================
    Styles pour la page d'import photo - Cohérence avec le thème bordeaux
@@ -2598,4 +2735,124 @@ body.mobile-menu-open {
   border-top: 1px solid var(--border-color);
   padding: var(--spacing-md) var(--spacing-lg);
   gap: var(--spacing-sm);
+}
+
+/* ── Maturity Timeline ── */
+.maturity-timeline {
+  --mt-height: 6px;
+  --mt-young: var(--text-muted);
+  --mt-optimal: var(--accent-success);
+  --mt-past: var(--accent-danger);
+  --mt-track: var(--bg-hover);
+  --mt-marker: var(--accent-primary);
+  margin-top: auto;
+  padding-top: var(--spacing-xs);
+}
+
+.maturity-timeline-bar {
+  position: relative;
+  height: var(--mt-height);
+  border-radius: calc(var(--mt-height) / 2);
+  background: var(--mt-track);
+  display: flex;
+  overflow: hidden;
+}
+
+.maturity-timeline-bar .mt-segment {
+  height: 100%;
+  min-width: 2px;
+  transition: flex var(--transition-normal);
+}
+
+.mt-segment.young {
+  background: var(--mt-young);
+  border-radius: calc(var(--mt-height) / 2) 0 0 calc(var(--mt-height) / 2);
+}
+
+.mt-segment.optimal {
+  background: var(--mt-optimal);
+}
+
+.mt-segment.past {
+  background: var(--mt-past);
+  border-radius: 0 calc(var(--mt-height) / 2) calc(var(--mt-height) / 2) 0;
+}
+
+/* Diamond marker for "Now" */
+.maturity-timeline-marker-wrap {
+  position: relative;
+  height: 0;
+}
+
+.maturity-timeline-marker {
+  position: absolute;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--mt-marker);
+  border: 2px solid var(--bg-card);
+  border-radius: 2px;
+  z-index: 2;
+  box-shadow: 0 1px 4px var(--shadow-color);
+  transition: left var(--transition-normal);
+}
+
+/* Labels under the bar */
+.maturity-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.maturity-timeline-labels span {
+  white-space: nowrap;
+}
+
+.maturity-timeline-labels .mt-label-optimal {
+  color: var(--accent-success);
+  font-weight: 600;
+}
+
+/* Compact variant for dashboard cards */
+.maturity-timeline.compact {
+  --mt-height: 4px;
+}
+
+.maturity-timeline.compact .maturity-timeline-marker {
+  width: 8px;
+  height: 8px;
+  top: -2px;
+}
+
+.maturity-timeline.compact .maturity-timeline-labels {
+  font-size: 0.55rem;
+  margin-top: 4px;
+}
+
+/* Large variant for detail page */
+.maturity-timeline.large {
+  --mt-height: 10px;
+}
+
+.maturity-timeline.large .maturity-timeline-marker {
+  width: 16px;
+  height: 16px;
+  top: -4px;
+}
+
+.maturity-timeline.large .maturity-timeline-labels {
+  font-size: 0.75rem;
+  margin-top: 10px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .maturity-timeline-marker,
+  .mt-segment {
+    transition: none;
+  }
 }

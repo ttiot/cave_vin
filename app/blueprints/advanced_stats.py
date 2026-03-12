@@ -293,7 +293,13 @@ def stock_predictions():
             "estimated_empty_date": cat_empty_date,
             "status": _get_stock_status(cat_months) if cat_months else "stable",
         }
-    
+
+    # Pré-trier : catégories avec consommation d'abord (par mois croissants), sans consommation en dernier
+    category_predictions = dict(
+        sorted(category_predictions.items(),
+               key=lambda x: (x[1]["months_until_empty"] is None, x[1]["months_until_empty"] or 0))
+    )
+
     # Alertes de stock bas
     low_stock_alerts = []
     for cat_name, pred in category_predictions.items():

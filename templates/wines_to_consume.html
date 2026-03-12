@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block extra_head %}
 <style>
   /* Légende d'urgence compacte */
@@ -427,30 +428,7 @@
     gap: var(--spacing-sm);
   }
   
-  /* Animation d'entrée pour les cartes */
-  @keyframes cardSlideIn {
-    from {
-      opacity: 0;
-      transform: translateY(15px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .wine-card-compact {
-    animation: cardSlideIn 0.3s ease forwards;
-  }
-  
-  .wine-card-compact:nth-child(1) { animation-delay: 0.02s; }
-  .wine-card-compact:nth-child(2) { animation-delay: 0.04s; }
-  .wine-card-compact:nth-child(3) { animation-delay: 0.06s; }
-  .wine-card-compact:nth-child(4) { animation-delay: 0.08s; }
-  .wine-card-compact:nth-child(5) { animation-delay: 0.1s; }
-  .wine-card-compact:nth-child(6) { animation-delay: 0.12s; }
-  .wine-card-compact:nth-child(7) { animation-delay: 0.14s; }
-  .wine-card-compact:nth-child(8) { animation-delay: 0.16s; }
+  /* Animation d'entrée déléguée au système .reveal global */
   
   /* Responsive */
   @media (max-width: 576px) {
@@ -518,7 +496,7 @@
   {% set urgency = item.urgency_score %}
   {% set age = item.wine_age %}
   
-  <div class="wine-card-compact"
+  <div class="wine-card-compact reveal"
        data-wine-id="{{ wine.id }}"
        data-detail-url="{{ url_for('wines.wine_detail', wine_id=wine.id) }}"
        data-wine-name="{{ wine.name }}"
@@ -582,7 +560,32 @@
       </span>
       {% endif %}
       
-      <!-- Barre de progression -->
+      <!-- Timeline de maturité -->
+      {% if item.recommended_years %}
+      {% set vintage = extras.get('year', 0)|int %}
+      {% set min_yr = item.recommended_years[0] %}
+      {% set max_yr = item.recommended_years[1] %}
+      <div class="maturity-timeline"
+           data-vintage="{{ vintage }}"
+           data-min-years="{{ min_yr }}"
+           data-max-years="{{ max_yr }}"
+           data-current-year="{{ current_year }}">
+        <div class="maturity-timeline-marker-wrap">
+          <div class="maturity-timeline-marker"></div>
+        </div>
+        <div class="maturity-timeline-bar">
+          <div class="mt-segment young"></div>
+          <div class="mt-segment optimal"></div>
+          <div class="mt-segment past"></div>
+        </div>
+        <div class="maturity-timeline-labels">
+          <span>{{ vintage }}</span>
+          <span class="mt-label-optimal">{{ vintage + min_yr }}–{{ vintage + max_yr }}</span>
+          <span>{{ vintage + max_yr + 5 }}</span>
+        </div>
+      </div>
+      {% else %}
+      <!-- Fallback progress bar quand pas de données de garde -->
       <div class="progress-compact">
         <div class="progress-bar-compact">
           <div class="progress-fill
@@ -595,6 +598,7 @@
         </div>
         <div class="progress-label">Score : {{ "%.0f"|format(urgency) }}/100</div>
       </div>
+      {% endif %}
     </div>
     
     <!-- Actions -->
@@ -645,13 +649,7 @@
 </div>
 
 {% else %}
-<div class="alert alert-secondary">
-  <h5>Aucun vin à afficher</h5>
-  <p class="mb-0">Aucun vin avec un millésime n'a été trouvé dans votre cave, ou aucune information de garde n'est disponible.</p>
-  <p class="mb-0 mt-2">
-    <a href="{{ url_for('main.index') }}" class="alert-link">Retour à la liste des vins</a>
-  </p>
-</div>
+{{ empty_state(icon='bottle', title='Aucun vin à afficher', message='Aucun vin avec un millésime n\'a été trouvé dans votre cave, ou aucune information de garde n\'est disponible.', action_url=url_for('main.index'), action_label='Retour à la cave', size='lg') }}
 {% endif %}
 
 <div class="mt-4">

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty_state %}
 {% block extra_head %}
 <style>
   /* Carte de cave moderne */
@@ -311,13 +312,6 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="empty-state-cellars">
-  <div class="empty-state-cellars-icon">📦</div>
-  <h4 class="empty-state-cellars-title">Aucune cave enregistrée</h4>
-  <p class="empty-state-cellars-text">Créez votre première cave pour commencer à organiser vos bouteilles.</p>
-  <a href="{{ url_for('cellars.add_cellar') }}" class="btn btn-dark">
-    <i class="bi bi-plus-lg me-1"></i> Créer ma première cave
-  </a>
-</div>
+{{ empty_state(icon='cellar', title='Aucune cave enregistrée', message='Créez votre première cave pour commencer à organiser vos bouteilles.', action_url=url_for('cellars.add_cellar'), action_label='Créer ma première cave', size='lg') }}
 {% endif %}
 {% endblock %}

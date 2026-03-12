@@ -24,6 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
     initTutorial();
     initOfflineIndicator();
     initCacheManagement();
+    initScrollReveal();
+    initMicroInteractions();
+    initMaturityTimelines();
 });
 
 /**
@@ -1387,10 +1390,164 @@ function cachePageForOffline(url) {
     }
 }
 
+/**
+ * Animations d'entrée au scroll avec IntersectionObserver
+ */
+function initScrollReveal() {
+    const prefersReduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (prefersReduced) return;
+
+    const reveals = document.querySelectorAll(".reveal");
+    if (!reveals.length) return;
+
+    const observer = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const el = entry.target;
+                // Stagger delay based on batch position
+                const siblings = Array.from(
+                    el.parentElement?.querySelectorAll(".reveal") || [],
+                );
+                const idx = siblings.indexOf(el);
+                el.style.transitionDelay = `${idx * 0.06}s`;
+                el.classList.add("revealed");
+                observer.unobserve(el);
+            });
+        },
+        { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+    );
+
+    reveals.forEach((el) => observer.observe(el));
+}
+
+/**
+ * Micro-interactions : boutons, cartes, theme toggle, counter-up
+ */
+function initMicroInteractions() {
+    // Counter-up animation pour les chiffres statistiques
+    const prefersReduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (!prefersReduced) {
+        const counters = document.querySelectorAll("[data-counter-up]");
+        if (counters.length) {
+            const counterObserver = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((entry) => {
+                        if (!entry.isIntersecting) return;
+                        animateCounter(entry.target);
+                        counterObserver.unobserve(entry.target);
+                    });
+                },
+                { threshold: 0.5 },
+            );
+            counters.forEach((el) => counterObserver.observe(el));
+        }
+    }
+
+    // Ripple effect pour les cartes cliquables
+    document
+        .querySelectorAll(
+            ".wine-card-modern, .wine-card-compact, .bento-tile",
+        )
+        .forEach((card) => {
+            card.addEventListener("pointerdown", createRipple);
+        });
+
+    // Theme toggle spin animation
+    const themeToggle = document.getElementById("themeToggle");
+    if (themeToggle) {
+        themeToggle.addEventListener("click", () => {
+            themeToggle.classList.add("spin-toggle");
+            themeToggle.addEventListener(
+                "animationend",
+                () => themeToggle.classList.remove("spin-toggle"),
+                { once: true },
+            );
+        });
+    }
+}
+
+function animateCounter(el) {
+    const target = parseFloat(el.dataset.counterUp);
+    if (isNaN(target)) return;
+    const suffix = el.dataset.counterSuffix || "";
+    const decimals = (el.dataset.counterDecimals || "0") | 0;
+    const duration = 800;
+    const start = performance.now();
+
+    function step(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        // ease-out cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = target * ease;
+        el.textContent = current.toFixed(decimals) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+function createRipple(e) {
+    const card = e.currentTarget;
+    const existing = card.querySelector(".ripple-effect");
+    if (existing) existing.remove();
+
+    const ripple = document.createElement("span");
+    ripple.classList.add("ripple-effect");
+    const rect = card.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    ripple.style.width = ripple.style.height = size + "px";
+    ripple.style.left = e.clientX - rect.left - size / 2 + "px";
+    ripple.style.top = e.clientY - rect.top - size / 2 + "px";
+    card.appendChild(ripple);
+    ripple.addEventListener("animationend", () => ripple.remove());
+}
+
+/**
+ * Initialise les timelines de maturité (segments + marqueur diamant).
+ * Fonctionne sur toute page contenant des .maturity-timeline[data-vintage].
+ */
+function initMaturityTimelines() {
+    document.querySelectorAll(".maturity-timeline[data-vintage]").forEach((tl) => {
+        const vintage = parseInt(tl.dataset.vintage);
+        const minYears = parseInt(tl.dataset.minYears);
+        const maxYears = parseInt(tl.dataset.maxYears);
+        const now = parseInt(tl.dataset.currentYear);
+        if (!vintage || !minYears) return;
+
+        const optStart = vintage + minYears;
+        const optEnd = vintage + maxYears;
+        const tlEnd = optEnd + 5;
+        const totalSpan = tlEnd - vintage;
+        if (totalSpan <= 0) return;
+
+        const youngPct = ((optStart - vintage) / totalSpan) * 100;
+        const optimalPct = ((optEnd - optStart) / totalSpan) * 100;
+        const pastPct = 100 - youngPct - optimalPct;
+
+        const segs = tl.querySelectorAll(".mt-segment");
+        if (segs[0]) segs[0].style.flex = `${youngPct} 0 0%`;
+        if (segs[1]) segs[1].style.flex = `${optimalPct} 0 0%`;
+        if (segs[2]) segs[2].style.flex = `${pastPct} 0 0%`;
+
+        const marker = tl.querySelector(".maturity-timeline-marker");
+        if (marker) {
+            const clampedNow = Math.max(vintage, Math.min(now, tlEnd));
+            const markerPct = ((clampedNow - vintage) / totalSpan) * 100;
+            marker.style.left = `${markerPct}%`;
+        }
+    });
+}
+
 // Exposer certaines fonctions globalement pour utilisation dans les templates
 window.CaveVin = {
     showToast,
     cachePageForOffline,
     subscribeToPush,
     unsubscribeFromPush,
+    initMaturityTimelines,
 };

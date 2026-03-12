@@ -104,7 +104,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for cat_name, pred in category_predictions.items()|sort(attribute='1.months_until_empty') %}
+          {% for cat_name, pred in category_predictions.items() %}
           <tr class="status-{{ pred.status }}">
             <td><strong>{{ cat_name }}</strong></td>
             <td>{{ pred.stock }}</td>
